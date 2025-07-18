@@ -20,12 +20,81 @@ struct LimitedConstantInteraction{D<:ElectronicDispersion} <: ElectronPhononInte
     dispersion::D  
 end
 
+struct FanMigdalInteraction{
+    G<:ElectronPropagator, 
+    D<:PhononPropagator
+    } <: ElectronPhononInteraction
+    electron::G
+    phonon::D
+end
+
 struct BareCoulombInteraction <: CoulombInteraction
     cutoff::Float64
 end
 
-struct ScreenedCoulombInteraction <: CoulombInteraction
-    λ::Float64
+
+struct StaticRPAPolarization{
+    D<:ElectronicDispersion, 
+    S<:Smearing} <: Polarization
+    dispersion::D
+    smearing::S
+end
+
+struct DynamicalRPAPolarization{
+    D<:ElectronicDispersion, 
+    S<:Smearing} <: Polarization
+    dispersion::D
+    smearing::S
+end
+
+struct ScreenedCoulombInteraction{
+    I<:CoulombInteraction, 
+    P<:Polarization
+    } <: ScreenedInteraction
+    bare::I
+    polarization::P
+end
+
+function χ(
+    q::Float64,
+    kgrid::AbstractVector{Float64}, 
+    polarization::StaticRPAPolarization
+    ) ::Float64
+
+    integrand(k) = begin
+        εk = ε(k, polarization.dispersion)
+        εkq = ε(k+q, polarization.dispersion)
+        dε = εk - εkq
+        -(
+            f(εk, polarization.smearing) - f(εkq, polarization.smearing)
+        ) / dε
+    end
+
+    integrand_vals = integrand.(kgrid)
+    dk = mean(diff(kgrid))  # 均匀格点可简化
+
+    return sum(integrand_vals) * dk / (2π)
+end
+
+function χ(
+    q::Float64,
+    ω::Float64,
+    kgrid::AbstractVector{Float64}, 
+    polarization::DynamicalRPAPolarization
+    ) ::Float64
+
+    integrand(k) = begin
+        εk = ε(k, polarization.dispersion)
+        εkq = ε(k+q, polarization.dispersion)
+        (
+            f(εk, polarization.smearing) - f(εkq, polarization.smearing)
+        ) / (εkq - εk - ω)
+    end
+
+    integrand_vals = integrand.(kgrid)
+    dk = mean(diff(kgrid))  # 均匀格点可简化
+
+    return sum(integrand_vals) * dk / (2π)
 end
 
 function V(
@@ -71,12 +140,58 @@ function V(
     q::Float64, 
     interaction::BareCoulombInteraction
     ) ::Float64
-    return abs(q) < interaction.cutoff ? 0.0 : Constants.e^2 / ( q)^2 / (4π * Constants.ε0)
+    return abs(q) < interaction.cutoff ? 0.0 : 1/ ( q)^2
 end
 
 function V(
-    q::Float64, 
-    interaction::ScreenedCoulombInteraction
+    q::Float64,
+    kgrid::AbstractVector{Float64},
+    screened_interaction::ScreenedCoulombInteraction
     ) ::Float64
-    return 1 / (q^2 + interaction.λ^2)
+
+    V_screened = V(q, screened_interaction.bare) / (
+        1 + V(q, screened_interaction.bare) * χ(q, kgrid, screened_interaction.polarization)
+    )
+    return V_screened
+end
+
+function V(
+    q::Float64,
+    kgrid::AbstractVector{Float64},
+    interaction::FanMigdalInteraction
+    ) ::Float64
+
+    V_screened = V(q, screened_interaction.bare) / (
+        1 + V(q, screened_interaction.bare) * χ(q, kgrid, screened_interaction.polarization)
+    )
+    return V_screened
+end
+
+function Σ(
+    k::Float64,
+    ω::Float64,
+    qgrid::AbstractVector{Float64},
+    interaction::FanMigdalInteraction,
+    )
+
+    integrand(q) = begin
+        kq = k + q
+        ε_kq = ε(kq, dispersion)
+        ω_q = ω_phonon(q)
+
+        f_val = f(ε_kq, μ, T)
+        n_val = n(ω_q, T)
+        g_val = g2(k, q)
+
+        denom1 = ω - ε_kq - ω_q + im*η
+        denom2 = ω - ε_kq + ω_q + im*η
+
+        term1 = (n_val + f_val) / denom1
+        term2 = (n_val + 1 - f_val) / denom2
+
+        return g_val * (term1 + term2)
+    end
+
+    result, _ = quadgk(integrand, first(qgrid), last(qgrid); rtol=1e-4)
+    return result / (2π)
 end

@@ -1,7 +1,9 @@
 module BCS
 
+using Statistics
 using LinearAlgebra
 using QuadGK
+using ..Constants
 
 include("types.jl")
 include("dispersions.jl")
@@ -12,10 +14,13 @@ include("smearings.jl")
 include("solvers.jl")
 
 
-export FreeElectron_1d, TightBinding_1d, RenormalizedDispersion, ε
-export EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel, ω
-export ConstantInteraction_1d, LocalInteraction_1d, YukawaInteraction_1d, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, V
-export DebyePhononPropagator, RetardedPhononPropagator, FreeElectronPropagator, G, D
+export  FreeElectron_1d, TightBinding_1d, RenormalizedDispersion, ε
+export  EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel, ω
+export  ConstantInteraction_1d, LocalInteraction_1d, YukawaInteraction_1d, 
+        LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, 
+        StaticRPAPolarization, DynamicalRPAPolarization, χ, V
+export  DebyePhononPropagator, RetardedPhononPropagator, 
+        FreeElectronPropagator, G, D
 export FermiDiracSmearing, BoseEinsteinSmearing, GaussianSmearing, f
 export solve_bcs
 

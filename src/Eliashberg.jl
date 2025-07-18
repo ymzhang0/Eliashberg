@@ -1,10 +1,10 @@
 module Eliashberg
 
+include("Constants.jl")
 include("BCS.jl")
 include("Utilities.jl")
-include("Constants.jl")
 
-using .BCS
 using .Constants
+using .BCS
 using .Utilities
 end # module Eliashberg

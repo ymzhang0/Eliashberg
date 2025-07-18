@@ -7,6 +7,8 @@ abstract type Smearing end
 abstract type Interaction end
 abstract type CoulombInteraction <: Interaction end
 abstract type ElectronPhononInteraction <: Interaction end
+abstract type ScreenedInteraction <: Interaction end
+abstract type Polarization end 
 
 abstract type Propagator end
 

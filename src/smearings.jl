@@ -14,12 +14,12 @@ struct GaussianSmearing <: Smearing
 end
 
 function f(ε::Float64, model::FermiDiracSmearing)
-    β = 1 / model.T
+    β = 1 / Constants.kB2Ha.val * model.T
     return 1.0 / (exp(β * ε) + 1)
 end
 
 function f(ε::Float64, model::BoseEinsteinSmearing)
-    β = 1 / model.T
+    β = 1 / Constants.kB2Ha.val * model.T
     return 1.0 / (exp(β * ε) - 1)
 end
 
