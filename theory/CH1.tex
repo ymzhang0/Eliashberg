@@ -1,0 +1,296 @@
+\documentclass[14pt, a4paper]{extarticle}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{amscd}
+\usepackage{amsthm}
+\usepackage{amscd}
+\usepackage{amsfonts}
+\usepackage{mathtools}
+\usepackage{cancel}
+
+\DeclarePairedDelimiter\bra{\langle}{\rvert}
+\DeclarePairedDelimiter\ket{\lvert}{\rangle}
+\DeclarePairedDelimiter\avg{\langle}{\rangle}
+\DeclarePairedDelimiterX\braket[2]{\langle}{\rangle}{#1\,\delimsize\vert\,\mathopen{}#2}
+
+\begin{document}
+
+\title{Eliashberg Theory}
+\author{Yiming Zhang}
+\date{2025-07-22}
+
+\maketitle
+
+\section{Introduction}
+This document proves that based on free-particle Hamiltonian, if we add an attractive potential, the symmetry of
+the ground state will be broken. The new ground state will be a bound state.
+
+\section{Free-particle Hamiltonian}
+
+We have the following Hamiltonian:
+
+\begin{equation}
+    H = \sum_{i=1}^N \varepsilon_\mathbf{k} c
+\end{equation}
+
+where $p_i$ is the momentum of the $i$-th particle, and $m$ is the mass of the particle.
+
+The ground state is of course not free electrons. It is an interesting coherent state where particle number is not definite.
+
+It is constructed as follows:
+
+\begin{equation}
+    \ket{\psi_{BCS}} = e^{\sum_{k} \phi_{k} c_{k\uparrow}^\dagger c_{-k\downarrow}^\dagger} \ket{0}
+\end{equation}
+
+We can not create two electrons with the same spin and momentum so the exponential term is truncated to its 1st order.
+
+\begin{equation}
+    \ket{\psi_{BCS}} = \prod_{k} \left(1 + \phi_{k} c_{k\uparrow}^\dagger c_{-k\downarrow}^\dagger\right) \ket{0}
+\end{equation}
+
+Given different Cooper pair wave functions $\ket{\phi_k}$, we can construct different kinds of ground states. We notice that this ground state is not normalized.
+
+\begin{equation}
+    \braket{\psi_{BCS}}{\psi_{BCS}} = \prod_{k} \braket{0}{1 + \phi^*_{k} c_{-k\downarrow} c_{k\uparrow}} \braket{1 + \phi_{k} c_{k\uparrow}^\dagger c_{-k\downarrow}^\dagger}{0}
+\end{equation}
+
+NOTICE: It's free to move $(1 + \phi_{k} c_{k\uparrow}^\dagger c_{-k\downarrow}^\dagger)$ as long as we keep the order of items with the same momentum.
+
+It's convenient to define creation and annihilation of Cooper pairs as follows:
+
+\begin{equation}
+    b_{k}^\dagger \equiv c_{k\uparrow}^\dagger c_{-k\downarrow}^\dagger
+\end{equation}
+
+Of course, vice versa:
+\begin{equation}
+    b_{k} \equiv c_{-k\downarrow} c_{k\uparrow}
+\end{equation}
+
+We can rewrite the ground state as follows:
+
+\begin{equation}
+    \ket{\psi_{BCS}} = \prod_{k} \left(1 + \phi_{k} b_{k}^\dagger\right) \ket{0}
+\end{equation}
+
+We can prove the commutation relation of $b_{k}$ and $b_{k}^\dagger$ as follows:
+
+\begin{equation}
+    [b_{k}, b_{k'}^\dagger] = \delta_{k, k'}
+\end{equation}
+
+\begin{equation}
+    [(1-b_{k}), (1-b_{k'}^\dagger)] = \delta_{k, k'}
+\end{equation}
+
+So Cooper pair is a boson.
+
+We go back to the normalization of the ground state:
+
+\begin{align}
+    \braket{\psi_{BCS}}{\psi_{BCS}} & = \prod_{k} \braket{0}{1 + \phi^*_{k} b_{k}} \braket{1 + \phi_{k} b_{k}^\dagger}{0} \\
+    & = \prod_{k} \bra{0} 1 + \cancel{\phi^*_{k} b_{k}} + \cancel{\phi_{k} b_{k}^\dagger} + \phi_{k} \phi^*_{k} b_{k} b_{k}^\dagger \ket{0} \\
+    & = \prod_{k} \braket{0}{1 + \phi_{k} \phi^*_{k} (1 - \cancel{b_{k}^\dagger b_{k}})} \ket{0} \\
+    & = \prod_{k} (1 + \phi^2_{k})
+\end{align}
+
+Based on that we can get the expectation value of Cooper pair creation/annihilation operator:
+
+\begin{align}
+    \bra{\psi_{BCS}} b_{k}^\dagger \ket{\psi_{BCS}} & = \bra{0} \prod_{k'} \left(1 + \phi^*_{k'} b_{k'}\right) b_{k}^\dagger \prod_{k''} \left(1 + \phi_{k''} b_{k''}^\dagger\right) \ket{0} \\
+    & = \bra{0} \left(1 + \phi^*_{k} b_{k} \right) b^\dagger_{k} \prod_{k'\neq k} \left(1 + \phi^*_{k'} b_{k'}\right) \prod_{k''} \left(1 + \phi_{k''} b_{k''}^\dagger\right) \ket{0} \\
+    & = \bra{0} \left( \cancel{1} + \phi^*_{k} b_{k} \right) b^\dagger_{k} \left( 1 + \cancel{\phi_{k} b^\dagger_{k}} \right) \prod_{k'\neq k} \left(1 + \phi^*_{k'} b_{k'}\right) \left(1 + \phi_{k'} b_{k'}^\dagger\right)\ket{0} \\
+    & = \bra{0} \left(\phi^*_{k} \right) \left( 1 - \cancel{ b^\dagger_{k}  b_{k}} \right) \prod_{k'\neq k} \left(1 + \phi^*_{k'} b_{k'}\right) \left(1 + \phi_{k'} b_{k'}^\dagger\right)\ket{0} \\
+    & = \phi^*_{k} \prod_{k'\neq k} \left(1 + \phi^2_{k'}\right)  \\
+\end{align}
+
+Similarly, we can get the expectation value of $b_{k}$:
+
+\begin{align}
+    \bra{\psi_{BCS}} b_{k} \ket{\psi_{BCS}} & = \bra{0} \prod_{k'} \left(1 + \phi^*_{k'} b_{k'}\right) b_{k} \prod_{k''} \left(1 + \phi_{k''} b_{k''}^\dagger\right) \ket{0} \\
+    & = \bra{0} \prod_{k'} \left(1 + \phi^*_{k'} b_{k'}\right) \prod_{k''\neq k} \left(1 + \phi_{k''} b_{k''}^\dagger\right) b_{k} \left(\cancel{1} + \phi_{k} b_{k}^\dagger\right)\ket{0} \\
+    & = \bra{0} \prod_{k'\neq k} \left(1 + \phi^*_{k'} b_{k'}\right) \prod_{k''\neq k} \left(1 + \phi_{k''} b_{k''}^\dagger\right) \left(1 + \cancel{\phi^*_{k} b_{k}}\right) \phi_{k} \left( 1 - \cancel{b_{k}^\dagger b_{k}}\right)\ket{0} \\
+    & = \phi_{k} \prod_{k'\neq k} \left(1 + \phi^2_{k'}\right)  \\
+\end{align}
+
+It might give us a hint that the average of field operator over a coherent state is the wave function.
+
+And we can get a mean-field theory by averaging the 4-point interaction term over Cooper channel.
+
+\begin{align}
+    \delta(b^\dagger_{k'})\delta(b_{k}) & = (b^\dagger_{k'} - \avg{b^\dagger_{k'}})(b_{k} - \avg{b_{k}}) \\
+    & = b^\dagger_{k'} b_{k} - b^\dagger_{k'} \avg{b_{k}} - \avg{b^\dagger_{k'}} b_{k} + \avg{b^\dagger_{k'}} \avg{b_{k}} \\
+    & \approx 0
+\end{align}
+
+So
+
+\begin{equation}
+    b^\dagger_{k'} b_{k} \approx b^\dagger_{k'} \avg{b_{k}} + \avg{b^\dagger_{k'}} b_{k} - \avg{b^\dagger_{k'}} \avg{b_{k}}
+\end{equation}
+
+Giving $ \avg{b_{k}} $  ($\avg{b^\dagger_{k'}} $) new names as gap function $\Delta_{k}$ ($\Delta^*_{k}$), we can get the mean-field Hamiltonian:
+
+\begin{align}
+    H  = & \sum_{\mathbf{k}, \sigma} \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} + V^{\text{e-ph}}_{\mathbf{k}, \mathbf{k'}} c^\dagger_{\mathbf{k}\uparrow} c^\dagger_{\mathbf{k'}\uparrow} c_{-\mathbf{k'}\downarrow} c_{-\mathbf{k}\uparrow} \\
+    \xrightarrow{\text{MF}} & \sum_{\mathbf{k}, \sigma} \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} + \sum_{\mathbf{k}} \Delta_{\mathbf{k}} c_{\mathbf{k}\uparrow}^\dagger c_{-\mathbf{k}\downarrow}^\dagger + \Delta^*_{-\mathbf{k}} c_{-\mathbf{k}\downarrow} c_{\mathbf{k}\uparrow} + \Delta^*_{-\mathbf{k}} \Delta_{\mathbf{k}} \\
+    \xrightarrow{\text{Nambu Spinor}} & \sum_{\mathbf{k}, \sigma} \Psi_{\mathbf{k}}^{\dagger} (\vec{h}_{\mathbf{k}} \cdot \vec{\tau}) \Psi_{\mathbf{k}} + \Delta^*_{-\mathbf{k}} \Delta_{\mathbf{k}} \\
+\end{align}
+
+Now that we have a Hamiltonian of quadratic form, we can write it in a matrix form.
+
+If we define Nambu spinors and write this Hamiltonian on this basis, it would be easy to diagonalize it and get the eigen pairs.
+
+\begin{align}
+    \Psi_{\mathbf{k}}^{\dagger} = \begin{pmatrix} c_{\mathbf{k}\uparrow}^{\dagger} & c_{-\mathbf{k}\downarrow} \end{pmatrix},
+    \Psi_{\mathbf{k}} = \begin{pmatrix} c_{\mathbf{k}\uparrow} \\ c_{-\mathbf{k}\downarrow}^\dagger \end{pmatrix}
+\end{align}
+
+Diagonalizing the Hamiltonian will give us the eigen states (the supreconducting state) and the ground state energy of the system.
+
+Gap function is obtained by minimizing the free energy.
+
+\begin{equation}
+    \Delta_{k} = -\sum_{\mathbf{k'}} V_{\mathbf{k}, \mathbf{k'}} \left( \frac{\Delta_{\mathbf{k'}}}{2 E_{\mathbf{k'}}} \text{tanh}(\frac{\beta E_{\mathbf{k'}}}{2})\right)
+\end{equation}
+
+where $E$ is the ground state energy, $\mu$ is the chemical potential, $N$ is the number of particles, and $\Delta_{k}$ is the gap function.
+
+
+It is a bit un-intuitive to understand the meaning of the Nambu spinors.
+
+For normal spinors like Dirac spinors, it's a 4 component vector where different
+entry represents the wavefunction of particle anti-particle with spin up/down.
+
+For Nambu spinors, it's a 2 component vector where different
+entry represents the wavefunction of particle with spin up/down.
+
+But Nambu spinor is a vector of operators. Straightforwardly, we might think well it can
+generate a 2-component wavefunction upon operatoring on the vacuum state.
+
+Anyway, we might write the Hamiltonian as a 2$\times$2 matrix.
+
+We do it step by step, firstly we write the creation and annihilation operators in the Nambu basis.
+
+\begin{align}
+    c_{k}^\dagger c_{-k}^\dagger & = \Psi_{\mathbf{k}}^{\dagger} \begin{pmatrix} 0 & 1 \\ 0 & 0 \end{pmatrix} \Psi_{\mathbf{k'}} \\
+    c_{ -k} c_{k} & = \Psi_{\mathbf{k}}^{\dagger} \begin{pmatrix} 0 & 0 \\ 1 & 0 \end{pmatrix} \Psi_{\mathbf{k'}} \\
+\end{align}
+
+We all know that 2-dimensional traceless unitary matrix is a vector space.
+
+There basis are the very well-known Pauli matrices. We cite it here for convenience.
+
+\begin{align}
+    \sigma_x / \sigma_1= \begin{pmatrix} 0 & 1 \\ 1 & 0 \end{pmatrix},
+    \sigma_y / \sigma_2 = \begin{pmatrix} 0 & -i \\ i & 0 \end{pmatrix},
+    \sigma_z / \sigma_3 = \begin{pmatrix} 1 & 0 \\ 0 & -1 \end{pmatrix}
+\end{align}
+
+We can define creation and annihilation operators based on the Pauli matrices.
+
+\begin{align}
+    \sigma_+ = \frac{1}{\sqrt{2}} \left( \sigma_1 + i \sigma_2 \right) = \begin{pmatrix} 0 & 1 \\ 0 & 0 \end{pmatrix} \\
+    \sigma_- = \frac{1}{\sqrt{2}} \left( \sigma_1 - i \sigma_2 \right) = \begin{pmatrix} 0 & 0 \\ 1 & 0 \end{pmatrix} \\
+\end{align}
+
+So the creation and annihilation operators can be written as:
+
+\begin{align}
+    c_{k}^\dagger c_{-k}^\dagger & = \Psi_{\mathbf{k}}^{\dagger} \sigma_+ \Psi_{\mathbf{k}} \\
+    c_{ -k} c_{k} & = \Psi_{\mathbf{k}}^{\dagger} \sigma_- \Psi_{\mathbf{k}} \\
+\end{align}
+
+We can then write the BCS ground state as:
+
+\begin{align}
+    \ket{\psi_{BCS}} = \prod_{k} \left(1 + \phi_{k} \sigma_+\right) \ket{0} \\
+\end{align}
+
+We can write the Hamiltonian in the Nambu basis as:
+
+\begin{align}
+    H & = \sum_{k} \varepsilon_{k} \Psi_{\mathbf{k}}^{\dagger} \Psi_{\mathbf{k}} + \sum_{k} \Delta_{k} \Psi_{\mathbf{k}}^{\dagger} \sigma_+ \Psi_{\mathbf{k}} + \Delta^*_{-k} \Psi_{\mathbf{k}}^{\dagger} \sigma_- \Psi_{\mathbf{k}} + \Delta^*_{-k} \Delta_{k} \\
+      & = \sum_{k} \Psi_{\mathbf{k}}^{\dagger} (\varepsilon_{k} \sigma_0 + \Delta_{k} \sigma_+ + \Delta^*_{-k} \sigma_- ) \Psi_{\mathbf{k}} + \Delta^*_{-k} \Delta_{k} \\
+\end{align}
+
+It will be more convenient to write it in Pauli matrix basis instead of creation/annihilation operators.
+
+But refactoring it won't be a big job. Just separate the real and imaginary parts.
+
+\begin{align}
+    H & = \sum_{k} \Psi_{\mathbf{k}}^{\dagger} (\varepsilon_{k} \sigma_0 + \mathrm{Re}(\Delta_{k}) \sigma_1 + \mathrm{Im}(\Delta_{k}) \sigma_2 ) \Psi_{\mathbf{k}} + \mathrm{Re}(\Delta^*_{k}) \mathrm{Im}(\Delta_{k}) \\
+\end{align}
+
+Of course the ground state is determined by $\Delta_{k}$. Then $Delta_{k}$ is again a expection value on ground state.
+
+So this leads to a self-consistent equation for $\Delta_{k}$.
+
+But we will firstly make some comments on the Hamiltonian.
+
+Firstly, if there is no gap, the Hamiltonian is just the free-particle Hamiltonian.
+
+However we can still evaluate the Hamiltonian on coherent state.
+
+We know that for normal spinors, we usually make $\sigma_3$ commute with the Hamiltonian.
+
+Hence the eigen states of $\sigma_3$ are the eigen states of the system.
+
+For the Nambu spinors, we can connect $\sigma_3$ with $\sigma_0$ by a unitary transformation.
+
+\begin{align}
+    \sigma_{3k} & = \Psi_{\mathbf{k}}^{\dagger} \sigma_3 \Psi_{\mathbf{k}} \\
+     & = (c_{k}^\dagger c_{k} - c_{-k} c_{-k}^\dagger) \\
+     & = n_k + n_{-k} - 1 \\
+\end{align}
+
+We notice that ground state and Cooper pair states are both eigenstates of $\sigma_3$.
+
+They happens to have eigenvalues $\pm 1$.
+
+We find this correspondance between spinors and Nambu spinors.
+
+These two eigen vectors spans the mixture of ground state and Cooper pair states.
+
+For any kind of $\Delta_{k}$, we can always find a unitary transformation to diagonalize the Hamiltonian.
+
+\section{Nambu-Gor'kov formalism}
+
+One may solve the Dyson equation of the Nambu-Gor'kov equation to get the interacting Green's function,
+
+\begin{align}
+    \hat{G}^{-1}(\mathbf{k}, \omega) & = \hat{G_0}^{-1}(\mathbf{k}, \omega) - \hat{\Sigma}(\mathbf{k}, \omega) \\
+     & = \hat{G_0}^{-1}(\mathbf{k}, \omega) - \hat{\tau_3} \hat{G_0}  \hat{\tau_3} D(\mathbf{k}, \omega) \\
+\end{align}
+
+
+
+
+
+\section{Symmetry breaking of the MF Hamiltonian}
+
+We will see here how the $U(1)$ symmetry is broken by the mean-field Hamiltonian and how it leads to a breaking of conservation of particle number.
+
+We will see that it preserve the $SU(2)$ symmetry.
+
+\section{Phonon-mediated interaction}
+
+
+
+
+
+
+\section{Spin-fluctuation in the Hamiltonian}
+
+Spin-fluctuation can serve as a mediation of attractive potential between electrons, where phonon plays this role in conventional superconductors.
+
+But here we want to see the interplay between spin-fluctuation and phonon mediation.
+
+The best case is that spin-fluctuation is also kind of a quadratic form.
+
+Or maybe it's a quatic interactino but we take the mean-field approximation.
+\end{document}
