@@ -1,0 +1,13 @@
+version: 1
+project:
+  title: Eliashberg Theory Notes
+  authors:
+    - name: Yiming Zhang
+  id: eliashberg-theory
+  subject: Physics
+  open_access: true
+  license: CC-BY-4.0
+  venue:
+    title: Personal Notes
+site:
+  template: book-theme

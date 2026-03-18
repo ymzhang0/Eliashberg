@@ -5,9 +5,6 @@
 \usepackage{amsthm}
 \usepackage{amsfonts}
 \usepackage{amscd}
-\usepackage{amsthm}
-\usepackage{amscd}
-\usepackage{amsfonts}
 \usepackage{mathtools}
 \usepackage{cancel}
 
@@ -140,6 +137,54 @@ Giving $ \avg{b_{k}} $  ($\avg{b^\dagger_{k'}} $) new names as gap function $\De
     \xrightarrow{\text{MF}} & \sum_{\mathbf{k}, \sigma} \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} + \sum_{\mathbf{k}} \Delta_{\mathbf{k}} c_{\mathbf{k}\uparrow}^\dagger c_{-\mathbf{k}\downarrow}^\dagger + \Delta^*_{-\mathbf{k}} c_{-\mathbf{k}\downarrow} c_{\mathbf{k}\uparrow} + \Delta^*_{-\mathbf{k}} \Delta_{\mathbf{k}} \\
     \xrightarrow{\text{Nambu Spinor}} & \sum_{\mathbf{k}, \sigma} \Psi_{\mathbf{k}}^{\dagger} (\vec{h}_{\mathbf{k}} \cdot \vec{\tau}) \Psi_{\mathbf{k}} + \Delta^*_{-\mathbf{k}} \Delta_{\mathbf{k}} \\
 \end{align}
+
+\section{Path integral formalism}
+
+Now we have the BCS Hamiltonian. We might get the partition function by path integral of the Fermion field for the four-point interaction.
+
+Using Hubbard-Stratonovich transformation, we can trade the four-point interaction of the fermion field for an effective bosonic field coupling with a 2-point fermion field.
+
+Firstly, the path integral of the fermion field is:
+
+\begin{equation}
+    Z = \int \mathcal{D} \bar{c^\dagger} \mathcal{D} c \exp 
+    \left( \sum_{\mathbf{k}, \sigma} \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} + \sum_{\mathbf{k}, \mathbf{k'}} V_{\mathbf{k}, \mathbf{k'}} c_{\mathbf{k}\uparrow}^\dagger c_{-\mathbf{k'}\downarrow}^\dagger c_{-\mathbf{k}\downarrow} c_{\mathbf{k'}\uparrow} \right)
+\end{equation}
+
+
+If we don't do a mean-field but directly expand the exponential function with respect to the 4-point interaction term. We will get a series:
+
+\begin{align}
+    Z = \int \mathcal{D} \bar{c^\dagger} \mathcal{D} c 
+    \frac{\left(\sum_{\mathbf{k}, \mathbf{k'}} V_{\mathbf{k}, \mathbf{k'}} c_{\mathbf{k}\uparrow}^\dagger c_{-\mathbf{k'}\downarrow}^\dagger c_{-\mathbf{k}\downarrow} c_{\mathbf{k'}\uparrow}\right)^n}{n!} 
+    \exp \left( \sum_{\mathbf{k}, \sigma} \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} \right)
+\end{align}
+
+Using the functional derivative we convert the functional average into a derivative of Gaussian integral with analytical expression.
+
+\begin{align}
+    \frac{\delta}{\delta \bar{j_{\mathbf{k}\sigma}^\dagger}} \int \mathcal{D} \bar{c^\dagger} \mathcal{D} c \exp \left( \sum_{\mathbf{k}} \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} + \sum_{\mathbf{k}} j_{\mathbf{k}\sigma} c_{\mathbf{k}\sigma} + \sum_{\mathbf{k}} j_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma}^\dagger \right) 
+    =
+    \frac{\delta}{\delta \bar{j_{\mathbf{k}\sigma}^\dagger}} exp \left( \sum_{\mathbf{k}} \varepsilon_{\mathbf{k}^-1} j_{\mathbf{k}\sigma}^\dagger j_{\mathbf{k}\sigma} \right)
+\end{align}
+
+From this kind of unperturbed Hamiltonian and linear coupling we can't get finite average of Cooper pair amplitude.
+
+But if we write the coupling in the quadratic form, we can get a finite average of Cooper pair amplitude.
+\begin{align}
+    \frac{\delta}{\delta \Delta_{\mathbf{k}}} 
+    \exp 
+    \left( 
+        \sum_{\mathbf{k}}
+        \varepsilon_{\mathbf{k}} c_{\mathbf{k}\sigma}^\dagger c_{\mathbf{k}\sigma} +
+        \Delta_{\mathbf{k}}^\dagger c_{\mathbf{k}\uparrow}^\dagger c_{-\mathbf{k}\downarrow}^\dagger +
+        \Delta_{\mathbf{k}} c_{\mathbf{k}\uparrow} c_{-\mathbf{k}\downarrow} 
+        \right)
+\end{align}
+
+
+
+
 
 Now that we have a Hamiltonian of quadratic form, we can write it in a matrix form.
 

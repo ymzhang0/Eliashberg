@@ -1,0 +1,15 @@
+version: 1
+project:
+  title: Eliashberg Theory Notes
+  description: Notes directly converted from LaTeX
+  authors:
+    - name: Yiming Zhang
+  keywords:
+    - physics
+    - eliashberg
+    - theory
+  toc:
+    - file: CH0.md
+    - file: CH1.md
+site:
+  template: book-theme
