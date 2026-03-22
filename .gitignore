@@ -1,0 +1,13 @@
+# Quarto
+.quarto/
+_book/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# MySt Markdown
+myst.log
+_build/
+
+# macOS
+.DS_Store

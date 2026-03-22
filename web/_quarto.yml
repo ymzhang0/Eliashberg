@@ -1,0 +1,19 @@
+project:
+  type: book
+
+book:
+  title: "Eliashberg Theory Notes"
+  author: "Yiming Zhang"
+  chapters:
+    - index.qmd
+    - content/CH0.ipynb
+    - content/CH1.ipynb
+
+format:
+  html:
+    theme: flatly
+    css: styles/eliashberg-ojs.css
+    include-in-header: includes/mathjax-numbering.html
+    toc: true
+    number-sections: true
+    code-fold: true

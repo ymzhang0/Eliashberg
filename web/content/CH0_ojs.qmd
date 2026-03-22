@@ -1,0 +1,166 @@
+---
+title: Fast Interactive Figures (OJS)
+---
+
+This page keeps the existing `shinylive` chapter untouched and adds a faster front-end companion built with Observable JS. The curves are rendered directly in the browser, and repeated parameter combinations are cached locally so the sliders stay responsive.
+
+For the full derivation and the original notebook-based version, see [Field integration for 4-point interactions](CH0.ipynb).
+
+```{ojs}
+import {
+  quarticFigure,
+  freeEnergyFigure,
+  densityPotentialFigure,
+  cooperInstabilityFigure,
+  channelCompareFigure,
+  densityRpaFigure,
+  rpaFreeEnergyFigure,
+  exchangeFigure,
+  bcsFigure
+} from "./ojs/eliashberg-plots.js"
+
+legendSwatch = (item) => {
+  if (item.kind === "point") {
+    return htl.html`<span class="ojs-legend-point" style=${{color: item.color}}></span>`
+  }
+  const dashMap = {
+    solid: "solid",
+    dashed: "dashed",
+    dotted: "dotted",
+    dashdot: "dashed"
+  }
+  return htl.html`<span class="ojs-legend-line" style=${{
+    color: item.color,
+    borderTopStyle: dashMap[item.dash ?? "solid"]
+  }}></span>`
+}
+
+renderLegend = (items, note = null) => htl.html`
+  <aside class="ojs-legend">
+    <div class="ojs-legend-list">
+      ${items.map((item) => htl.html`
+        <div class="ojs-legend-item">
+          ${legendSwatch(item)}
+          <span>${item.label}</span>
+        </div>
+      `)}
+    </div>
+    ${note ? htl.html`<div class="ojs-legend-note">${note}</div>` : ""}
+  </aside>
+`
+
+figureShell = (body, items, note = null) => htl.html`
+  <div class="ojs-figure-shell">
+    <div class="ojs-figure-body">${body}</div>
+    ${renderLegend(items, note)}
+  </div>
+`
+```
+
+## Quartic Action vs Quadratic Approximation
+
+```{ojs}
+viewof quarticA = Inputs.range([0.1, 10], {value: 10, step: 0.1, label: "a"})
+viewof quarticB = Inputs.range([0.1, 10], {value: 1, step: 0.1, label: "b"})
+
+quartic = quarticFigure({Plot, a: quarticA, b: quarticB})
+figureShell(quartic.plot, quartic.legend, quartic.note)
+```
+
+## Free Energy vs Interaction Strength
+
+```{ojs}
+viewof freeEnergyA = Inputs.range([0.1, 10], {value: 10, step: 0.1, label: "a"})
+viewof freeEnergyBMax = Inputs.range([0.1, 10], {value: 5, step: 0.1, label: "max b"})
+
+freeEnergy = freeEnergyFigure({Plot, a: freeEnergyA, bMax: freeEnergyBMax})
+figureShell(freeEnergy.plot, freeEnergy.legend, freeEnergy.note)
+```
+
+## Density-Channel Potential: Exact vs RPA
+
+```{ojs}
+viewof densityEpsilon = Inputs.range([0.1, 10], {value: 1, step: 0.1, label: "epsilon"})
+viewof densityVMax = Inputs.range([0.1, 10], {value: 0.8, step: 0.1, label: "max V"})
+
+densityPotential = densityPotentialFigure({Plot, epsilon: densityEpsilon, vMax: densityVMax})
+figureShell(densityPotential.plot, densityPotential.legend, densityPotential.note)
+```
+
+## Bosonic Cooper Instability
+
+```{ojs}
+viewof cooperG = Inputs.range([0.1, 10], {value: 0.8, step: 0.1, label: "g"})
+viewof cooperEpsilon = Inputs.range([0.1, 10], {value: 1, step: 0.1, label: "epsilon"})
+
+cooperInstability = cooperInstabilityFigure({Plot, g: cooperG, epsilon: cooperEpsilon})
+figureShell(cooperInstability.plot, cooperInstability.legend, cooperInstability.note)
+```
+
+## Direct vs Cooper Channel
+
+```{ojs}
+viewof channelEpsilon = Inputs.range([0.1, 10], {value: 1, step: 0.1, label: "epsilon"})
+viewof channelGDirect = Inputs.range([0.1, 10], {value: 0.5, step: 0.1, label: "g (direct)"})
+viewof channelGCooper1 = Inputs.range([0.1, 10], {value: 0.5, step: 0.1, label: "g (cooper 1)"})
+viewof channelGCooper2 = Inputs.range([0.1, 10], {value: 0.2, step: 0.1, label: "g (cooper 2)"})
+
+channelCompare = channelCompareFigure({
+  Plot,
+  epsilon: channelEpsilon,
+  gDirect: channelGDirect,
+  gCooper1: channelGCooper1,
+  gCooper2: channelGCooper2
+})
+
+figureShell(
+  htl.html`<div class="ojs-plot-grid">${channelCompare.leftPlot}${channelCompare.rightPlot}</div>`,
+  channelCompare.legend,
+  channelCompare.note
+)
+```
+
+## Density Channel: Exact vs RPA Expansion
+
+```{ojs}
+viewof densityBeta = Inputs.range([0.1, 10], {value: 5, step: 0.1, label: "beta"})
+viewof densityCgAbs = Inputs.range([0.1, 10], {value: 1, step: 0.1, label: "|Cg|"})
+viewof densityXi = Inputs.range([0.1, 5], {value: 0.5, step: 0.1, label: "xi"})
+
+densityRpa = densityRpaFigure({Plot, beta: densityBeta, cgAbs: densityCgAbs, xi: densityXi})
+figureShell(densityRpa.plot, densityRpa.legend, densityRpa.note)
+```
+
+## RPA Free Energy Components
+
+```{ojs}
+viewof rpaBeta = Inputs.range([0.1, 10], {value: 5, step: 0.1, label: "beta"})
+viewof rpaXi = Inputs.range([0.1, 5], {value: 0.5, step: 0.1, label: "xi"})
+viewof rpaGMax = Inputs.range([0.1, 10], {value: 5, step: 0.1, label: "max g"})
+
+rpaFreeEnergy = rpaFreeEnergyFigure({Plot, beta: rpaBeta, xi: rpaXi, gMax: rpaGMax})
+figureShell(rpaFreeEnergy.plot, rpaFreeEnergy.legend, rpaFreeEnergy.note)
+```
+
+## Exchange Channel: Exact vs Stoner
+
+```{ojs}
+viewof exchangeBeta = Inputs.range([0.1, 10], {value: 10, step: 0.1, label: "beta"})
+viewof exchangeCg = Inputs.range([0.1, 10], {value: 2, step: 0.1, label: "Cg"})
+viewof exchangeXi1 = Inputs.range([-2, 2], {value: -0.5, step: 0.1, label: "xi_1"})
+viewof exchangeXi2 = Inputs.range([-2, 2], {value: 0.5, step: 0.1, label: "xi_2"})
+
+exchange = exchangeFigure({Plot, beta: exchangeBeta, Cg: exchangeCg, xi1: exchangeXi1, xi2: exchangeXi2})
+figureShell(exchange.plot, exchange.legend, exchange.note)
+```
+
+## Cooper Channel: BCS vs Ginzburg-Landau
+
+```{ojs}
+viewof bcsBeta = Inputs.range([0.1, 20], {value: 20, step: 0.1, label: "beta"})
+viewof bcsCg = Inputs.range([0.1, 10], {value: 0.5, step: 0.1, label: "Cg"})
+viewof bcsXi = Inputs.range([0.1, 5], {value: 0.2, step: 0.1, label: "xi"})
+
+bcs = bcsFigure({Plot, beta: bcsBeta, Cg: bcsCg, xi: bcsXi})
+figureShell(bcs.plot, bcs.legend, bcs.note)
+```

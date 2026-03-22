@@ -1,0 +1,53 @@
+<script>
+function renumberDisplayEquationsBySection() {
+  const main = document.querySelector("main.content");
+  if (!main) return;
+
+  const counters = new Map();
+  const chapterNumber =
+    document.querySelector(".quarto-page-breadcrumbs .chapter-number")?.textContent.trim() ||
+    document.querySelector("h1 .chapter-number")?.textContent.trim() ||
+    "0";
+
+  let currentSection = chapterNumber;
+
+  const walker = document.createTreeWalker(main, NodeFilter.SHOW_ELEMENT);
+  while (walker.nextNode()) {
+    const el = walker.currentNode;
+    if (!(el instanceof Element)) continue;
+
+    if (el.matches("h1, h2, h3, h4, h5, h6")) {
+      const sectionNumber =
+        el.getAttribute("data-number") ||
+        el.querySelector(".header-section-number")?.textContent.trim();
+      if (sectionNumber) {
+        currentSection = sectionNumber;
+      }
+      continue;
+    }
+
+    if (el.tagName === "MJX-CONTAINER" && el.getAttribute("display") === "true") {
+      const count = (counters.get(currentSection) || 0) + 1;
+      counters.set(currentSection, count);
+
+      const tag = el.querySelector("mjx-tag mjx-tag-content, mjx-tag");
+      if (tag) {
+        tag.textContent = `(${currentSection}.${count})`;
+      }
+    }
+  }
+}
+
+window.MathJax = {
+  tex: {
+    tags: "all"
+  },
+  startup: {
+    pageReady() {
+      return MathJax.startup.defaultPageReady().then(() => {
+        renumberDisplayEquationsBySection();
+      });
+    }
+  }
+};
+</script>

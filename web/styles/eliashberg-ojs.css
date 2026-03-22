@@ -1,0 +1,81 @@
+.ojs-figure-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin: 1rem 0 2rem;
+}
+
+.ojs-figure-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ojs-figure-body .plot {
+  max-width: 100%;
+  height: auto;
+}
+
+.ojs-plot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ojs-legend {
+  flex: 0 0 220px;
+  border: 1px solid #d8dee9;
+  border-radius: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  background: #fafbfc;
+}
+
+.ojs-legend-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ojs-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.ojs-legend-line {
+  width: 2.6rem;
+  flex: 0 0 2.6rem;
+  border-top-width: 3px;
+  border-top-style: solid;
+  border-top-color: currentColor;
+}
+
+.ojs-legend-point {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 0.8rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.ojs-legend-note {
+  margin-top: 0.7rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #48566a;
+}
+
+@media (max-width: 900px) {
+  .ojs-figure-shell {
+    flex-direction: column;
+  }
+
+  .ojs-legend {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .ojs-plot-grid {
+    grid-template-columns: 1fr;
+  }
+}

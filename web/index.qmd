@@ -1,0 +1,10 @@
+# Preface {.unnumbered}
+
+Welcome to the **Eliashberg Theory Notes**.
+
+These notes cover:
+- Hubbard-Stratonovich Transformation
+- BCS Theory Mean Field
+- Dynamic effects and self-energy
+
+Use the sidebar navigation to read the chapters.
