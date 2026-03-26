@@ -3,7 +3,7 @@ module Visualization
 using Makie
 using StaticArrays
 using LinearAlgebra
-using ..Eliashberg: Dispersion, ElectronicDispersion, KGrid, AbstractKGrid, KPath, band_structure, ε, FreeElectron, TightBinding, RenormalizedDispersion
+using ..Eliashberg: Dispersion, ElectronicDispersion, KGrid, AbstractKGrid, KPath, band_structure, ε, FreeElectron, TightBinding, RenormalizedDispersion, MeanFieldDispersion
 
 export visualize_dispersion, dimensionality, visualize_landscape, visualize_spectral_function
 
@@ -24,6 +24,7 @@ _extract_D(::Type{<:Dispersion}) = error("Could not infer dimensionality. Please
 _extract_D(::Type{<:FreeElectron{D}}) where D = D
 _extract_D(::Type{<:TightBinding{D}}) where D = D
 _extract_D(::Type{<:RenormalizedDispersion{D}}) where D = D
+_extract_D(::Type{<:MeanFieldDispersion{D}}) where D = D
 
 
 # ============================================================================
@@ -124,9 +125,9 @@ function visualize_dispersion(::Val{2}, disp::Dispersion, kgrid::KGrid{2}; E_Fer
     return fig
 end
 
-# ----------------- 3D Dispatch (Band Structure along KPath) -----------------
+# ----------------- Band Structure along KPath (Any Dimension) -----------------
 
-function visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kpath::KPath; E_Fermi=0.0, axis=(;), kwargs...)
+function visualize_dispersion(::Val{D}, disp::ElectronicDispersion, kpath::KPath; E_Fermi=0.0, axis=(;), kwargs...) where {D}
     # 1. 计算一维路径的累积距离 (用于 X 轴)
     dist = 0.0
     distances = zeros(length(kpath.points))
@@ -147,7 +148,7 @@ function visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kpath::KPath
     fig = Figure(size=(800, 600))
     ax = Axis(fig[1, 1];
         ylabel="Energy E(k)",
-        title="3D Band Structure",
+        title="$(D)D Band Structure",
         xticks=(tick_positions, tick_labels), # 神来之笔：修改 X 轴刻度
         xgridvisible=false, # 关掉默认网格，因为我们要自己画高对称竖线
         axis...)
@@ -174,47 +175,57 @@ end
 """
     visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kgrid::KGrid{3}; E_Fermi=0.0, kwargs...)
 
-Generates a 3D isosurface (Fermi Surface) plot for a 3D volume grid.
-Extracts the contour where E(kx, ky, kz) = E_Fermi.
+Generates an interactive 3D isosurface (Fermi Surface) plot.
+Ignores the sparse `kgrid` and calculates energies on a dense 100x100x100 mesh for high-quality aesthetics.
 """
 function visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kgrid::KGrid{3};
     E_Fermi=0.0, axis=(;), kwargs...)
 
-    # 1. Extract unique kx, ky, kz from the KGrid
-    kxs = unique(sort([k[1] for k in kgrid.points]))
-    kys = unique(sort([k[2] for k in kgrid.points]))
-    kzs = unique(sort([k[3] for k in kgrid.points]))
+    # 1. Generate a dense, uniform 3D k-mesh for high-quality plotting
+    n_pts = 100
+    kxs = range(-π, π, length=n_pts)
+    kys = range(-π, π, length=n_pts)
+    kzs = range(-π, π, length=n_pts)
 
-    # 2. Evaluate Dispersion over the 3D Volume
-    E_volume = zeros(Float64, length(kxs), length(kys), length(kzs))
+    # 2. Evaluate Dispersion over the dense 3D Volume
+    println("Calculating energies on a dense $n_pts x $n_pts x $n_pts mesh for 3D visualization...")
+    E_volume = zeros(Float32, length(kxs), length(kys), length(kzs))
     for (i, kx) in enumerate(kxs)
         for (j, ky) in enumerate(kys)
             for (k, kz) in enumerate(kzs)
-                # We assume the dispersion returns a Hermitian matrix; 
-                # pick the first eigenvalue (lowest band) as the reference for the isosurface
-                vals = real(band_structure(disp, SVector(kx, ky, kz)).values)
+                # Pick the first eigenvalue (lowest band) as the reference
+                vals = real(band_structure(disp, SVector{3, Float64}(kx, ky, kz)).values)
                 E_volume[i, j, k] = vals[1]
             end
         end
     end
 
-    # 3. Setup Axis3 and Isosurface Rendering
-    fig = Figure(size=(800, 800))
+    # 3. Setup Interactive Figure and Axis3
+    fig = Figure(size=(900, 800), fontsize=16)
+    
+    # Set a pleasant default view angle using elevation and azimuth
     ax = Axis3(fig[1, 1];
         xlabel=L"k_x", ylabel=L"k_y", zlabel=L"k_z",
-        title="3D Fermi Surface (E = $E_Fermi)",
+        title="Interactive 3D Fermi Surface",
+        elevation=π/6, azimuth=π/4,
         axis...)
 
-    # Use Makie's contour! for 3D isosurface extraction via Marching Cubes
-    # Note: For 3D volume-like data, Makie expects limits (start, end) for each axis
-    contour!(ax,
-        (kxs[1], kxs[end]),
-        (kys[1], kys[end]),
-        (kzs[1], kzs[end]),
-        E_volume;
-        levels=[E_Fermi],
+    # 4. Implement a Slider to control the chemical potential dynamically
+    E_min, E_max = minimum(E_volume), maximum(E_volume)
+    sg = SliderGrid(fig[2, 1],
+        (label = "μ (Fermi level)", range = range(E_min, E_max, length=300), startvalue = Float64(E_Fermi))
+    )
+    mu_slider = sg.sliders[1].value
+
+    # Lift the slider value into a vector for contour!
+    iso_level = lift(μ -> Float32[μ], mu_slider)
+
+    # 5. Isosurface Rendering with Smoothing, Shading, and Transparency
+    contour!(ax, kxs, kys, kzs, E_volume;
+        levels=iso_level,
         colormap=:viridis,
-        alpha=0.6,
+        shading=true,
+        alpha=0.5,
         transparency=true,
         kwargs...)
 

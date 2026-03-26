@@ -39,6 +39,16 @@ struct RenormalizedDispersion{D, M<:ElectronicDispersion, S<:SelfEnergy} <: Elec
     self_energy::S
 end
 
+struct MeanFieldDispersion{D, M<:ElectronicDispersion, F<:AuxiliaryField} <: ElectronicDispersion
+    bare_dispersion::M
+    field::F
+    phi::Float64
+end
+
+function MeanFieldDispersion(bare::M, field::ChargeDensityWave{D}, phi::Real) where {D, M<:ElectronicDispersion}
+    return MeanFieldDispersion{D, M, typeof(field)}(bare, field, Float64(phi))
+end
+
 # Evaluate dispersion at momentum k as a Hermitian matrix
 function ε(
     k::SVector{D, Float64},
@@ -80,6 +90,31 @@ function ε(
     bare_H = ε(k, model.bare_dispersion)
     Σ_H = Σ(k, model.self_energy) 
     return Hermitian(bare_H + Σ_H)
+end
+
+function ε(
+    k::SVector{D, Float64},
+    model::MeanFieldDispersion{D, M, <:ChargeDensityWave{D}}
+    ) where {D, M}
+    
+    bare_disp = model.bare_dispersion
+    field = model.field
+    phi = model.phi
+
+    # Original dispersion at k
+    H11 = real(ε(k, bare_disp)[1, 1])
+    
+    # Original dispersion at k + Q
+    H22 = real(ε(k + field.q, bare_disp)[1, 1])
+    
+    # Off-diagonal coupling
+    H12 = phi
+    
+    # Construct 2x2 Hermitian matrix
+    H = @SMatrix [H11 H12;
+                  H12 H22]
+                  
+    return Hermitian(H)
 end
 
 # Phonon dispersions

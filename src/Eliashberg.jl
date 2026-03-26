@@ -9,7 +9,6 @@ include("dispersions.jl")
 
 # Utilities and Feature modules
 include("Utilities.jl")
-include("fields.jl")
 include("susceptibilities.jl")
 include("scanners.jl")
 include("effective_action.jl")
@@ -35,9 +34,9 @@ end
 export PhysicalModel, AuxiliaryField, ApproximationLevel, ExactTrLn, RPA
 export ChargeDensityWave, EffectiveAction
 export StaticMeanField, DynamicalFluctuation
-export reconstructed_bands, LindhardSusceptibility, evaluate, solve_ground_state
+export LindhardSusceptibility, evaluate, solve_ground_state
 export scan_instability_landscape, scan_spectral_function
-export Dispersion, ElectronicDispersion, PhononDispersion, TightBinding
+export Dispersion, ElectronicDispersion, PhononDispersion, TightBinding, MeanFieldDispersion
 export KPath, KGrid, generate_kpath
 
 end # module Eliashberg

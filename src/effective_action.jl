@@ -12,12 +12,14 @@ function evaluate(action::EffectiveAction, phi::Float64, ::ExactTrLn; T::Float64
 
     term1 = phi^2 / action.V_bare
 
+    mf_disp = MeanFieldDispersion(action.model, action.field, phi)
+
     tr_ln_sum = 0.0
     for i in 1:length(action.grid)
         k = action.grid.points[i]
         w = action.grid.weights[i]
 
-        lambdas = reconstructed_bands(k, phi, action.field, action.model)
+        lambdas = real(band_structure(mf_disp, k).values)
 
         for lam in lambdas
             if lam < 0
