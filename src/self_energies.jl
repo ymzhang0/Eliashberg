@@ -1,7 +1,7 @@
-struct HartreeFockSelfEnergy <: SelfEnergy
+struct HartreeFockSelfEnergy{Dim} <: SelfEnergy
     interaction::CoulombInteraction          # V(q)
     smearing::Smearing             # f(ε)
-    dispersion::ElectronicDispersion
+    dispersion::ElectronicDispersion{Dim}
 end
 
 struct RPASelfEnergy <: SelfEnergy

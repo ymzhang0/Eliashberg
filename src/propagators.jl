@@ -1,18 +1,18 @@
-struct DebyePhononPropagator{D<:PhononDispersion} <: PhononPropagator
+struct DebyePhononPropagator{Dim,T<:PhononDispersion{Dim}} <: PhononPropagator
     ωD::Float64
     η::Float64
-    dispersion::D
+    dispersion::T
 end
 
-struct RetardedPhononPropagator{D<:PhononDispersion} <: PhononPropagator
+struct RetardedPhononPropagator{Dim,T<:PhononDispersion{Dim}} <: PhononPropagator
     ω0::Float64
     damping::Float64
-    dispersion::D
+    dispersion::T
 end
 
-struct FreeElectronPropagator{D<:ElectronicDispersion} <: ElectronPropagator
+struct FreeElectronPropagator{Dim,T<:ElectronicDispersion{Dim}} <: ElectronPropagator
     μ::Float64
-    dispersion::D
+    dispersion::T
 end
 
 function G(q::Float64, ω::Float64, model::FreeElectronPropagator) ::Float64

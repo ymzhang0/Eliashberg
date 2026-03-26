@@ -14,14 +14,14 @@ struct RPA <: ApproximationLevel end
 struct StaticMeanField{D} <: AuxiliaryField
     q::SVector{D,Float64}
 end
-StaticMeanField(q::SVector{D, <:Real}) where D = StaticMeanField{D}(SVector{D, Float64}(q))
+StaticMeanField(q::SVector{D,<:Real}) where D = StaticMeanField{D}(SVector{D,Float64}(q))
 
 # Represents a propagating bosonic fluctuation with momentum q and frequency ω
 struct DynamicalFluctuation{D} <: AuxiliaryField
     q::SVector{D,Float64}
     ω::Float64
 end
-DynamicalFluctuation(q::SVector{D, <:Real}, ω::Real) where D = DynamicalFluctuation{D}(SVector{D, Float64}(q), Float64(ω))
+DynamicalFluctuation(q::SVector{D,<:Real}, ω::Real) where D = DynamicalFluctuation{D}(SVector{D,Float64}(q), Float64(ω))
 
 # Specific types can subtype or wrapper these if needed, 
 # for now we provide these as the main concrete implementations.
@@ -29,9 +29,23 @@ struct ChargeDensityWave{D} <: AuxiliaryField
     q::SVector{D,Float64}
 end
 
-abstract type Dispersion <: PhysicalModel end
-abstract type ElectronicDispersion <: Dispersion end
-abstract type PhononDispersion <: Dispersion end
+
+"""
+    SuperconductingPairing <: AuxiliaryField
+
+Represents a superconducting condensate. The `symmetry` parameter dictates 
+the momentum dependence of the gap (e.g., :s_wave, :d_wave).
+"""
+struct SuperconductingPairing <: AuxiliaryField
+    symmetry::Symbol
+end
+
+# Default to conventional s-wave
+SuperconductingPairing() = SuperconductingPairing(:s_wave)
+
+abstract type Dispersion{D} <: PhysicalModel end
+abstract type ElectronicDispersion{D} <: Dispersion{D} end
+abstract type PhononDispersion{D} <: Dispersion{D} end
 
 abstract type Smearing end
 
@@ -64,11 +78,11 @@ Base.firstindex(g::AbstractKGrid) = 1
 Base.lastindex(g::AbstractKGrid) = length(g.points)
 
 # Effective Action struct
-struct EffectiveAction{M<:PhysicalModel,F<:AuxiliaryField,G<:AbstractKGrid}
+struct EffectiveAction{M<:PhysicalModel,F<:AuxiliaryField,G<:AbstractKGrid,I<:Interaction}
     model::M
     field::F
     grid::G
-    V_bare::Float64
+    interaction::I   # 替换掉原来的 V_bare::Float64
 end
 
 """

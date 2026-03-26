@@ -194,7 +194,7 @@ function visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kgrid::KGrid
         for (j, ky) in enumerate(kys)
             for (k, kz) in enumerate(kzs)
                 # Pick the first eigenvalue (lowest band) as the reference
-                vals = real(band_structure(disp, SVector{3, Float64}(kx, ky, kz)).values)
+                vals = real(band_structure(disp, SVector{3,Float64}(kx, ky, kz)).values)
                 E_volume[i, j, k] = vals[1]
             end
         end
@@ -202,18 +202,18 @@ function visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kgrid::KGrid
 
     # 3. Setup Interactive Figure and Axis3
     fig = Figure(size=(900, 800), fontsize=16)
-    
+
     # Set a pleasant default view angle using elevation and azimuth
     ax = Axis3(fig[1, 1];
         xlabel=L"k_x", ylabel=L"k_y", zlabel=L"k_z",
         title="Interactive 3D Fermi Surface",
-        elevation=π/6, azimuth=π/4,
+        elevation=π / 6, azimuth=π / 4,
         axis...)
 
     # 4. Implement a Slider to control the chemical potential dynamically
     E_min, E_max = minimum(E_volume), maximum(E_volume)
     sg = SliderGrid(fig[2, 1],
-        (label = "μ (Fermi level)", range = range(E_min, E_max, length=300), startvalue = Float64(E_Fermi))
+        (label="μ (Fermi level)", range=range(E_min, E_max, length=300), startvalue=Float64(E_Fermi))
     )
     mu_slider = sg.sliders[1].value
 
@@ -221,10 +221,9 @@ function visualize_dispersion(::Val{3}, disp::ElectronicDispersion, kgrid::KGrid
     iso_level = lift(μ -> Float32[μ], mu_slider)
 
     # 5. Isosurface Rendering with Smoothing, Shading, and Transparency
-    contour!(ax, kxs, kys, kzs, E_volume;
+    contour!(ax, (-π, π), (-π, π), (-π, π), E_volume;
         levels=iso_level,
         colormap=:viridis,
-        shading=true,
         alpha=0.5,
         transparency=true,
         kwargs...)
@@ -277,23 +276,23 @@ Plots a 1D line plot of the static susceptibility landscape.
 """
 function visualize_landscape(::Val{1}, qgrid::KGrid{1}, landscape_vector::Vector{Float64}; axis=(;), kwargs...)
     qs = [q[1] for q in qgrid.points]
-    
+
     # Sort for continuous plotting
     perm = sortperm(qs)
     qs_sorted = qs[perm]
     vals_sorted = landscape_vector[perm]
-    
+
     fig = Figure(size=(800, 500))
-    ax = Axis(fig[1, 1]; 
-        xlabel=L"q", ylabel=L"\chi_0(q, \omega=0)", 
+    ax = Axis(fig[1, 1];
+        xlabel=L"q", ylabel=L"\chi_0(q, \omega=0)",
         title="1D Instability Landscape",
         axis...)
-    
+
     lines!(ax, qs_sorted, vals_sorted; linewidth=2, color=:crimson, kwargs...)
-    
+
     # Draw Fermi level or zero line for reference
     hlines!(ax, [0.0], color=:black, alpha=0.3)
-    
+
     return fig
 end
 
@@ -307,19 +306,19 @@ function visualize_landscape(::Val{2}, qgrid::KGrid{2}, landscape_matrix::Matrix
     # Extract unique kx and ky for the axes
     kxs = unique(sort([k[1] for k in qgrid.points]))
     kys = unique(sort([k[2] for k in qgrid.points]))
-    
+
     fig = Figure(size=(800, 600))
-    ax = Axis(fig[1, 1]; 
-        xlabel=L"q_x", ylabel=L"q_y", 
+    ax = Axis(fig[1, 1];
+        xlabel=L"q_x", ylabel=L"q_y",
         title="Instability Landscape (Static Susceptibility)",
         axis...)
-    
+
     hm = heatmap!(ax, kxs, kys, landscape_matrix; colormap=:magma, kwargs...)
     Colorbar(fig[1, 2], hm, label=L"\chi_0(q, \omega=0)")
-    
+
     # Optional: Draw BZ boundaries if provided or assumed standard
     lines!(ax, [-π, π, π, -π, -π], [-π, -π, π, π, -π], color=:white, linestyle=:dash, alpha=0.5)
-    
+
     return fig
 end
 
@@ -339,11 +338,11 @@ function visualize_spectral_function(qpath::KPath{D}, omegas::AbstractVector{Flo
         dist += norm(qpath.points[i] - qpath.points[i-1])
         distances[i] = dist
     end
-    
+
     # 2. Extract symmetry node positions and labels
     tick_positions = distances[qpath.node_indices]
     tick_labels = qpath.node_labels
-    
+
     # 3. Setup Figure and Axis
     fig = Figure(size=(900, 600))
     ax = Axis(fig[1, 1];
@@ -352,17 +351,17 @@ function visualize_spectral_function(qpath::KPath{D}, omegas::AbstractVector{Flo
         xticks=(tick_positions, tick_labels),
         xgridvisible=false,
         axis...)
-    
+
     # 4. Plot Heatmap (X: distances, Y: omegas)
     hm = heatmap!(ax, distances, omegas, spectral_matrix; colormap=:inferno, kwargs...)
     Colorbar(fig[1, 2], hm, label=L"\text{Im}[\chi(q, \omega)]")
-    
+
     # 5. Draw vertical symmetry lines
     vlines!(ax, tick_positions, color=:white, linestyle=:dash, linewidth=0.8, alpha=0.6)
-    
+
     # Ensure tight x-limits
     xlims!(ax, distances[1], distances[end])
-    
+
     return fig
 end
 
