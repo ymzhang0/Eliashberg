@@ -1,5 +1,6 @@
 module BCS
 
+using StaticArrays
 using Statistics
 using LinearAlgebra
 using QuadGK
@@ -14,9 +15,10 @@ include("smearings.jl")
 include("solvers.jl")
 
 
-export  FreeElectron_1d, TightBinding_1d, RenormalizedDispersion, ε
+export  AbstractKGrid, KGrid
+export  FreeElectron, TightBinding, RenormalizedDispersion, ε, band_structure
 export  EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel, ω
-export  ConstantInteraction_1d, LocalInteraction_1d, YukawaInteraction_1d, 
+export  ConstantInteraction, LocalInteraction, YukawaInteraction, 
         LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, 
         StaticRPAPolarization, DynamicalRPAPolarization, χ, V
 export  DebyePhononPropagator, RetardedPhononPropagator, 

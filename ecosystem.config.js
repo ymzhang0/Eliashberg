@@ -8,7 +8,7 @@ module.exports = {
     name: "eliashberg-web",
     script: "/Applications/quarto/bin/quarto",
     interpreter: "none",
-    args: "preview --port 4200 --host 0.0.0.0",
+    args: "preview --port 4200 --host 0.0.0.0 --no-browser",
     cwd: path.join(projectRoot, "web"),
     // 环境变量
     env: {
@@ -19,5 +19,6 @@ module.exports = {
     },
     watch: false,
     autorestart: true,
+    max_restarts: 10,
   }]
 }

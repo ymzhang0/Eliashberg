@@ -1,11 +1,18 @@
-struct FreeElectron_1d <: ElectronicDispersion 
-    EF::Float64
-end
+using LinearAlgebra
+using StaticArrays
 
-struct TightBinding_1d <: ElectronicDispersion
+struct FreeElectron{D} <: ElectronicDispersion 
+    EF::Float64
+    mass::Float64
+end
+FreeElectron{D}(EF::Float64) where D = FreeElectron{D}(EF, 1.0) # default mass=1
+
+struct TightBinding{D} <: ElectronicDispersion
     t::Float64
+    tp::Float64
     EF::Float64
 end
+TightBinding{D}(t, EF) where D = TightBinding{D}(t, 0.0, EF)
 
 struct EinsteinModel <: PhononDispersion
     ωE::Float64
@@ -27,48 +34,73 @@ struct MonoatomicLatticeModel <: PhononDispersion
     a::Float64  # lattice constant
 end
 
-struct RenormalizedDispersion{D<:ElectronicDispersion, S<:SelfEnergy} <: ElectronicDispersion
-    bare_dispersion::D
+struct RenormalizedDispersion{D, M<:ElectronicDispersion, S<:SelfEnergy} <: ElectronicDispersion
+    bare_dispersion::M
     self_energy::S
 end
 
+# Evaluate dispersion at momentum k as a Hermitian matrix
 function ε(
-    k::Float64,
-    model::FreeElectron_1d
-    ) ::Float64
-    return k^2 - model.EF
+    k::SVector{D, Float64},
+    model::FreeElectron{D}
+    ) where {D}
+    val = sum(abs2, k) / (2 * model.mass) - model.EF
+    return Hermitian(hcat(val)) # 1x1 Hermitian matrix
 end
 
 function ε(
-    k::Float64, 
-    model::TightBinding_1d
-    ) ::Float64
-    return -2 * model.t * cos(k) - model.EF
+    k::SVector{1, Float64}, 
+    model::TightBinding{1}
+    )
+    val = -2 * model.t * cos(k[1]) - model.EF
+    return Hermitian(hcat(val))
 end
 
 function ε(
-    k::Float64, 
-    model::RenormalizedDispersion
-    ) ::Float64
-    return ε(k, model.bare_dispersion) + Σ(k, model.self_energy)
+    k::SVector{2, Float64}, 
+    model::TightBinding{2}
+    )
+    val = -2 * model.t * (cos(k[1]) + cos(k[2])) - 4 * model.tp * cos(k[1]) * cos(k[2]) - model.EF
+    return Hermitian(hcat(val))
 end
-    
-ω(
-    q::Float64, 
-    model::EinsteinModel
-    ) = model.ωE
 
-ω(
-    q::Float64, 
-    model::DebyeModel
-    ) = model.vs * abs(q)
+function ε(
+    k::SVector{3, Float64}, 
+    model::TightBinding{3}
+    )
+    val = -2 * model.t * (cos(k[1]) + cos(k[2]) + cos(k[3])) - model.EF
+    return Hermitian(hcat(val))
+end
 
-ω(
-    q::Float64, 
-    d::PolaritonModel
-    ) = sqrt(d.ωE^2 + (d.vs * q)^2)
+function ε(
+    k::SVector{D, Float64}, 
+    model::RenormalizedDispersion{D}
+    ) where {D}
+    # Simplified placeholder for self energy renormalization
+    bare_H = ε(k, model.bare_dispersion)
+    Σ_H = Σ(k, model.self_energy) 
+    return Hermitian(bare_H + Σ_H)
+end
 
-ω(
-    q::Float64, 
-    d::MonoatomicLatticeModel
-    ) = sqrt(2 * d.K / d.M * (1 - cos(d.a * q)))
+# Phonon dispersions
+ω(q::SVector{D, Float64}, model::EinsteinModel) where {D} = model.ωE
+ω(q::SVector{D, Float64}, model::DebyeModel) where {D} = model.vs * norm(q)
+ω(q::SVector{D, Float64}, d::PolaritonModel) where {D} = sqrt(d.ωE^2 + (d.vs * norm(q))^2)
+
+function ω(q::SVector{D, Float64}, d::MonoatomicLatticeModel) where {D}
+    val = sum(1 - cos(d.a * qi) for qi in q)
+    return sqrt(2 * d.K / d.M * val)
+end
+
+"""
+    band_structure(disp, k)
+
+Returns an `Eigen` object containing eigenvalues and eigenvectors for the 
+Hamiltonian matrix at momentum `k`.
+This abstracts away the diagonalization needed for Lindhard bubble calculations 
+in generalized many-body systems.
+"""
+function band_structure(disp::ElectronicDispersion, k::SVector{D, Float64}) where {D}
+    H = ε(k, disp)
+    return eigen(H)
+end
