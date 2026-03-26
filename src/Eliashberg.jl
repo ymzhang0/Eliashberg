@@ -1,18 +1,22 @@
 module Eliashberg
 
+# Basic utilities and constants
 include("Constants.jl")
 
-# Core new architecture additions
+# Core architecture - Types and Dispersions defined early
 include("types.jl")
 include("dispersions.jl")
+
+# Utilities and Feature modules
+include("Utilities.jl")
 include("fields.jl")
 include("susceptibilities.jl")
 include("scanners.jl")
 include("effective_action.jl")
 include("observables.jl")
 
+# Sub-packages (relying on above types)
 include("BCS.jl")
-include("Utilities.jl")
 include("visualization.jl")
 
 using .Constants

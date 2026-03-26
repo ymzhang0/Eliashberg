@@ -5,9 +5,13 @@ using Statistics
 using LinearAlgebra
 using QuadGK
 using ..Constants
+using ..Eliashberg: PhysicalModel, AuxiliaryField, Dispersion, ElectronicDispersion, PhononDispersion, 
+                   AbstractKGrid, KGrid, SelfEnergy, Interaction, Smearing, Propagator, ε, band_structure,
+                   CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, Polarization,
+                   GapFunction, SpectralFunction, ElectronSpectralFunction, PhononSpectralFunction,
+                   ElectronPropagator, PhononPropagator, GorkovPropagator
 
-include("types.jl")
-include("dispersions.jl")
+# BCS-specific feature modules
 include("interactions.jl")
 include("propagators.jl")
 include("self_energies.jl")

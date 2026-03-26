@@ -260,6 +260,33 @@ end
 # ============================================================================
 
 """
+    visualize_landscape(::Val{1}, qgrid::KGrid{1}, landscape_vector::Vector{Float64}; axis=(;), kwargs...)
+
+Plots a 1D line plot of the static susceptibility landscape.
+"""
+function visualize_landscape(::Val{1}, qgrid::KGrid{1}, landscape_vector::Vector{Float64}; axis=(;), kwargs...)
+    qs = [q[1] for q in qgrid.points]
+    
+    # Sort for continuous plotting
+    perm = sortperm(qs)
+    qs_sorted = qs[perm]
+    vals_sorted = landscape_vector[perm]
+    
+    fig = Figure(size=(800, 500))
+    ax = Axis(fig[1, 1]; 
+        xlabel=L"q", ylabel=L"\chi_0(q, \omega=0)", 
+        title="1D Instability Landscape",
+        axis...)
+    
+    lines!(ax, qs_sorted, vals_sorted; linewidth=2, color=:crimson, kwargs...)
+    
+    # Draw Fermi level or zero line for reference
+    hlines!(ax, [0.0], color=:black, alpha=0.3)
+    
+    return fig
+end
+
+"""
     visualize_landscape(::Val{2}, qgrid::KGrid{2}, landscape_matrix::Matrix{Float64}; axis=(;), kwargs...)
 
 Plots a 2D heatmap of the static susceptibility landscape.

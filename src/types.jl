@@ -57,6 +57,12 @@ abstract type GapFunction end
 
 abstract type AbstractKGrid{D} end
 
+Base.length(g::AbstractKGrid) = length(g.points)
+Base.iterate(g::AbstractKGrid, state=1) = iterate(g.points, state)
+Base.getindex(g::AbstractKGrid, i::Int) = g.points[i]
+Base.firstindex(g::AbstractKGrid) = 1
+Base.lastindex(g::AbstractKGrid) = length(g.points)
+
 # Effective Action struct
 struct EffectiveAction{M<:PhysicalModel,F<:AuxiliaryField,G<:AbstractKGrid}
     model::M
@@ -77,12 +83,7 @@ struct KGrid{D} <: AbstractKGrid{D}
     weights::Vector{Float64}
 end
 
-Base.length(g::KGrid) = length(g.points)
-Base.iterate(g::KGrid, state=1) = iterate(g.points, state)
-Base.eltype(::Type{KGrid{D}}) where {D} = SVector{D,Float64}
-Base.getindex(g::KGrid, i::Int) = g.points[i]
-Base.firstindex(g::KGrid) = 1
-Base.lastindex(g::KGrid) = length(g.points)
+Base.eltype(::Type{<:AbstractKGrid{D}}) where {D} = SVector{D,Float64}
 
 """
     KPath{D} <: AbstractKGrid{D}
