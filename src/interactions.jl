@@ -35,19 +35,7 @@ struct BareCoulombInteraction <: CoulombInteraction
     cutoff::Float64
 end
 
-struct StaticRPAPolarization{
-    M<:ElectronicDispersion, 
-    S<:Smearing} <: Polarization
-    dispersion::M
-    smearing::S
-end
-
-struct DynamicalRPAPolarization{
-    M<:ElectronicDispersion, 
-    S<:Smearing} <: Polarization
-    dispersion::M
-    smearing::S
-end
+# Legacy polarization types removed. LindhardSusceptibility is the new source of truth.
 
 struct ScreenedCoulombInteraction{
     I<:CoulombInteraction, 
@@ -57,87 +45,7 @@ struct ScreenedCoulombInteraction{
     polarization::P
 end
 
-"""
-    χ(q, kgrid, polarization::StaticRPAPolarization)
-
-Compute the static Lindhard polarization bubble summing over band indices 
-and implicitly integrating over the `AbstractKGrid{D}`.
-"""
-function χ(
-    q::SVector{D, Float64},
-    kgrid::AbstractKGrid{D}, 
-    polarization::StaticRPAPolarization
-    ) where {D}
-
-    sum_val = 0.0
-    for (i, k) in enumerate(kgrid)
-        eig_k = band_structure(polarization.dispersion, k)
-        eig_kq = band_structure(polarization.dispersion, k + q)
-
-        Ek = eig_k.values
-        Uk = eig_k.vectors
-        Ekq = eig_kq.values
-        Ukq = eig_kq.vectors
-
-        # Coherence factor / Wavefunction overlap
-        M_mat = Uk' * Ukq 
-
-        for m in 1:length(Ek)
-            for n in 1:length(Ekq)
-                dE = Ek[m] - Ekq[n]
-                overlap = abs2(M_mat[m, n])
-                if abs(dE) > 1e-8
-                    df = f(Ek[m], polarization.smearing) - f(Ekq[n], polarization.smearing)
-                    term = -overlap * df / dE
-                    sum_val += term * kgrid.weights[i]
-                end
-            end
-        end
-    end
-
-    return sum_val / (2π)^D
-end
-
-"""
-    χ(q, ω, kgrid, polarization::DynamicalRPAPolarization)
-
-Compute the dynamical Lindhard polarization bubble.
-"""
-function χ(
-    q::SVector{D, Float64},
-    ω::Float64,
-    kgrid::AbstractKGrid{D}, 
-    polarization::DynamicalRPAPolarization
-    ) where {D}
-
-    sum_val = 0.0
-    # small broadening or implicit limit can be added
-    η = 1e-3
-    for (i, k) in enumerate(kgrid)
-        eig_k = band_structure(polarization.dispersion, k)
-        eig_kq = band_structure(polarization.dispersion, k + q)
-
-        Ek = eig_k.values
-        Uk = eig_k.vectors
-        Ekq = eig_kq.values
-        Ukq = eig_kq.vectors
-
-        M_mat = Uk' * Ukq 
-
-        for m in 1:length(Ek)
-            for n in 1:length(Ekq)
-                overlap = abs2(M_mat[m, n])
-                df = f(Ek[m], polarization.smearing) - f(Ekq[n], polarization.smearing)
-                denom = Ekq[n] - Ek[m] - ω - im * η
-                
-                term = overlap * df / denom
-                sum_val += real(term) * kgrid.weights[i]
-            end
-        end
-    end
-
-    return sum_val / (2π)^D
-end
+# Legacy chi methods removed.
 
 function V(
     interaction::ConstantInteraction{D}, 
@@ -201,10 +109,9 @@ function V(
     ) where {D}
 
     bare_V = V(q, screened_interaction.bare)
-    V_screened = bare_V / (
-        1 + bare_V * χ(q, kgrid, screened_interaction.polarization)
-    )
-    return V_screened
+    # The legacy χ call is removed. P should now be a LindhardSusceptibility-like functor.
+    chi_val = screened_interaction.polarization(q)
+    return bare_V / (1 + bare_V * chi_val)
 end
 
 # FanMigdal placeholder implementations 

@@ -41,7 +41,16 @@ function evaluate(action::EffectiveAction, phi::Float64, ::RPA; T::Float64=1e-3)
     chi0 = LindhardSusceptibility(action.model, action.grid, T)
     
     # Evaluate susceptibility at the auxiliary field wavevector
-    chi_val = chi0(action.field.Q)
+    chi_val = chi0(action.field.q)
     
     return (1.0 / action.V_bare - chi_val) * phi^2
+end
+
+"""
+    evaluate(action::EffectiveAction, phi_values::AbstractVector{<:Real}, level::ApproximationLevel; T::Float64=1e-3)
+
+Evaluates the effective action for a collection of `phi` values.
+"""
+function evaluate(action::EffectiveAction, phi_values::AbstractVector{<:Real}, level::ApproximationLevel; T::Float64=1e-3)
+    return [evaluate(action, phi, level; T=T) for phi in phi_values]
 end

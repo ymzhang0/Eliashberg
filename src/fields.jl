@@ -16,9 +16,9 @@ function reconstructed_bands(k::SVector{D, Float64}, phi::Float64, field::Charge
     H11 = real(ε(k, model)[1,1])
     
     # original dispersion at k+Q 
-    # (Note: here we assume ε expects SVector, so k + field.Q works directly)
-    k_plus_Q = k + field.Q
-    H22 = real(ε(k_plus_Q, model)[1,1])
+    # (Note: here we assume ε expects SVector, so k + field.q works directly)
+    k_plus_q = k + field.q
+    H22 = real(ε(k_plus_q, model)[1,1])
     
     H12 = phi
     H21 = phi
