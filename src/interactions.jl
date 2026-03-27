@@ -2,22 +2,22 @@ using LinearAlgebra
 using StaticArrays
 using QuadGK
 
-struct ConstantInteraction{D} <: ElectronPhononInteraction
+struct ConstantInteraction <: ElectronPhononInteraction
     V0::Float64
 end
 
-struct LocalInteraction{D} <: ElectronPhononInteraction
+struct LocalInteraction <: ElectronPhononInteraction
     V0::Float64
     threshold::Float64
     fsthick::Float64
 end
 
-struct YukawaInteraction{D} <: ElectronPhononInteraction
+struct YukawaInteraction <: ElectronPhononInteraction
     V0::Float64
     λ::Float64
 end
 
-struct LimitedConstantInteraction{D,M<:ElectronicDispersion} <: ElectronPhononInteraction
+struct LimitedConstantInteraction{D,M<:ElectronicDispersion{D}} <: ElectronPhononInteraction
     V0::Float64
     ωc::Float64
     dispersion::M
@@ -48,15 +48,22 @@ end
 # Legacy chi methods removed.
 
 function V(
-    interaction::ConstantInteraction{D},
-) where {D}
+    interaction::ConstantInteraction,
+)
     return interaction.V0
+end
+
+function V(
+    q::SVector{D,Float64},
+    interaction::ConstantInteraction
+) where {D}
+    return V(interaction)
 end
 
 function V(
     k::SVector{D,Float64},
     kp::SVector{D,Float64},
-    interaction::LocalInteraction{D},
+    interaction::LocalInteraction,
     dispersion_model::ElectronicDispersion{D}
 ) where {D}
     # Uses band structure energies nearest to Fermi surface
@@ -74,9 +81,16 @@ end
 function V(
     k::SVector{D,Float64},
     kp::SVector{D,Float64},
-    interaction::YukawaInteraction{D},
+    interaction::YukawaInteraction,
 ) where {D}
-    return interaction.V0 / (norm(k - kp)^2 + interaction.λ^2)
+    return V(k - kp, interaction)
+end
+
+function V(
+    q::SVector{D,Float64},
+    interaction::YukawaInteraction
+) where {D}
+    return interaction.V0 / (norm(q)^2 + interaction.λ^2)
 end
 
 function V(

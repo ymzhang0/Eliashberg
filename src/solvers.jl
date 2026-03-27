@@ -8,11 +8,11 @@ function renormalized_dispersion(disp::ElectronicDispersion{D}, Σ::SelfEnergy, 
 end
 
 # Unified interaction evaluation fallbacks for solver pipeline
-function evaluate_V(k::SVector{D,Float64}, kp::SVector{D,Float64}, interaction::ConstantInteraction{D}, disp::ElectronicDispersion{D}) where {D}
+function evaluate_V(k::SVector{D,Float64}, kp::SVector{D,Float64}, interaction::ConstantInteraction, disp::ElectronicDispersion{D}) where {D}
     return V(interaction)
 end
 
-function evaluate_V(k::SVector{D,Float64}, kp::SVector{D,Float64}, interaction::YukawaInteraction{D}, disp::ElectronicDispersion{D}) where {D}
+function evaluate_V(k::SVector{D,Float64}, kp::SVector{D,Float64}, interaction::YukawaInteraction, disp::ElectronicDispersion{D}) where {D}
     return V(k, kp, interaction)
 end
 

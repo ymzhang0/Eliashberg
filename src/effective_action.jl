@@ -67,7 +67,7 @@ function evaluate(action::EffectiveAction, phi::Float64, ::RPA; T::Float64=1e-3)
     V_total = V(q_vec, action.interaction)
     chi_val = chi0(q_vec)
 
-    return (1.0 / action.V_bare - real(chi_val)) * phi^2
+    return (1.0 / V_total - real(chi_val)) * phi^2
 end
 
 """
