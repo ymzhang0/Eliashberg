@@ -1,9 +1,5 @@
-module Constants
+# src/Constants.jl
 
-using Unitful
-using PhysicalConstants.CODATA2022
-
-include("la.jl")
 
 const Å      = 1e-10 # m
 
@@ -27,8 +23,3 @@ const kB2eV    = kB / e    # eV/K
 const kB2Ha    = kB / Ha2J    # Ha/K
 
 const A2Bohr    = a0 / Å    # Bohr^{-1}
-
-export Å, a0, Ry, me, e, ε0, h, ħ, kB, c, Ry2J, Ry2eV, Ha2J, Ha2eV, kB2meV, kB2eV, kB2Ha, A2Bohr
-
-
-end

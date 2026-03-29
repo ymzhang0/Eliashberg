@@ -1,5 +1,4 @@
 # Pauli matrices
-using LinearAlgebra
 
 export σ₀, σ₁, σ₂, σ₃, pauli_matrices, γ⁰, γ¹, γ², γ³, gamma_matrices, commutator, anticommutator
 
