@@ -8,6 +8,8 @@ using Unitful
 using PhysicalConstants.CODATA2022
 using QuadGK
 using Optim
+using Distributed
+using SparseArrays
 
 # 1. Fundamental Constants and Linear Algebra (Base Tier)
 include("Constants.jl") # Also includes la.jl
@@ -17,6 +19,10 @@ include("Geometry/types.jl")
 include("Models/types.jl")
 include("Responses/types.jl")
 include("Solvers/types.jl")
+
+# 2.5 Engine Tier (Pure execution and scheduling abstractions)
+include("Engine/Engine.jl")
+using .Engine: GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLayout, AssemblySpectrum, DenseEigenSolver, SparseEigenSolverHook, bootstrap_engine_workers!, grid_samples, assemble_grid_vector, assemble_grid_matrix, assemble_sparse_grid_matrix, assemble_block_grid_matrix, assemble_sparse_block_grid_matrix, solve_assembled_eigensystem, integrate_grid, distributed_map_grid
 
 # 3. Data Structure Tier (Concrete structs and constructors)
 # Geometry
@@ -84,7 +90,8 @@ export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_st
 
 # Solvers
 export ApproximationLevel, ExactTrLn, RPA
-export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function
+export Engine, GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLayout, AssemblySpectrum, DenseEigenSolver, SparseEigenSolverHook, bootstrap_engine_workers!, grid_samples, assemble_grid_vector, assemble_grid_matrix, assemble_sparse_grid_matrix, assemble_block_grid_matrix, assemble_sparse_block_grid_matrix, solve_assembled_eigensystem, integrate_grid, distributed_map_grid
+export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
 
 # Visualization
 export visualize_dispersion, dimensionality, visualize_landscape, visualize_spectral_function, visualize_phase_transition, visualize_renormalized_bands, visualize_zeeman_pairing_landscape, visualize_collective_modes

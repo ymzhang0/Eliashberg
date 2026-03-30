@@ -41,9 +41,9 @@ vertex_matrix(::PairDensityWave) = SA[
 """
     GeneralizedSusceptibility{M, G, F}
 
-Functor to evaluate the generalized polarization bubble χ₀(q, ω) for a given 
-physical model, k-grid, auxiliary field (determining the vertex matrix), temperature, 
-and broadening η.
+Functor that maps external parameters to a response value while reducing over an
+internal weighted grid. The auxiliary field selects the vertex operator, while
+`T` and `η` parameterize the kernel evaluation.
 """
 struct GeneralizedSusceptibility{M<:PhysicalModel,G<:AbstractKGrid,F<:AuxiliaryField}
     model::M
@@ -59,71 +59,74 @@ GeneralizedSusceptibility(model, grid, field, T) = GeneralizedSusceptibility(mod
 """
     (chi::GeneralizedSusceptibility)(fluct::DynamicalFluctuation)
 
-Evaluates the generalized dynamical susceptibility, incorporating exact eigensystems 
-and coherence factors based on the auxiliary field's vertex matrix.
+Evaluate the response by reducing over the internal grid with
+`Engine.integrate_grid`. The outer call only specifies the external parameters;
+the weighted reduction is delegated to the pure execution engine.
 """
 function (chi::GeneralizedSusceptibility)(fluct::DynamicalFluctuation{D}) where {D}
-    # Ensure fluctuation momentum dimension matches grid dimension
     if !(chi.grid isa AbstractKGrid{D})
         throw(DimensionMismatch("Fluctuation momentum dimension ($D) does not match grid dimension"))
     end
 
-    q = fluct.q
-    ω = fluct.ω
-    η = chi.η
-    T = chi.T
-
-    res = 0.0im
-    N = length(chi.grid)
-
-    V_mat = vertex_matrix(chi.field)
-
-    for i in 1:N
-        k = chi.grid.points[i]
-        w = chi.grid.weights[i]
-
-        # Calculate full eigensystem
-        eig_k = band_structure(chi.model, k)
-        eig_kq = band_structure(chi.model, k + q)
-
-        n_bands_k = length(eig_k.values)
-        n_bands_kq = length(eig_kq.values)
-
-        # Loop over ALL band combinations m (for k) and n (for k+q)
-        for m in 1:n_bands_k
-            for n in 1:n_bands_kq
-                E_m = real(eig_k.values[m])
-                E_n = real(eig_kq.values[n])
-
-                # Coherence Factor (Matrix Element)
-                u_m = eig_k.vectors[:, m]
-                u_n = eig_kq.vectors[:, n]
-                M_mn = abs2(dot(u_n, V_mat * u_m))
-
-                if M_mn > 1e-10
-                    f_m = (E_m / T > 50.0) ? 0.0 : 1.0 / (exp(E_m / T) + 1.0)
-                    f_n = (E_n / T > 50.0) ? 0.0 : 1.0 / (exp(E_n / T) + 1.0)
-
-                    # Check for static intra-band limit to avoid 0/0 NaN
-                    if abs(E_n - E_m) < 1e-8 && abs(ω) < 1e-8
-                        # Use L'Hopital's rule (derivative of Fermi function)
-                        df_dE = f_m * (f_m - 1.0) / T
-
-                        # In the Lindhard formula, term is -(df/dE)
-                        res += w * M_mn * (-df_dE)
-                    else
-                        denominator = (E_n - E_m) - ω - 1im * η
-                        res += w * M_mn * (f_m - f_n) / denominator
-                    end
-                end
-            end
-        end
-    end
-
-    return res # Return the complex susceptibility
+    return Engine.integrate_grid(SusceptibilityReductionKernel(chi, fluct), chi.grid)
 end
 
 # Support for static evaluation via SVector
 function (chi::GeneralizedSusceptibility)(Q::SVector{D,<:Real}) where {D}
     return chi(DynamicalFluctuation(Q, 0.0))
 end
+
+struct SusceptibilityReductionKernel{C,F,V}
+    chi::C
+    fluct::F
+    vertex::V
+end
+
+SusceptibilityReductionKernel(chi::GeneralizedSusceptibility, fluct::DynamicalFluctuation) =
+    SusceptibilityReductionKernel(chi, fluct, vertex_matrix(chi.field))
+
+function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D}
+    response_sum = 0.0im
+
+    eig_k = band_structure(kernel.chi.model, k)
+    eig_kq = band_structure(kernel.chi.model, k + kernel.fluct.q)
+
+    for m in eachindex(eig_k.values)
+        for n in eachindex(eig_kq.values)
+            energy_m = real(eig_k.values[m])
+            energy_n = real(eig_kq.values[n])
+
+            vec_m = eig_k.vectors[:, m]
+            vec_n = eig_kq.vectors[:, n]
+            coherence = abs2(dot(vec_n, kernel.vertex * vec_m))
+
+            coherence <= 1e-10 && continue
+
+            occ_m = _fermi_weight(energy_m, kernel.chi.T)
+            occ_n = _fermi_weight(energy_n, kernel.chi.T)
+
+            if abs(energy_n - energy_m) < 1e-8 && abs(kernel.fluct.ω) < 1e-8
+                response_sum += coherence * (-_fermi_derivative(occ_m, kernel.chi.T))
+            else
+                denominator = (energy_n - energy_m) - kernel.fluct.ω - 1im * kernel.chi.η
+                response_sum += coherence * (occ_m - occ_n) / denominator
+            end
+        end
+    end
+
+    return response_sum
+end
+
+function _fermi_weight(energy::Float64, temperature::Float64)
+    scaled = energy / temperature
+
+    if scaled > 50.0
+        return 0.0
+    elseif scaled < -50.0
+        return 1.0
+    end
+
+    return 1.0 / (exp(scaled) + 1.0)
+end
+
+_fermi_derivative(occupation::Float64, temperature::Float64) = occupation * (occupation - 1.0) / temperature

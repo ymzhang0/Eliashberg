@@ -218,10 +218,9 @@ function visualize_collective_modes(
     end
 
     # ==========================================
-    # 2. 构造超导 BdG 色散与极化率计算器
+    # 2. 构造超导 BdG 色散
     # ==========================================
     bdg_dispersion = MeanFieldDispersion(model, field, phi_gs)
-    chi_calculator = GeneralizedSusceptibility(bdg_dispersion, kgrid, field, T_val, eta)
 
     # ==========================================
     # 3. 提取 qpath 信息与频率网格
@@ -245,15 +244,7 @@ function visualize_collective_modes(
     # ==========================================
     println("🚀 开始扫描集体激发谱 (q, ω)... 这可能需要一点时间")
 
-    chi_im_matrix = zeros(length(qpath.points), length(omegas))
-
-    for (iq, q) in enumerate(qpath.points)
-        for (iw, w) in enumerate(omegas)
-            fluct = DynamicalFluctuation(q, w)
-            val = chi_calculator(fluct)
-            chi_im_matrix[iq, iw] = imag(val)
-        end
-    end
+    chi_im_matrix = scan_rpa_spectral_function_hpc(bdg_dispersion, kgrid, qpath.points, omegas; T=T_val, η=eta)
 
     # ==========================================
     # 5. 画图

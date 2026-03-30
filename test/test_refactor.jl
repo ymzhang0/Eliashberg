@@ -1,10 +1,113 @@
 using Test
 using Eliashberg
 using StaticArrays
+using Distributed
+using LinearAlgebra
+using SparseArrays
 
 @testset "Dimensionality-Agnostic Refactor" begin
     grid = generate_2d_kgrid(4, 4)
     @test length(grid) == 16
+
+    line_grid = generate_1d_kgrid(8)
+    direct_integral = sum((k[1]^2) * w for (k, w) in zip(line_grid.points, line_grid.weights))
+    @test integrate_grid(k -> k[1]^2, line_grid) ≈ direct_integral
+    @test Eliashberg.Engine.integrate_grid(k -> k[1]^2, line_grid) ≈ direct_integral
+    samples = grid_samples(line_grid)
+    @test samples[1] isa GridSample
+    @test samples[1].value == line_grid.points[1]
+    @test samples[1].weight == line_grid.weights[1]
+
+    mapped = distributed_map_grid((x, y) -> x + 10y, [1, 2], [3, 4, 5])
+    @test mapped == [31 41 51; 32 42 52]
+    @test Eliashberg.Engine.distributed_map_grid((x, y) -> x + 10y, [1, 2], [3, 4, 5]) == mapped
+    assembled_vector = assemble_grid_vector(sample -> sample.index + sample.weight, samples)
+    @test length(assembled_vector) == length(samples)
+    assembled_matrix = assemble_grid_matrix((left, right) -> left.index == right.index ? 1.0 : 0.0, samples, samples)
+    @test assembled_matrix == Matrix{Float64}(I, length(samples), length(samples))
+    sparse_matrix = assemble_sparse_grid_matrix((left, right) -> left.index == right.index ? 2.0 : 0.0, samples, samples)
+    @test issparse(sparse_matrix)
+    @test Matrix(sparse_matrix) == 2.0 * Matrix{Float64}(I, length(samples), length(samples))
+
+    block_layout = UniformBlockLayout(2, 2)
+    dense_block_matrix = assemble_block_grid_matrix(
+        (left, right) -> left.index == right.index ? [1.0 0.0; 0.0 1.0] : zeros(2, 2),
+        samples,
+        samples,
+        block_layout
+    )
+    @test size(dense_block_matrix) == (2 * length(samples), 2 * length(samples))
+    @test dense_block_matrix == Matrix{Float64}(I, 2 * length(samples), 2 * length(samples))
+
+    sparse_block_matrix = assemble_sparse_block_grid_matrix(
+        (left, right) -> left.index == right.index ? [3.0 0.0; 0.0 3.0] : zeros(2, 2),
+        samples,
+        samples,
+        block_layout
+    )
+    @test issparse(sparse_block_matrix)
+    @test Matrix(sparse_block_matrix) == 3.0 * Matrix{Float64}(I, 2 * length(samples), 2 * length(samples))
+
+    variable_layout = VariableBlockLayout([1, 2, 1], [2, 1, 2])
+    variable_row_axis = samples[1:3]
+    variable_col_axis = samples[1:3]
+    dense_variable_blocks = assemble_block_grid_matrix(
+        (left, right) -> begin
+            row_size = variable_layout.row_axis.block_sizes[left.index]
+            col_size = variable_layout.col_axis.block_sizes[right.index]
+            left.index == right.index ? fill(Float64(left.index), row_size, col_size) : zeros(row_size, col_size)
+        end,
+        variable_row_axis,
+        variable_col_axis,
+        variable_layout
+    )
+    @test size(dense_variable_blocks) == (sum(variable_layout.row_axis.block_sizes), sum(variable_layout.col_axis.block_sizes))
+    @test dense_variable_blocks[1, 1] == 1.0
+    @test dense_variable_blocks[2:3, 3] == fill(2.0, 2)
+    @test dense_variable_blocks[4, 4:5] == fill(3.0, 2)
+
+    sparse_variable_blocks = assemble_sparse_block_grid_matrix(
+        (left, right) -> begin
+            row_size = variable_layout.row_axis.block_sizes[left.index]
+            col_size = variable_layout.col_axis.block_sizes[right.index]
+            left.index == right.index ? fill(Float64(2 * left.index), row_size, col_size) : zeros(row_size, col_size)
+        end,
+        variable_row_axis,
+        variable_col_axis,
+        variable_layout
+    )
+    @test issparse(sparse_variable_blocks)
+    @test Matrix(sparse_variable_blocks)[1, 1] == 2.0
+    @test Matrix(sparse_variable_blocks)[2:3, 3] == fill(4.0, 2)
+    @test Matrix(sparse_variable_blocks)[4, 4:5] == fill(6.0, 2)
+
+    dense_spectrum = solve_assembled_eigensystem(assembled_matrix)
+    @test dense_spectrum isa AssemblySpectrum
+    @test length(dense_spectrum.values) == length(samples)
+
+    sparse_hook = SparseEigenSolverHook((matrix; kwargs...) -> eigen(Matrix(matrix)))
+    sparse_spectrum = solve_assembled_eigensystem(sparse_matrix; solver=sparse_hook)
+    @test sparse_spectrum isa AssemblySpectrum
+    @test length(sparse_spectrum.values) == length(samples)
+
+    existing_workers = Set(Distributed.workers())
+    bootstrapped_workers = Int[]
+    try
+        bootstrapped_workers = bootstrap_engine_workers!(1)
+        @test length(bootstrapped_workers) >= 1
+
+        mapped_with_bootstrap = distributed_map_grid(
+            (x, y) -> x + 10y,
+            [1, 2],
+            [3, 4, 5];
+            bootstrap_workers=true,
+            n_workers=1
+        )
+        @test mapped_with_bootstrap == mapped
+    finally
+        new_workers = setdiff(bootstrapped_workers, collect(existing_workers))
+        !isempty(new_workers) && Distributed.rmprocs(new_workers)
+    end
 
     lat = SquareLattice(1.0)
     model = TightBinding(lat, 1.0, 0.0, 0.0)
@@ -26,9 +129,28 @@ using StaticArrays
     @test landscape isa Matrix{Float64}
     @test size(landscape) == (4, 4)
 
+    qpath = generate_kpath(lat; n_pts_per_segment=4)
+    omegas = collect(range(0.0, 1.0, length=5))
+    spectral = scan_spectral_function(model, grid, qpath, omegas; T=0.1, η=0.02)
+    @test size(spectral) == (length(qpath), length(omegas))
+
     inter = ConstantInteraction(0.5)
     vals, vecs = solve_bcs(grid, model, inter)
     @test length(vals) == length(grid)
     @test size(vecs) == (length(grid), length(grid))
     @test all(isfinite, real.(vals))
+
+    vals_bootstrapped, vecs_bootstrapped = solve_bcs(grid, model, inter; bootstrap_workers=true, n_workers=1)
+    @test length(vals_bootstrapped) == length(grid)
+    @test size(vecs_bootstrapped) == size(vecs)
+
+    vals_sparse, vecs_sparse = solve_bcs(
+        grid,
+        model,
+        inter;
+        matrix_format=:sparse,
+        eigensolver=sparse_hook
+    )
+    @test length(vals_sparse) == length(grid)
+    @test size(vecs_sparse) == size(vecs)
 end

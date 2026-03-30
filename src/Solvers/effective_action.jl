@@ -1,6 +1,25 @@
 struct ExactTrLn <: ApproximationLevel end
 struct RPA <: ApproximationLevel end
 
+struct ExactTrLnContributionKernel{M}
+    dispersion::M
+    temperature::Float64
+end
+
+function (kernel::ExactTrLnContributionKernel)(k::SVector)
+    tr_ln_contribution = 0.0
+
+    for band_energy in real(band_structure(kernel.dispersion, k).values)
+        if band_energy < 0
+            tr_ln_contribution += band_energy - kernel.temperature * log1p(exp(band_energy / kernel.temperature))
+        else
+            tr_ln_contribution += -kernel.temperature * log1p(exp(-band_energy / kernel.temperature))
+        end
+    end
+
+    return tr_ln_contribution
+end
+
 """
     evaluate_action(phi, field, model, interaction, kgrid, ::ExactTrLn; T=1e-3)
 
@@ -29,22 +48,8 @@ function evaluate_action(
 
     # 3. 构造平均场重构的能带
     mf_disp = MeanFieldDispersion(model, field, phi)
-
-    tr_ln_sum = 0.0
-    for i in 1:length(kgrid)
-        k = kgrid.points[i]
-        w = kgrid.weights[i]
-
-        lambdas = real(band_structure(mf_disp, k).values)
-
-        for lam in lambdas
-            if lam < 0
-                tr_ln_sum += w * (lam - T * log1p(exp(lam / T)))
-            else
-                tr_ln_sum += w * (-T * log1p(exp(-lam / T)))
-            end
-        end
-    end
+    tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
+    tr_ln_sum = Engine.integrate_grid(tr_ln_kernel, kgrid)
 
     return term1 + tr_ln_sum
 end

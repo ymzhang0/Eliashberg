@@ -76,4 +76,3 @@ function compare_integrals(a::Number, b::Number)
 
     return real(result_hs)
 end
-
