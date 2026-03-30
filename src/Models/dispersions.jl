@@ -164,10 +164,10 @@ end
 # Multi-Orbital Legacy / Convenience Constructors
 # ---------------------------------------------------------
 
-KagomeLattice(t::Float64, EF::Float64=0.0) = KagomeLattice(hexagonal_lattice(1.0), t, EF)
-Graphene(t::Float64, EF::Float64=0.0) = Graphene(hexagonal_lattice(1.0), t, EF)
-SSHModel(t1::Float64, t2::Float64, EF::Float64=0.0) = SSHModel(chain_lattice(1.0), t1, t2, EF)
+KagomeLattice(t::Float64, EF::Float64=0.0) = KagomeLattice(HexagonalLattice(1.0), t, EF)
+Graphene(t::Float64, EF::Float64=0.0) = Graphene(HexagonalLattice(1.0), t, EF)
+SSHModel(t1::Float64, t2::Float64, EF::Float64=0.0) = SSHModel(ChainLattice(1.0), t1, t2, EF)
 
-MonoatomicLatticeModel{1}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{1}(chain_lattice(a), K, M)
-MonoatomicLatticeModel{2}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{2}(square_lattice(a), K, M)
-MonoatomicLatticeModel{3}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{3}(cubic_lattice(a), K, M)
+MonoatomicLatticeModel{1}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{1}(ChainLattice(a), K, M)
+MonoatomicLatticeModel{2}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{2}(SquareLattice(a), K, M)
+MonoatomicLatticeModel{3}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{3}(CubicLattice(a), K, M)

@@ -76,6 +76,13 @@ function V(
 end
 
 function V(
+    q::SVector{D,Float64},
+    interaction::LocalInteraction
+) where {D}
+    return norm(q) < interaction.threshold ? interaction.V0 : 0.0
+end
+
+function V(
     k::SVector{D,Float64},
     kp::SVector{D,Float64},
     interaction::YukawaInteraction,
@@ -107,6 +114,13 @@ end
 
 function V(
     q::SVector{D,Float64},
+    interaction::LimitedConstantInteraction{D}
+) where {D}
+    return interaction.V0
+end
+
+function V(
+    q::SVector{D,Float64},
     interaction::BareCoulombInteraction
 ) where {D}
     q_norm = norm(q)
@@ -118,9 +132,14 @@ function V(
     kgrid::AbstractKGrid{D},
     screened_interaction::ScreenedCoulombInteraction
 ) where {D}
+    return V(q, screened_interaction)
+end
 
+function V(
+    q::SVector{D,Float64},
+    screened_interaction::ScreenedCoulombInteraction
+) where {D}
     bare_V = V(q, screened_interaction.bare)
-    # The legacy χ call is removed. P should now be a GeneralizedSusceptibility-like functor.
     chi_val = screened_interaction.polarization(q)
     return bare_V / (1 + bare_V * chi_val)
 end
@@ -132,6 +151,13 @@ function V(
     interaction::FanMigdalInteraction
 ) where {D}
     # Placeholder screened interaction for FanMigdal
+    return V(q, interaction)
+end
+
+function V(
+    q::SVector{D,Float64},
+    interaction::FanMigdalInteraction
+) where {D}
     return 0.0
 end
 

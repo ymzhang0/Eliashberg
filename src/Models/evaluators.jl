@@ -10,6 +10,17 @@
 Evaluates the tight-binding Hamiltonian at momentum `k` using Fourier transform
 over the explicit real-space hopping vectors.
 """
+function ε(k::SVector{D,Float64}, model::FreeElectron{D}) where {D}
+    E_k = dot(k, k) / (2 * model.mass) - model.EF
+    return Hermitian(hcat(E_k))
+end
+
+"""
+    ε(k::SVector{D, Float64}, model::TightBinding{D}) where {D}
+
+Evaluates the tight-binding Hamiltonian at momentum `k` using Fourier transform
+over the explicit real-space hopping vectors.
+"""
 function ε(k::SVector{D,Float64}, model::TightBinding{D}) where {D}
     # Start with the on-site energy (Fermi level shift)
     E_k = -model.EF

@@ -9,27 +9,50 @@ the most unstable nesting wavevectors.
 Internal momentum integration is performed over `kgrid`.
 Returns an array of susceptibility values corresponding to the points in `qgrid`.
 """
-function scan_instability_landscape(model::PhysicalModel, kgrid::KGrid{D}, qgrid::KGrid{D}; T=0.001, η=1e-3) where {D}
-    # Instantiate the susceptibility functor with a default density-like field
-    chi_functor = GeneralizedSusceptibility(model, kgrid, ChargeDensityWave(zero(SVector{D,Float64})), T, η)
-    
-    # Pre-allocate the landscape array
-    # We use real part as susceptibility is typically defined as the real response
+function _instability_functor(model::PhysicalModel, kgrid::KGrid{D}, T, η) where {D}
+    return GeneralizedSusceptibility(model, kgrid, ChargeDensityWave(zero(SVector{D,Float64})), T, η)
+end
+
+function scan_instability_landscape(model::PhysicalModel, kgrid::KGrid{1}, qgrid::KGrid{1}; T=0.001, η=1e-3)
+    chi_functor = _instability_functor(model, kgrid, T, η)
     landscape = zeros(Float64, length(qgrid))
-    
+
     @info "Scanning instability landscape over $(length(qgrid)) q-points..."
-    
+
     for (i, q) in enumerate(qgrid.points)
-        # Construct a DynamicalFluctuation with zero frequency for static instability analysis
-        fluctuation = DynamicalFluctuation(q, 0.0)
-        
-        # Evaluate the susceptibility
-        val = chi_functor(fluctuation)
-        
-        # For instability, we are interested in the magnitude/real part of the static response
-        landscape[i] = real(val)
+        landscape[i] = real(chi_functor(DynamicalFluctuation(q, 0.0)))
     end
-    
+
+    return landscape
+end
+
+function scan_instability_landscape(model::PhysicalModel, kgrid::KGrid{2}, qgrid::KGrid{2}; T=0.001, η=1e-3)
+    chi_functor = _instability_functor(model, kgrid, T, η)
+    qxs = unique(sort([q[1] for q in qgrid.points]))
+    qys = unique(sort([q[2] for q in qgrid.points]))
+    ix = Dict(qx => i for (i, qx) in enumerate(qxs))
+    iy = Dict(qy => j for (j, qy) in enumerate(qys))
+    landscape = zeros(Float64, length(qxs), length(qys))
+
+    @info "Scanning instability landscape over $(length(qgrid)) q-points..."
+
+    for q in qgrid.points
+        landscape[ix[q[1]], iy[q[2]]] = real(chi_functor(DynamicalFluctuation(q, 0.0)))
+    end
+
+    return landscape
+end
+
+function scan_instability_landscape(model::PhysicalModel, kgrid::KGrid{D}, qgrid::KGrid{D}; T=0.001, η=1e-3) where {D}
+    chi_functor = _instability_functor(model, kgrid, T, η)
+    landscape = zeros(Float64, length(qgrid))
+
+    @info "Scanning instability landscape over $(length(qgrid)) q-points..."
+
+    for (i, q) in enumerate(qgrid.points)
+        landscape[i] = real(chi_functor(DynamicalFluctuation(q, 0.0)))
+    end
+
     return landscape
 end
 

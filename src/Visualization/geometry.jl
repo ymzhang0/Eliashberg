@@ -8,11 +8,11 @@
 # ----------------------------------------------------------------------------
 
 """
-    visualize_lattice(lattice::Lattice{1}; extent=3, kwargs...)
+    visualize_lattice(lattice::AbstractLattice{1}; extent=3, kwargs...)
 
 Visualizes a 1D real-space lattice chain.
 """
-function visualize_lattice(lattice::Lattice{1}; extent=3, axis=(;), kwargs...)
+function visualize_lattice(lattice::AbstractLattice{1}; extent=3, axis=(;), kwargs...)
     # 把高度调低一点，因为是一维的，太高了显得空旷
     fig = Figure(size=(600, 200))
 
@@ -58,12 +58,12 @@ function visualize_lattice(lattice::Lattice{1}; extent=3, axis=(;), kwargs...)
 end
 
 """
-    visualize_lattice(lattice::Lattice{2}; extent=2, kwargs...)
+    visualize_lattice(lattice::AbstractLattice{2}; extent=2, kwargs...)
 
 Visualizes a 2D real-space lattice with hollow sites, primitive vectors, 
 magnitudes, and the angle between them (without bounding boxes or grid lines).
 """
-function visualize_lattice(lattice::Lattice{2}; extent=2, axis=(;), kwargs...)
+function visualize_lattice(lattice::AbstractLattice{2}; extent=2, axis=(;), kwargs...)
     fig = Figure(size=(600, 600))
 
     # 1. 彻底干掉边框、网格和坐标轴刻度
@@ -135,12 +135,12 @@ function visualize_lattice(lattice::Lattice{2}; extent=2, axis=(;), kwargs...)
 end
 
 """
-    visualize_lattice(lattice::Lattice{3}; extent=1, kwargs...)
+    visualize_lattice(lattice::AbstractLattice{3}; extent=1, kwargs...)
 
 Visualizes a 3D real-space lattice with hollow sites, primitive vectors, 
 magnitudes, and the angles between them (without bounding boxes or grids).
 """
-function visualize_lattice(lattice::Lattice{3}; extent=1, axis=(;), kwargs...)
+function visualize_lattice(lattice::AbstractLattice{3}; extent=1, axis=(;), kwargs...)
     fig = Figure(size=(800, 800))
 
     # 1. 彻底干掉 3D 边框、网格和刻度标签
@@ -222,11 +222,11 @@ end
 # ----------------------------------------------------------------------------
 
 """
-    visualize_reciprocal_space(lattice::Lattice{1}, kgrid=nothing; kwargs...)
+    visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid=nothing; kwargs...)
 
 Visualizes the 1D reciprocal lattice and 1st Brillouin Zone.
 """
-function visualize_reciprocal_space(lattice::Lattice{1}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(600, 300))
     ax = Axis(fig[1, 1];
         title="1D Reciprocal Space & K-Grid",
@@ -258,11 +258,11 @@ function visualize_reciprocal_space(lattice::Lattice{1}, kgrid::Union{AbstractKG
 end
 
 """
-    visualize_reciprocal_space(lattice::Lattice{2}, kgrid=nothing; kwargs...)
+    visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid=nothing; kwargs...)
 
 Visualizes the 2D reciprocal lattice vectors and the primitive Brillouin Zone parallelogram.
 """
-function visualize_reciprocal_space(lattice::Lattice{2}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(700, 700))
     ax = Axis(fig[1, 1]; aspect=DataAspect(), title="2D Reciprocal Space & K-Grid",
         xlabel=L"k_x", ylabel=L"k_y", axis...)
@@ -291,11 +291,11 @@ function visualize_reciprocal_space(lattice::Lattice{2}, kgrid::Union{AbstractKG
 end
 
 """
-    visualize_reciprocal_space(lattice::Lattice{3}, kgrid=nothing; kwargs...)
+    visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid=nothing; kwargs...)
 
 Visualizes the 3D reciprocal primitive vectors and the grid points inside the primitive cell.
 """
-function visualize_reciprocal_space(lattice::Lattice{3}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(800, 800))
     ax = Axis3(fig[1, 1]; aspect=:data, title="3D Reciprocal Space & K-Grid",
         xlabel=L"k_x", ylabel=L"k_y", zlabel=L"k_z", axis...)

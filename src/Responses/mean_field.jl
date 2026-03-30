@@ -12,6 +12,16 @@ struct NormalNambuDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersi
     bare::M
 end
 
+struct FFLONormalDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
+    bare::M
+    q::SVector{D,Float64}
+end
+
+struct PDWNormalDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
+    bare::M
+    q::SVector{D,Float64}
+end
+
 # Generic constructor to ensure phi is Float64
 function MeanFieldDispersion(bare::M, field::F, phi::Real) where {D,M<:ElectronicDispersion{D},F<:AuxiliaryField}
     return MeanFieldDispersion{D,M,F}(bare, field, Float64(phi))
@@ -52,6 +62,16 @@ function ε(k::SVector{D,Float64}, model::NormalNambuDispersion) where {D}
     ek = real(ε(k, model.bare)[1, 1])
     e_minus_k = real(ε(-k, model.bare)[1, 1])
     return Hermitian(@SMatrix [ek 0.0; 0.0 -e_minus_k])
+end
+
+function ε(::SVector{D,Float64}, ::FFLONormalDispersion{D}) where {D}
+    @warn "FFLO normal-state basis is not fully implemented yet."
+    throw(ErrorException("FFLO normal-state basis is not fully implemented yet."))
+end
+
+function ε(::SVector{D,Float64}, ::PDWNormalDispersion{D}) where {D}
+    @warn "PDW normal-state basis is not fully implemented yet."
+    throw(ErrorException("PDW normal-state basis is not fully implemented yet."))
 end
 
 # 2. Charge Density Wave (k coupled to k+q)

@@ -16,20 +16,30 @@ end
 
 
 function Σ(
-    p::Float64, 
-    model::HartreeFockSelfEnergy,
-    ) ::Float64
+    k::SVector{1,Float64},
+    model::HartreeFockSelfEnergy{1},
+)
+    dispersion_model = model.dispersion
+    smearing_model = model.smearing
+    interaction_model = model.interaction
 
-    dispersion = model.dispersion
-    smearing = model.smearing
-    interaction = model.interaction
-
-    integrand(p′) = f(ε(p′, dispersion), smearing) * V(p - p′, interaction)
+    integrand(kp_scalar) = begin
+        kp = SVector{1,Float64}(kp_scalar)
+        eps_kp = real(ε(kp, dispersion_model)[1, 1])
+        f(eps_kp, smearing_model) * V(k - kp, interaction_model)
+    end
 
     result, _ = quadgk(integrand, -2, 2; rtol=1e-4)
-    return -1 / (2π) * result
+    return Hermitian(hcat(-result / (2π)))
 end
 
+Σ(k::Float64, model::HartreeFockSelfEnergy{1}) = real(Σ(SVector{1,Float64}(k), model)[1, 1])
 
+function Σ(::SVector{D,Float64}, ::HartreeFockSelfEnergy{D}) where {D}
+    throw(ErrorException("HartreeFockSelfEnergy is currently implemented only for 1D momenta."))
+end
+
+Σ(::SVector{D,Float64}, model::RPASelfEnergy) where {D} = Hermitian(hcat(model.U * model.n))
+Σ(::Float64, model::RPASelfEnergy) = model.U * model.n
 
 

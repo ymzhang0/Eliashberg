@@ -6,8 +6,7 @@ using Marker: @any
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 begin
 	import Pkg
-	# Activate the local environment where Eliashberg.jl is located
-	Pkg.activate(joinpath(Pkg.devdir(), "..", "..")) # Adjusting to the project root
+	Pkg.activate("..")
     # Note: For a "ready-to-run" script, we assume Eliashberg is available in the load path.
     # In a real Pluto environment, the user would usually `using Eliashberg` after adding it.
 end
@@ -46,27 +45,25 @@ begin
     # Using a 1D Tight Binding model for speed and clarity
 	t_hop = 1.0
 	mu = 0.5
-	model = TightBinding{1}(t_hop, mu)
-	field = SuperconductingPairing(:s_wave)
+	lattice = ChainLattice(1.0)
+	model = TightBinding(lattice, t_hop, mu)
+	field = BCSReducedPairing(:s_wave)
 	
 	# 2. Grid Setup
 	k_pts = [SVector{1,Float64}(k) for k in range(-pi, pi, length=100)]
-	weights = fill(2*pi/100, 100)
-	grid = KGrid{1}(k_pts, weights)
+	weights = fill(2 * pi / 100, 100)
+	grid = KGrid(k_pts, weights)
 	
 	# 3. Interaction
 	interaction = ConstantInteraction(V_in)
-	
-	# 4. Effective Action Object
-	action = EffectiveAction(model, field, grid, interaction)
 end
 
 # ╔═╡ 6e7f8a9b-0c1d-2e3f-4g5h-6i7j8k9l0m1n
 begin
 	phi_vals = range(0.0, 0.5, length=50)
 	
-	f_exact = evaluate(action, collect(phi_vals), ExactTrLn(); T=T)
-	f_rpa = evaluate(action, collect(phi_vals), RPA(); T=T)
+	f_exact = evaluate_action(phi_vals, field, model, interaction, grid, ExactTrLn(); T=T)
+	f_rpa = evaluate_action(phi_vals, field, model, interaction, grid, RPA(); T=T)
 	
 	# Normalize to F(0) = 0 for better visual comparison
 	f_exact .-= f_exact[1]
@@ -76,9 +73,10 @@ end
 # ╔═╡ 7f8a9b0c-1d2e-3f4g-5h6i-7j8k9l0m1n2o
 begin
 	# Find the global minimum for "Exact" curve
-	min_res = optimize(p -> evaluate(action, p, ExactTrLn(); T=T), 0.0, 0.5)
+	objective(phi) = evaluate_action(Float64(phi), field, model, interaction, grid, ExactTrLn(); T=T)
+	min_res = optimize(objective, 0.0, 0.5)
 	phi_min = Optim.minimizer(min_res)
-	f_min = Optim.minimum(min_res) - evaluate(action, 0.0, ExactTrLn(); T=T)
+	f_min = Optim.minimum(min_res) - objective(0.0)
 end
 
 # ╔═╡ 8a9b0c1d-2e3f-4g5h-6i7j-8k9l0m1n2o3p

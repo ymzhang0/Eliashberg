@@ -1,8 +1,13 @@
 
-function renormalized_dispersion(disp::ElectronicDispersion{D}, Σ::SelfEnergy, k::SVector{D,Float64}, ω::Float64) where {D}
-    ε0 = ε(k, disp)
-    Σval = Σ(k, ω)
-    return Hermitian(ε0 + Σval)
+function renormalized_dispersion(
+    disp::ElectronicDispersion{D},
+    self_energy::SelfEnergy,
+    k::SVector{D,Float64},
+    omega::Float64
+) where {D}
+    bare_H = ε(k, disp)
+    sigma_H = Σ(k, self_energy)
+    return Hermitian(bare_H + sigma_H)
 end
 
 """
