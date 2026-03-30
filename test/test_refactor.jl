@@ -81,6 +81,23 @@ using SparseArrays
     @test Matrix(sparse_variable_blocks)[2:3, 3] == fill(4.0, 2)
     @test Matrix(sparse_variable_blocks)[4, 4:5] == fill(6.0, 2)
 
+    dense_block_diagonal = assemble_block_diagonal_matrix(
+        sample -> [Float64(sample.index) 0.0; 0.0 Float64(sample.index)],
+        samples,
+        UniformBlockLayout(2, 2)
+    )
+    @test size(dense_block_diagonal) == (2 * length(samples), 2 * length(samples))
+    @test dense_block_diagonal[1:2, 1:2] == [1.0 0.0; 0.0 1.0]
+    @test dense_block_diagonal[3:4, 1:2] == zeros(2, 2)
+
+    sparse_block_diagonal = assemble_sparse_block_diagonal_matrix(
+        sample -> [Float64(sample.index) 0.0; 0.0 Float64(sample.index)],
+        samples,
+        UniformBlockLayout(2, 2)
+    )
+    @test issparse(sparse_block_diagonal)
+    @test Matrix(sparse_block_diagonal) == dense_block_diagonal
+
     dense_spectrum = solve_assembled_eigensystem(assembled_matrix)
     @test dense_spectrum isa AssemblySpectrum
     @test length(dense_spectrum.values) == length(samples)
@@ -89,6 +106,27 @@ using SparseArrays
     sparse_spectrum = solve_assembled_eigensystem(sparse_matrix; solver=sparse_hook)
     @test sparse_spectrum isa AssemblySpectrum
     @test length(sparse_spectrum.values) == length(samples)
+
+    graphene = Graphene(1.0, 0.0)
+    graphene_assembly = assemble_sampled_hamiltonian(grid, graphene)
+    @test graphene_assembly isa SampledHamiltonianAssembly
+    @test graphene_assembly.layout isa VariableBlockLayout
+    @test size(graphene_assembly.matrix) == (2 * length(grid), 2 * length(grid))
+
+    graphene_spectrum = solve_sampled_hamiltonian(grid, graphene)
+    @test graphene_spectrum isa AssemblySpectrum
+    @test length(graphene_spectrum.values) == 2 * length(grid)
+
+    one_d_model = TightBinding(ChainLattice(1.0), 1.0, 0.0)
+    bdg_dispersion = MeanFieldDispersion(one_d_model, BCSReducedPairing(), 0.2)
+    bdg_assembly = assemble_sampled_hamiltonian(line_grid, bdg_dispersion; matrix_format=:sparse)
+    @test bdg_assembly.layout isa VariableBlockLayout
+    @test issparse(bdg_assembly.matrix)
+    @test size(bdg_assembly.matrix) == (2 * length(line_grid), 2 * length(line_grid))
+
+    bdg_spectrum = solve_sampled_hamiltonian(line_grid, bdg_dispersion; matrix_format=:sparse, eigensolver=sparse_hook)
+    @test bdg_spectrum isa AssemblySpectrum
+    @test length(bdg_spectrum.values) == 2 * length(line_grid)
 
     existing_workers = Set(Distributed.workers())
     bootstrapped_workers = Int[]

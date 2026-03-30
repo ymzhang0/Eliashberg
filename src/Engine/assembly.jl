@@ -106,6 +106,51 @@ function assemble_grid_matrix(f::F, row_axis, col_axis; kwargs...) where {F}
 end
 
 """
+    assemble_block_diagonal_matrix(f::F, axis, layout; kwargs...) where {F}
+
+Assemble a dense block-diagonal matrix by mapping a block-valued local kernel
+over a single sample axis and packing the returned blocks along the diagonal.
+"""
+function assemble_block_diagonal_matrix(f::F, axis, layout::UniformBlockLayout; kwargs...) where {F}
+    blocks = assemble_grid_vector(f, axis; kwargs...)
+    return _dense_block_diagonal_matrix(blocks, layout)
+end
+
+function assemble_block_diagonal_matrix(f::F, axis, layout::VariableBlockLayout; kwargs...) where {F}
+    blocks = assemble_grid_vector(f, axis; kwargs...)
+    return _dense_block_diagonal_matrix(blocks, layout)
+end
+
+"""
+    assemble_sparse_block_diagonal_matrix(f::F, axis, layout; atol=0.0, kwargs...) where {F}
+
+Assemble a sparse block-diagonal matrix by mapping a block-valued local kernel
+over a single sample axis and materializing only entries whose magnitude is
+strictly larger than `atol`.
+"""
+function assemble_sparse_block_diagonal_matrix(
+    f::F,
+    axis,
+    layout::UniformBlockLayout;
+    atol::Real=0.0,
+    kwargs...
+) where {F}
+    blocks = assemble_grid_vector(f, axis; kwargs...)
+    return _sparse_block_diagonal_matrix(blocks, layout, atol)
+end
+
+function assemble_sparse_block_diagonal_matrix(
+    f::F,
+    axis,
+    layout::VariableBlockLayout;
+    atol::Real=0.0,
+    kwargs...
+) where {F}
+    blocks = assemble_grid_vector(f, axis; kwargs...)
+    return _sparse_block_diagonal_matrix(blocks, layout, atol)
+end
+
+"""
     assemble_sparse_grid_matrix(f::F, row_axis, col_axis; atol=0.0, kwargs...) where {F}
 
 Assemble a sparse scalar matrix by mapping a local kernel over the Cartesian
@@ -279,11 +324,62 @@ function _dense_block_matrix(blocks::AbstractMatrix, layout::VariableBlockLayout
     return matrix
 end
 
+function _dense_block_diagonal_matrix(blocks::AbstractVector, layout::UniformBlockLayout)
+    n_blocks = length(blocks)
+    result_type = _diagonal_block_eltype(blocks, layout)
+    matrix = Matrix{result_type}(undef, n_blocks * layout.row_block_size, n_blocks * layout.col_block_size)
+    fill!(matrix, zero(result_type))
+
+    for block_index in 1:n_blocks
+        row_range = _block_range(block_index, layout.row_block_size)
+        col_range = _block_range(block_index, layout.col_block_size)
+        matrix[row_range, col_range] = _coerce_block(blocks[block_index], layout, block_index, block_index)
+    end
+
+    return matrix
+end
+
+function _dense_block_diagonal_matrix(blocks::AbstractVector, layout::VariableBlockLayout)
+    _validate_diagonal_layout(length(blocks), layout)
+    result_type = _diagonal_block_eltype(blocks, layout)
+    matrix = Matrix{result_type}(undef, layout.row_axis.total_size, layout.col_axis.total_size)
+    fill!(matrix, zero(result_type))
+
+    for block_index in eachindex(blocks)
+        row_range = _block_range(layout.row_axis, block_index)
+        col_range = _block_range(layout.col_axis, block_index)
+        matrix[row_range, col_range] = _coerce_block(blocks[block_index], layout, block_index, block_index)
+    end
+
+    return matrix
+end
+
 function _dense_block_eltype(blocks::AbstractMatrix, layout::UniformBlockLayout)
     result_type = Union{}
 
     for block in blocks
         result_type = promote_type(result_type, eltype(_coerce_block(block, layout)))
+    end
+
+    return result_type === Union{} ? Float64 : result_type
+end
+
+function _diagonal_block_eltype(blocks::AbstractVector, layout::UniformBlockLayout)
+    result_type = Union{}
+
+    for (block_index, block) in enumerate(blocks)
+        result_type = promote_type(result_type, eltype(_coerce_block(block, layout, block_index, block_index)))
+    end
+
+    return result_type === Union{} ? Float64 : result_type
+end
+
+function _diagonal_block_eltype(blocks::AbstractVector, layout::VariableBlockLayout)
+    _validate_diagonal_layout(length(blocks), layout)
+    result_type = Union{}
+
+    for (block_index, block) in enumerate(blocks)
+        result_type = promote_type(result_type, eltype(_coerce_block(block, layout, block_index, block_index)))
     end
 
     return result_type === Union{} ? Float64 : result_type
@@ -403,6 +499,64 @@ function _sparse_block_matrix_from_entries(
     return sparse(row_indices, col_indices, values, layout.row_axis.total_size, layout.col_axis.total_size)
 end
 
+function _sparse_block_diagonal_matrix(blocks::AbstractVector, layout::UniformBlockLayout, atol::Real)
+    value_type = _diagonal_sparse_value_type(blocks, layout)
+    n_blocks = length(blocks)
+    n_rows = n_blocks * layout.row_block_size
+    n_cols = n_blocks * layout.col_block_size
+    isempty(blocks) && return spzeros(Float64, n_rows, n_cols)
+
+    row_indices = Int[]
+    col_indices = Int[]
+    values = Vector{value_type}(undef, 0)
+
+    for (block_index, raw_block) in enumerate(blocks)
+        row_range = _block_range(block_index, layout.row_block_size)
+        col_range = _block_range(block_index, layout.col_block_size)
+        block = _coerce_block(raw_block, layout, block_index, block_index)
+
+        for (local_row, global_row) in enumerate(row_range)
+            for (local_col, global_col) in enumerate(col_range)
+                value = block[local_row, local_col]
+                _is_significant(value, atol) || continue
+                push!(row_indices, global_row)
+                push!(col_indices, global_col)
+                push!(values, value)
+            end
+        end
+    end
+
+    return sparse(row_indices, col_indices, values, n_rows, n_cols)
+end
+
+function _sparse_block_diagonal_matrix(blocks::AbstractVector, layout::VariableBlockLayout, atol::Real)
+    _validate_diagonal_layout(length(blocks), layout)
+    value_type = _diagonal_sparse_value_type(blocks, layout)
+    isempty(blocks) && return spzeros(Float64, layout.row_axis.total_size, layout.col_axis.total_size)
+
+    row_indices = Int[]
+    col_indices = Int[]
+    values = Vector{value_type}(undef, 0)
+
+    for (block_index, raw_block) in enumerate(blocks)
+        row_range = _block_range(layout.row_axis, block_index)
+        col_range = _block_range(layout.col_axis, block_index)
+        block = _coerce_block(raw_block, layout, block_index, block_index)
+
+        for (local_row, global_row) in enumerate(row_range)
+            for (local_col, global_col) in enumerate(col_range)
+                value = block[local_row, local_col]
+                _is_significant(value, atol) || continue
+                push!(row_indices, global_row)
+                push!(col_indices, global_col)
+                push!(values, value)
+            end
+        end
+    end
+
+    return sparse(row_indices, col_indices, values, layout.row_axis.total_size, layout.col_axis.total_size)
+end
+
 function _coerce_block(block::AbstractMatrix, layout::UniformBlockLayout)
     size(block) == (layout.row_block_size, layout.col_block_size) ||
         throw(DimensionMismatch("Block size $(size(block)) does not match layout ($(layout.row_block_size), $(layout.col_block_size))."))
@@ -456,6 +610,25 @@ end
 
 function _block_shape(layout::VariableBlockLayout, block_row::Int, block_col::Int)
     return (layout.row_axis.block_sizes[block_row], layout.col_axis.block_sizes[block_col])
+end
+
+function _diagonal_sparse_value_type(blocks::AbstractVector, layout)
+    value_type = Union{}
+
+    for (block_index, block) in enumerate(blocks)
+        value_type = promote_type(value_type, eltype(_coerce_block(block, layout, block_index, block_index)))
+    end
+
+    return value_type === Union{} ? Float64 : value_type
+end
+
+_validate_diagonal_layout(::Int, ::UniformBlockLayout) = nothing
+
+function _validate_diagonal_layout(n_blocks::Int, layout::VariableBlockLayout)
+    n_blocks == length(layout.row_axis.block_sizes) ||
+        throw(DimensionMismatch("Diagonal block count $n_blocks does not match variable row layout length $(length(layout.row_axis.block_sizes))."))
+    n_blocks == length(layout.col_axis.block_sizes) ||
+        throw(DimensionMismatch("Diagonal block count $n_blocks does not match variable column layout length $(length(layout.col_axis.block_sizes))."))
 end
 
 function _validate_layout_axes(dims::Tuple{Int,Int}, layout::VariableBlockLayout)

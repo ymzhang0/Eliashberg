@@ -138,6 +138,53 @@ F_rpa = evaluate_action(phis, field, model, interaction, kgrid, RPA(); T=0.1)
 phi_gs = solve_ground_state(field, model, interaction, kgrid, ExactTrLn(); phi_guess=0.5, T=0.1)
 ```
 
+## Sampled Hamiltonian Assembly
+
+For multi-orbital Bloch models and BdG mean-field models, you can assemble the
+sampled direct-sum Hamiltonian explicitly and then diagonalize it through the
+engine solve layer.
+
+### Multi-orbital example: Graphene
+
+```julia
+lattice = HexagonalLattice(1.0)
+model = Graphene(1.0, 0.0)
+kgrid = generate_2d_kgrid(6, 6)
+
+assembly = assemble_sampled_hamiltonian(kgrid, model)
+spectrum = solve_sampled_hamiltonian(kgrid, model)
+
+size(assembly.matrix) == (2 * length(kgrid), 2 * length(kgrid))
+assembly.layout.row_axis.block_sizes[1] == 2
+```
+
+### BdG example: 1D BCS mean-field Hamiltonian
+
+```julia
+bare_model = TightBinding(ChainLattice(1.0), 1.0, -0.3)
+field = BCSReducedPairing(:s_wave)
+bdg_model = MeanFieldDispersion(bare_model, field, 0.25)
+kgrid = generate_1d_kgrid(32)
+
+# In production you can replace this with a package-backed sparse eigensolver.
+sparse_hook = SparseEigenSolverHook((matrix; kwargs...) -> eigen(Matrix(matrix)))
+
+assembly = assemble_sampled_hamiltonian(kgrid, bdg_model; matrix_format=:sparse)
+spectrum = solve_sampled_hamiltonian(
+    kgrid,
+    bdg_model;
+    matrix_format=:sparse,
+    eigensolver=sparse_hook
+)
+
+issparse(assembly.matrix)
+length(spectrum.values) == 2 * length(kgrid)
+```
+
+A complete visualization demo for both cases lives in:
+
+- `examples/sampled_hamiltonian_demo.jl`
+
 ## Susceptibilities and Spectral Scans
 
 Static and dynamical response calculations use `GeneralizedSusceptibility`, `scan_instability_landscape`, and `scan_spectral_function`.
@@ -179,6 +226,7 @@ Current example entry points live in `examples/`:
 - `examples/test_3d_viz.jl`
 - `examples/verify_all_vizes.jl`
 - `examples/Eliashberg_Dashboard.jl`
+- `examples/sampled_hamiltonian_demo.jl`
 - `examples/geometry.ipynb`
 - `examples/BCS.ipynb`
 - `examples/CDW.ipynb`
