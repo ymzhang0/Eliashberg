@@ -1,4 +1,5 @@
-# src/Solvers/effective_action.jl
+struct ExactTrLn <: ApproximationLevel end
+struct RPA <: ApproximationLevel end
 
 """
     evaluate_action(phi, field, model, interaction, kgrid, ::ExactTrLn; T=1e-3)

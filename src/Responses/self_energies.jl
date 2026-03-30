@@ -1,3 +1,8 @@
+struct RenormalizedDispersion{D,M<:ElectronicDispersion{D},S<:SelfEnergy} <: ElectronicDispersion{D}
+    bare_dispersion::M
+    self_energy::S
+end
+
 struct HartreeFockSelfEnergy{Dim} <: SelfEnergy
     interaction::CoulombInteraction          # V(q)
     smearing::Smearing             # f(ε)

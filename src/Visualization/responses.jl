@@ -243,7 +243,7 @@ function visualize_collective_modes(
     # ==========================================
     # 4. 执行动态扫描
     # ==========================================
-    println("🚀 开始扫描超导集体激发谱 (q, ω)... 这可能需要一点时间")
+    println("🚀 开始扫描集体激发谱 (q, ω)... 这可能需要一点时间")
 
     chi_im_matrix = zeros(length(qpath.points), length(omegas))
 

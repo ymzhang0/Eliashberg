@@ -1,6 +1,10 @@
 # ---------------------------------------------------------
 # 1D Lattices
 # ---------------------------------------------------------
+struct Lattice{D} <: AbstractLattice{D}
+    vectors::SMatrix{D,D,Float64}
+end
+
 struct ChainLattice <: AbstractLattice{1}
     a::Float64
     vectors::SMatrix{1,1,Float64,1}

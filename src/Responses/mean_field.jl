@@ -1,4 +1,16 @@
+# ----------------------------------------------------------------------------
+# Mean-Field Dispersion Structs & Constructors
+# ----------------------------------------------------------------------------
 
+struct MeanFieldDispersion{D,M<:ElectronicDispersion{D},F<:AuxiliaryField} <: ElectronicDispersion{D}
+    bare_dispersion::M
+    field::F
+    phi::Float64
+end
+
+struct NormalNambuDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
+    bare::M
+end
 
 # Generic constructor to ensure phi is Float64
 function MeanFieldDispersion(bare::M, field::F, phi::Real) where {D,M<:ElectronicDispersion{D},F<:AuxiliaryField}
@@ -21,6 +33,15 @@ end
 function MeanFieldDispersion(bare::M, field::PairDensityWave{D}, phi::Float64) where {D,M<:ElectronicDispersion{D}}
     return MeanFieldDispersion{D,M,PairDensityWave{D}}(bare, field, phi)
 end
+
+# ----------------------------------------------------------------------------
+# Basis Promotion Logic
+# ----------------------------------------------------------------------------
+
+normal_state_basis(model::ElectronicDispersion{D}, field::AuxiliaryField) where {D} = model
+normal_state_basis(model::ElectronicDispersion{D}, field::BCSReducedPairing) where {D} = NormalNambuDispersion{D,typeof(model)}(model)
+normal_state_basis(model::ElectronicDispersion{D}, field::FFLOPairing{D}) where {D} = FFLONormalDispersion{D,typeof(model)}(model, field.q)
+normal_state_basis(model::ElectronicDispersion{D}, field::PairDensityWave{D}) where {D} = PDWNormalDispersion{D,typeof(model)}(model, field.q)
 
 # ----------------------------------------------------------------------------
 # Matrix Elements (ε) - The Core Physics
@@ -97,8 +118,9 @@ function gap_form_factor(k::SVector{2,Float64}, field::AuxiliaryField)
     elseif field.symmetry == :d_wave
         return cos(k[1]) - cos(k[2])
     elseif field.symmetry == :p_wave
-        # Just an example of extensibility
         return sin(k[1]) + im * sin(k[2])
+    elseif field.symmetry == :s_plus_minus_wave
+        return cos(k[1]) * cos(k[2])
     else
         error("Unsupported pairing symmetry: $(field.symmetry)")
     end

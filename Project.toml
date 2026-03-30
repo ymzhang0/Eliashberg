@@ -6,6 +6,8 @@ authors = ["ymzhang0 <zhangyiming1998@gmail.com>"]
 [deps]
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ClusterManagers = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -23,6 +25,8 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 [compat]
 Bonito = "4.2.0"
 CairoMakie = "0.15.9"
+ClusterManagers = "2.0.0"
+Distributed = "1.11.0"
 GLMakie = "0.13.9"
 IJulia = "1.34.4"
 Makie = "0.24.9"

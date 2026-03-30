@@ -9,29 +9,38 @@ using PhysicalConstants.CODATA2022
 using QuadGK
 using Optim
 
-# 1. Fundamental Constants and Linear Algebra
+# 1. Fundamental Constants and Linear Algebra (Base Tier)
 include("Constants.jl") # Also includes la.jl
 
-# 2. Sharded Abstract and Base Types (Topological Order)
+# 2. Abstract Tier (Topological Order - Only abstract types)
 include("Geometry/types.jl")
 include("Models/types.jl")
 include("Responses/types.jl")
 include("Solvers/types.jl")
 
-# 3. Domain Implementations
-# Geometry (Real and Reciprocal space)
+# 3. Data Structure Tier (Concrete structs and constructors)
+# Geometry
 include("Geometry/lattice.jl")
-include("Geometry/reciprocal_lattice.jl")
 
-# Physical models and bare dispersions
+# Models
 include("Models/dispersions.jl")
 include("Models/interactions.jl")
 
-# Many-body responses and Mean-Field logic
-include("Responses/mean_field.jl")
+# Responses
+include("Responses/fields.jl")
 include("Responses/propagators.jl")
 include("Responses/smearings.jl")
 include("Responses/self_energies.jl")
+
+# 4. Method & Logic Tier (Computational algorithms and dispatch)
+# Geometry methods
+include("Geometry/reciprocal_lattice.jl")
+
+# Models methods
+include("Models/evaluators.jl")
+
+# Responses methods
+include("Responses/mean_field.jl")
 include("Responses/susceptibilities.jl")
 
 # Numerical solvers and algorithms
@@ -41,18 +50,16 @@ include("Solvers/effective_action.jl")
 include("Solvers/observables.jl")
 include("Solvers/scanners.jl")
 
-# Synchronization of Visualization Dependencies (Consolidated at top)
-
-# Visualization wrappers
+# 5. Visualization Tier
 include("Visualization/utils.jl")
 include("Visualization/geometry.jl")
 include("Visualization/bands.jl")
 include("Visualization/responses.jl")
 
-# 4. Backward Compatibility and Aliases
+# 6. Backward Compatibility and Aliases
 const LindhardSusceptibility = GeneralizedSusceptibility
 
-# 5. Centralized Exports
+# 7. Centralized Exports
 
 # Constants & LA
 export Å, a0, Ry, me, e, ε0, h, ħ, kB, c, Ry2J, Ry2eV, Ha2J, Ha2eV, kB2meV, kB2eV, kB2Ha, A2Bohr

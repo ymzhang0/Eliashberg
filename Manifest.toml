@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "af2739f8077b092097e21300335f0731caa2aad6"
+project_hash = "cc25a204fadfbfc75ed43d9aaffb7af82562971b"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -229,6 +229,12 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.ClusterManagers]]
+deps = ["Distributed", "Logging", "Pkg", "Sockets"]
+git-tree-sha1 = "17b0689c7e6b2f48f71c6834b6a1ed6882be10d2"
+uuid = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
+version = "2.0.0"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -470,7 +476,7 @@ uuid = "5ae413db-bbd1-5e63-b57d-d24a61df00f5"
 version = "2.2.4+0"
 
 [[deps.Eliashberg]]
-deps = ["CairoMakie", "GLMakie", "IJulia", "LinearAlgebra", "Makie", "Optim", "PhysicalConstants", "Plots", "QuadGK", "StaticArrays", "Statistics", "Test", "Unitful", "WGLMakie"]
+deps = ["Bonito", "CairoMakie", "Distributed", "GLMakie", "IJulia", "LinearAlgebra", "Makie", "Optim", "PhysicalConstants", "Plots", "QuadGK", "StaticArrays", "Statistics", "Test", "Unitful", "WGLMakie"]
 path = "."
 uuid = "adbadfb0-2f75-4cd8-9a77-6e8457d2b59b"
 version = "0.1.0"
