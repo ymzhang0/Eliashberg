@@ -28,6 +28,19 @@ using Eliashberg
 using StaticArrays
 ```
 
+On headless clusters, the core package does not require an OpenGL backend.
+If you only need solvers, response functions, or data generation, `using Eliashberg`
+should work without `GLMakie`.
+
+Visualization backends are optional and should be installed separately in the
+environment where you actually render figures:
+
+```julia
+using Pkg
+Pkg.add("CairoMakie")  # recommended for batch rendering on clusters
+# Pkg.add("GLMakie")   # only for local sessions with a working OpenGL display
+```
+
 ## Geometry and Grids
 
 ### 1D chain
@@ -86,7 +99,7 @@ Hk = ε(SVector{2, Float64}(1.0, 2.0), free_model)
 ## Visualizing Lattices and Bands
 
 ```julia
-using CairoMakie
+using CairoMakie  # optional plotting backend
 
 lattice = SquareLattice(1.0)
 model = TightBinding(lattice, 1.0, 0.2, 0.0)
