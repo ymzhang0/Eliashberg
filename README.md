@@ -106,10 +106,13 @@ model = TightBinding(lattice, 1.0, 0.2, 0.0)
 kgrid = generate_reciprocal_lattice(lattice, 80, 80)
 kpath = generate_kpath(lattice; n_pts_per_segment=50)
 
+path_data = compute_path_band_data(model, kpath)
+surface_data = compute_dispersion_surface_data(model, kgrid)
+
 fig1 = visualize_lattice(lattice)
 fig2 = visualize_reciprocal_space(lattice, kgrid)
-fig3 = visualize_dispersion(model, kpath)
-fig4 = visualize_dispersion(model, kgrid; E_Fermi=0.0)
+fig3 = plot_band_structure(kpath, path_data.bands)
+fig4 = plot_dispersion_surface(surface_data.kxs, surface_data.kys, surface_data.energy_matrix; E_Fermi=0.0)
 ```
 
 ## Mean-Field Action and Order Parameters
@@ -132,8 +135,19 @@ Ts = range(0.1, 0.4, length=10)
 F_exact = evaluate_action(phis, field, model, interaction, kgrid, ExactTrLn(); T=0.1)
 phi_gs = solve_ground_state(field, model, interaction, kgrid, ExactTrLn(); phi_guess=0.2, T=0.1)
 
-fig = visualize_phase_transition(phis, Ts, field, model, interaction, kgrid)
-bands_fig = visualize_renormalized_bands(Ts, field, model, interaction, kgrid, generate_kpath(lattice))
+phase_data = compute_phase_transition_data(phis, Ts, field, model, interaction, kgrid)
+kpath = generate_kpath(lattice)
+band_data = compute_renormalized_band_data(Ts, field, model, interaction, kgrid, kpath)
+
+fig = plot_phase_transition(phis, Ts, phase_data.condensation_energy, phase_data.order_parameters)
+bands_fig = plot_renormalized_bands(
+    Ts,
+    kpath,
+    band_data.bare_bands,
+    band_data.hole_bands,
+    band_data.particle_bands,
+    band_data.gaps
+)
 ```
 
 ### Charge-density-wave channel
@@ -213,7 +227,8 @@ chi0 = GeneralizedSusceptibility(model, kgrid, field, 0.1)
 chi_q = chi0(SVector{2, Float64}(0.1, 0.1))
 
 landscape = scan_instability_landscape(model, kgrid, qgrid; T=0.1, η=1e-3)
-fig = visualize_landscape(Val(2), qgrid, landscape)
+landscape_axes = compute_landscape_axes(qgrid)
+fig = plot_landscape(Val(2), landscape_axes.qxs, landscape_axes.qys, landscape)
 ```
 
 For a momentum-frequency spectral map:
@@ -229,7 +244,7 @@ qpath = generate_kpath(q_nodes, q_labels; n_pts_per_segment=100)
 omegas = range(0.0, 5.0, length=200)
 
 spectral = scan_spectral_function(model, kgrid, qpath, omegas; T=0.01, η=0.02)
-fig = visualize_spectral_function(qpath, omegas, spectral)
+fig = plot_spectral_function(qpath, omegas, spectral)
 ```
 
 ## Example Files

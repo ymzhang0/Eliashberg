@@ -4,6 +4,7 @@ using StaticArrays
 using Distributed
 using LinearAlgebra
 using SparseArrays
+using Makie
 
 @testset "Dimensionality-Agnostic Refactor" begin
     grid = generate_2d_kgrid(4, 4)
@@ -171,6 +172,78 @@ using SparseArrays
     omegas = collect(range(0.0, 1.0, length=5))
     spectral = scan_spectral_function(model, grid, qpath, omegas; T=0.1, η=0.02)
     @test size(spectral) == (length(qpath), length(omegas))
+    spectral_fig = plot_spectral_function(qpath, omegas, spectral)
+    @test spectral_fig isa Figure
+
+    line_band_data = compute_dispersion_curve_data(one_d_model, line_grid)
+    @test size(line_band_data.bands, 1) == length(line_grid)
+    dispersion_fig = plot_dispersion_curves(line_band_data.coordinates, line_band_data.bands)
+    @test dispersion_fig isa Figure
+
+    path = generate_kpath(ChainLattice(1.0); n_pts_per_segment=4)
+    path_band_data = compute_path_band_data(one_d_model, path)
+    @test size(path_band_data.bands, 1) == length(path)
+    band_fig = plot_band_structure(path, path_band_data.bands)
+    @test band_fig isa Figure
+
+    line_landscape_data = compute_landscape_line_data(line_grid, collect(1.0:length(line_grid)))
+    @test length(line_landscape_data.qs) == length(line_grid)
+    landscape_fig = plot_landscape(Val(1), line_landscape_data.qs, line_landscape_data.values)
+    @test landscape_fig isa Figure
+
+    phase_data = compute_phase_transition_data(
+        collect(range(0.0, 0.2, length=3)),
+        [0.1, 0.2],
+        BCSReducedPairing(:s_wave),
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid
+    )
+    @test size(phase_data.condensation_energy) == (3, 2)
+    phase_fig = plot_phase_transition(
+        collect(range(0.0, 0.2, length=3)),
+        [0.1, 0.2],
+        phase_data.condensation_energy,
+        phase_data.order_parameters
+    )
+    @test phase_fig isa Figure
+
+    renormalized_data = compute_renormalized_band_data(
+        [0.1],
+        BCSReducedPairing(:s_wave),
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid,
+        path
+    )
+    @test size(renormalized_data.hole_bands) == (length(path), 1)
+    renormalized_fig = plot_renormalized_bands(
+        [0.1],
+        path,
+        renormalized_data.bare_bands,
+        renormalized_data.hole_bands,
+        renormalized_data.particle_bands,
+        renormalized_data.gaps
+    )
+    @test renormalized_fig isa Figure
+
+    collective_data = compute_collective_mode_spectral_data(
+        0.1,
+        BCSReducedPairing(:s_wave),
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid,
+        path;
+        n_omegas=4
+    )
+    @test size(collective_data.spectral_matrix) == (length(path), 4)
+    collective_fig = plot_collective_modes(
+        path,
+        collective_data.omegas,
+        collective_data.spectral_matrix;
+        pair_breaking_edge=collective_data.pair_breaking_edge
+    )
+    @test collective_fig isa Figure
 
     inter = ConstantInteraction(0.5)
     vals, vecs = solve_bcs(grid, model, inter)

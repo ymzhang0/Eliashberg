@@ -43,3 +43,19 @@ function default_kgrid(::Val{3})
     ]
     return KGrid(path, ones(length(path)) / length(path))
 end
+
+"""
+    path_distances(path::KPath)
+
+Return the cumulative path-length coordinate associated with each point in a
+piecewise-linear path.
+"""
+function path_distances(path::KPath)
+    distances = zeros(length(path.points))
+    dist = 0.0
+    for idx in 2:length(path.points)
+        dist += norm(path.points[idx] - path.points[idx - 1])
+        distances[idx] = dist
+    end
+    return distances
+end

@@ -56,6 +56,7 @@ include("Solvers/sampled_hamiltonians.jl")
 include("Solvers/effective_action.jl")
 include("Solvers/observables.jl")
 include("Solvers/scanners.jl")
+include("Solvers/spectra.jl")
 
 # 5. Visualization Tier
 include("Visualization/utils.jl")
@@ -94,8 +95,12 @@ export ApproximationLevel, ExactTrLn, RPA
 export Engine, GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLayout, AssemblySpectrum, DenseEigenSolver, SparseEigenSolverHook, bootstrap_engine_workers!, grid_samples, assemble_grid_vector, assemble_grid_matrix, assemble_sparse_grid_matrix, assemble_block_grid_matrix, assemble_sparse_block_grid_matrix, assemble_block_diagonal_matrix, assemble_sparse_block_diagonal_matrix, solve_assembled_eigensystem, integrate_grid, distributed_map_grid
 export SampledHamiltonianAssembly, assemble_sampled_hamiltonian, solve_sampled_hamiltonian
 export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
+export compute_dispersion_curve_data, compute_dispersion_surface_data, compute_path_band_data, compute_fermi_surface_volume
+export compute_landscape_line_data, compute_landscape_axes, compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data
 
 # Visualization
+export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plot_fermi_surface, plot_renormalized_bands
+export plot_landscape, plot_spectral_function, plot_phase_transition, plot_zeeman_pairing_landscape, plot_collective_modes
 export visualize_dispersion, dimensionality, visualize_landscape, visualize_spectral_function, visualize_phase_transition, visualize_renormalized_bands, visualize_zeeman_pairing_landscape, visualize_collective_modes
 export visualize_lattice, visualize_reciprocal_space
 
