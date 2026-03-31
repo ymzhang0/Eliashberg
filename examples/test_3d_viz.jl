@@ -17,9 +17,16 @@ weights = ones(length(points)) / length(points)
 kgrid = KGrid(points, weights)
 
 # 3. Visualize the Fermi Surface (E = 0.0)
-# This will dispatch to the newly implemented 3D isosurface method.
+# Compute the volume data first, then render it through the pure plotting layer.
 println("Generating 3D Fermi Surface plot...")
-fig = visualize_dispersion(model, kgrid; E_Fermi=0.0)
+fermi_surface = compute_fermi_surface_volume(model; n_pts=60)
+fig = plot_fermi_surface(
+    fermi_surface.kxs,
+    fermi_surface.kys,
+    fermi_surface.kzs,
+    fermi_surface.energy_volume;
+    E_Fermi=0.0
+)
 
 # 4. Display or save
 # display(fig) # Uncomment if running in an interactive session

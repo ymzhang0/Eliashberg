@@ -2,11 +2,31 @@ using Eliashberg
 using StaticArrays
 using CairoMakie
 
-# Function to run a visualization and save it
+# Function to compute visualization data, render, and save it
 function test_viz(name, model, grid; kwargs...)
     println("Testing $name...")
     try
-        fig = visualize_dispersion(model, grid; kwargs...)
+        fig = if grid isa KPath
+            band_data = compute_path_band_data(model, grid)
+            plot_band_structure(grid, band_data.bands; kwargs...)
+        elseif grid isa KGrid{2}
+            surface_data = compute_dispersion_surface_data(model, grid)
+            plot_dispersion_surface(surface_data.kxs, surface_data.kys, surface_data.energy_matrix; kwargs...)
+        elseif grid isa KGrid{3}
+            fermi_surface = compute_fermi_surface_volume(model; n_pts=60)
+            plot_fermi_surface(
+                fermi_surface.kxs,
+                fermi_surface.kys,
+                fermi_surface.kzs,
+                fermi_surface.energy_volume;
+                kwargs...
+            )
+        elseif grid isa KGrid{1}
+            curve_data = compute_dispersion_curve_data(model, grid)
+            plot_dispersion_curves(curve_data.coordinates, curve_data.bands; kwargs...)
+        else
+            throw(ArgumentError("Unsupported grid type $(typeof(grid)) for visualization test."))
+        end
         save("$(name).png", fig)
         println("  SUCCESS: Saved $(name).png")
     catch e
