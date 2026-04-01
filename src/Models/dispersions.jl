@@ -22,6 +22,46 @@ struct TightBinding{D} <: ElectronicDispersion{D}
 end
 
 """
+    MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}
+
+Multi-orbital tight-binding model defined on a `Crystal{D}` with an explicit
+multi-atom basis. Each hopping is stored as
+`(atom_i, atom_j, cell_offset_R, t)` and is interpreted as a unique real-space
+term whose Hermitian partner is generated automatically in `ε(k)`.
+"""
+struct MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}
+    crystal::Crystal{D}
+    hoppings::Vector{Tuple{Int,Int,SVector{D,Int},ComplexF64}}
+    EF::Float64
+end
+
+"""
+    MultiOrbitalTightBinding(crystal::Crystal{D}, hoppings, EF) where {D}
+
+Build a `MultiOrbitalTightBinding` model directly from the internal `Crystal`
+representation. All hoppings are normalized to the statically typed format
+used by the evaluator. The cell offsets in `hoppings` may be given as plain
+Julia vectors or tuples and are converted internally to `SVector{D,Int}`.
+"""
+function MultiOrbitalTightBinding(crystal::Crystal{D}, hoppings, EF) where {D}
+    typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
+        (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
+        for (atom_i, atom_j, cell_offset_R, t) in hoppings
+    ]
+    return MultiOrbitalTightBinding{D}(crystal, typed_hoppings, Float64(EF))
+end
+
+"""
+    MultiOrbitalTightBinding(system::AbstractSystem{D}, hoppings, EF) where {D}
+
+Build a `MultiOrbitalTightBinding` model from an `AtomsBase.AbstractSystem` by
+first converting the system into the internal `Crystal` representation.
+"""
+function MultiOrbitalTightBinding(system::AbstractSystem{D}, hoppings, EF) where {D}
+    return MultiOrbitalTightBinding(Crystal(system), hoppings, EF)
+end
+
+"""
     KagomeLattice <: ElectronicDispersion{2}
 
 Represents a 2D Kagome lattice with 3 sublattice sites per unit cell.

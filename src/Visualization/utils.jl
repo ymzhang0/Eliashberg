@@ -16,6 +16,7 @@ _extract_D(::Type{<:Dispersion}) = error("Could not infer dimensionality. Please
 # Assuming the struct signature has D as the first parameter for these:
 _extract_D(::Type{<:FreeElectron{D}}) where D = D
 _extract_D(::Type{<:TightBinding{D}}) where D = D
+_extract_D(::Type{<:MultiOrbitalTightBinding{D}}) where D = D
 _extract_D(::Type{<:RenormalizedDispersion{D}}) where D = D
 _extract_D(::Type{<:MeanFieldDispersion{D}}) where D = D
 _extract_D(::Type{<:KagomeLattice}) = 2

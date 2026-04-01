@@ -37,6 +37,44 @@ function ε(k::SVector{D,Float64}, model::TightBinding{D}) where {D}
     return Hermitian(hcat(E_k))
 end
 
+"""
+    ε(k::SVector{D,Float64}, model::MultiOrbitalTightBinding{D}) where {D}
+
+Evaluate the Bloch Hamiltonian for a multi-atom-basis tight-binding model.
+For each real-space hopping `(i, j, R, t)`, the phase factor is computed from
+the exact Cartesian displacement between basis atom `i` in the home cell and
+basis atom `j` in the translated cell `R`.
+"""
+function ε(k::SVector{D,Float64}, model::MultiOrbitalTightBinding{D}) where {D}
+    crystal = model.crystal
+    lattice = primitive_vectors(crystal)
+    basis = crystal.fractional_positions
+    n_basis = length(basis)
+    hamiltonian = zeros(ComplexF64, n_basis, n_basis)
+
+    for site in 1:n_basis
+        hamiltonian[site, site] -= model.EF
+    end
+
+    for (atom_i, atom_j, cell_offset_R, hopping) in model.hoppings
+        fractional_displacement = basis[atom_j] + SVector{D,Float64}(cell_offset_R) - basis[atom_i]
+        delta_r = lattice * fractional_displacement
+        phase = exp(im * dot(k, delta_r))
+        contribution = hopping * phase
+
+        if atom_i == atom_j && iszero(cell_offset_R)
+            hamiltonian[atom_i, atom_i] += real(contribution)
+        elseif atom_i == atom_j
+            hamiltonian[atom_i, atom_i] += contribution + conj(contribution)
+        else
+            hamiltonian[atom_i, atom_j] += contribution
+            hamiltonian[atom_j, atom_i] += conj(contribution)
+        end
+    end
+
+    return Hermitian(hamiltonian)
+end
+
 function ε(k::SVector{2,Float64}, model::KagomeLattice)
     a1 = model.lattice.vectors[:, 1]
     a2 = model.lattice.vectors[:, 2]

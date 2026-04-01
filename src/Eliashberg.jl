@@ -4,6 +4,8 @@ module Eliashberg
 using LinearAlgebra
 using StaticArrays
 using Makie
+using AtomsBase
+using Spglib
 using Unitful
 using PhysicalConstants.CODATA2022
 using QuadGK
@@ -26,7 +28,7 @@ using .Engine: GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLay
 
 # 3. Data Structure Tier (Concrete structs and constructors)
 # Geometry
-include("Geometry/lattice.jl")
+include("Geometry/crystal.jl")
 
 # Models
 include("Models/dispersions.jl")
@@ -74,12 +76,15 @@ export Å, a0, Ry, me, e, ε0, h, ħ, kB, c, Ry2J, Ry2eV, Ha2J, Ha2eV, kB2meV, k
 export σ₀, σ₁, σ₂, σ₃, pauli_matrices, γ⁰, γ¹, γ², γ³, gamma_matrices, commutator, anticommutator
 
 # Geometry
-export Lattice, ChainLattice, SquareLattice, HexagonalLattice, CubicLattice, FCCLattice, BCCLattice, AbstractKGrid, KGrid, KPath
-export generate_1d_kgrid, generate_2d_kgrid, generate_3d_kgrid, reciprocal_vectors, generate_reciprocal_lattice, generate_kpath
+export Lattice, Crystal, ChainLattice, SquareLattice, HexagonalLattice, CubicLattice, FCCLattice, BCCLattice, AbstractKGrid, KGrid, KPath
+export ibrav, qe_lattice, cubic_p_lattice, cubic_f_lattice, cubic_i_lattice, hexagonal_p_lattice, trigonal_r_lattice, tetragonal_p_lattice, tetragonal_i_lattice
+export orthorhombic_p_lattice, orthorhombic_base_centered_lattice, orthorhombic_face_centered_lattice, orthorhombic_body_centered_lattice, monoclinic_p_lattice, monoclinic_base_centered_lattice, triclinic_lattice
+export scaled_positions, positions, append_atom!, set_scaled_positions!, set_positions!, set_cell!, cartesian_basis, generate_1d_kgrid, generate_2d_kgrid, generate_3d_kgrid, reciprocal_vectors, generate_reciprocal_lattice, generate_kpath
+export build_spglib_cell, generate_irreducible_kgrid
 
 # Models
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction
-export FreeElectron, TightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
+export FreeElectron, TightBinding, MultiOrbitalTightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
 export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction
 export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction
 export ε, ω, V

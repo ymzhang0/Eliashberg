@@ -90,7 +90,8 @@ end
 Calculates the 1D reciprocal lattice vector.
 """
 function reciprocal_vectors(lattice::AbstractLattice{1})
-    a = lattice.vectors[1, 1]
+    vectors = primitive_vectors(lattice)
+    a = vectors[1, 1]
     return SMatrix{1,1,Float64,1}(2π / a)
 end
 
@@ -124,8 +125,9 @@ Calculates and returns the 2D reciprocal lattice vectors `b_i` which satisfy
 the condition `a_i \\cdot b_j = 2\\pi \\delta_{ij}`.
 """
 function reciprocal_vectors(lattice::AbstractLattice{2})
-    a1 = lattice.vectors[:, 1]
-    a2 = lattice.vectors[:, 2]
+    vectors = primitive_vectors(lattice)
+    a1 = vectors[:, 1]
+    a2 = vectors[:, 2]
     area = a1[1] * a2[2] - a1[2] * a2[1]
 
     b1 = SVector{2}(2π * a2[2] / area, -2π * a2[1] / area)
@@ -169,9 +171,10 @@ end
 Calculates the 3D reciprocal lattice vectors using the cross product formulas.
 """
 function reciprocal_vectors(lattice::AbstractLattice{3})
-    a1 = lattice.vectors[:, 1]
-    a2 = lattice.vectors[:, 2]
-    a3 = lattice.vectors[:, 3]
+    vectors = primitive_vectors(lattice)
+    a1 = vectors[:, 1]
+    a2 = vectors[:, 2]
+    a3 = vectors[:, 3]
 
     # Cell volume V = a1 · (a2 × a3)
     V = dot(a1, cross(a2, a3))
@@ -183,6 +186,86 @@ function reciprocal_vectors(lattice::AbstractLattice{3})
     return @SMatrix [b1[1] b2[1] b3[1];
         b1[2] b2[2] b3[2];
         b1[3] b2[3] b3[3]]
+end
+
+"""
+    build_spglib_cell(crystal::Crystal{3})
+
+Convert a `Crystal{3}` into the unit-cell format expected by `Spglib`. The
+resulting cell stores a unitless `Float64` lattice, fractional basis
+coordinates, and integer atom types.
+"""
+function build_spglib_cell(crystal::Crystal{3})
+    symbol_to_type = Dict{Symbol,Int}()
+    atom_types = [get!(symbol_to_type, symbol, length(symbol_to_type) + 1) for symbol in crystal.atomic_symbols]
+
+    return Spglib.SpglibCell(
+        Matrix{Float64}(primitive_vectors(crystal)),
+        copy(crystal.fractional_positions),
+        atom_types,
+    )
+end
+
+"""
+    build_spglib_cell(system::AbstractSystem{3})
+
+Convert an `AtomsBase.AbstractSystem` into an `Spglib.SpglibCell` by first
+constructing the internal `Crystal` representation.
+"""
+function build_spglib_cell(system::AbstractSystem{3})
+    return build_spglib_cell(Crystal(system))
+end
+
+"""
+    generate_irreducible_kgrid(crystal::Crystal{3}, mesh::Vector{Int}; is_shift=[0, 0, 0])
+
+Generate a symmetry-reduced Brillouin-zone integration grid using
+`Spglib.get_ir_reciprocal_mesh`. The irreducible-point weights are normalized
+by the total number of points in the full mesh so that they sum to one.
+"""
+function generate_irreducible_kgrid(crystal::Crystal{3}, mesh::Vector{Int}; is_shift=[0, 0, 0])
+    length(mesh) == 3 || throw(ArgumentError("`mesh` must contain exactly three integers."))
+    length(is_shift) == 3 || throw(ArgumentError("`is_shift` must contain exactly three entries."))
+    all(mesh .> 0) || throw(ArgumentError("`mesh` entries must be positive."))
+
+    spglib_cell = build_spglib_cell(crystal)
+    mesh_result = Spglib.get_ir_reciprocal_mesh(
+        spglib_cell,
+        Int.(mesh);
+        is_shift=map(x -> !iszero(x), is_shift),
+    )
+
+    ir_mapping_table = Int.(mesh_result.ir_mapping_table)
+    grid_address = mesh_result.grid_address
+    irreducible_indices = sort!(unique(ir_mapping_table))
+    degeneracies = zeros(Int, length(grid_address))
+
+    for index in ir_mapping_table
+        degeneracies[index] += 1
+    end
+
+    reciprocal = reciprocal_vectors(crystal)
+    points = Vector{SVector{3,Float64}}(undef, length(irreducible_indices))
+    weights = Vector{Float64}(undef, length(irreducible_indices))
+    total_points = prod(mesh)
+
+    for (point_index, ir_index) in pairs(irreducible_indices)
+        fractional_k = SVector{3,Float64}(grid_address[ir_index])
+        points[point_index] = reciprocal * fractional_k
+        weights[point_index] = degeneracies[ir_index] / total_points
+    end
+
+    return KGrid(points, weights)
+end
+
+"""
+    generate_irreducible_kgrid(system::AbstractSystem{3}, mesh::Vector{Int}; is_shift=[0, 0, 0])
+
+Generate a symmetry-reduced Brillouin-zone integration grid directly from an
+`AtomsBase.AbstractSystem`.
+"""
+function generate_irreducible_kgrid(system::AbstractSystem{3}, mesh::Vector{Int}; is_shift=[0, 0, 0])
+    return generate_irreducible_kgrid(Crystal(system), mesh; is_shift)
 end
 
 """
