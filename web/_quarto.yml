@@ -6,6 +6,7 @@ book:
   author: "Yiming Zhang"
   chapters:
     - index.qmd
+    - content/cluster_workflows.qmd
     - content/CH0.ipynb
     - content/CH1.ipynb
     - content/RPA.ipynb

@@ -1,0 +1,313 @@
+---
+title: Lucia Cluster Workflows
+---
+
+# Lucia Cluster Workflows
+
+This chapter collects the practical steps needed to run `Eliashberg.jl` on the
+Lucia cluster with Julia, VSCode, and notebooks. The focus is on a workflow
+that keeps the physics environment reproducible while making interactive work
+reasonably convenient.
+
+## Recommended Workflow
+
+For heavy notebook-driven exploration, the most reliable setup is:
+
+1. Request an interactive Slurm allocation.
+2. Enter the allocated compute node with `srun --pty bash`.
+3. Connect VSCode to that compute node through Remote SSH.
+4. Use a project-local IJulia kernel that points at the `Eliashberg` environment.
+5. Run notebooks directly from VSCode on the compute node.
+
+This avoids rendering on the front-end node and ensures Julia actually sees the
+resources you requested.
+
+## Resource Shape for Julia
+
+For a single Julia notebook that should use many shared-memory CPU cores, the
+preferred Slurm shape is one task with many CPUs:
+
+```bash
+salloc --nodes=1 --ntasks=1 --cpus-per-task=128 --time=04:00:00
+```
+
+This layout is a better match for:
+
+- `JULIA_NUM_THREADS=128`
+- shared-memory numerical kernels
+- the threaded reduce engine in `Eliashberg.Engine.integrate_grid`
+
+By contrast, an allocation shaped like `--ntasks=128` is more natural for MPI or
+many-process jobs and is usually less convenient for a single notebook kernel.
+
+## Enter the Compute Node
+
+After `salloc`, you may still be sitting on a front-end host such as
+`frontal01`. Enter the actual compute node with:
+
+```bash
+srun --jobid=$SLURM_JOB_ID --pty bash
+```
+
+Then verify where you are:
+
+```bash
+hostname
+echo $SLURM_JOB_ID
+echo $SLURM_CPUS_PER_TASK
+echo $SLURM_NTASKS
+```
+
+For the single-kernel threaded workflow, the expected shape is:
+
+```bash
+SLURM_CPUS_PER_TASK=128
+SLURM_NTASKS=1
+```
+
+## Install a Project-Local Julia Notebook Kernel
+
+Install `IJulia` in the `Eliashberg` project environment rather than only in the
+global base environment.
+
+```bash
+cd /gpfs/home/acad/ucl-modl/yimzhang/Eliashberg
+julia --project=.
+```
+
+Inside Julia:
+
+```julia
+using Pkg
+Pkg.activate(".")
+Pkg.add("IJulia")
+Pkg.instantiate()
+
+using IJulia
+installkernel(
+    "Julia Eliashberg 128T",
+    env = Dict(
+        "JULIA_NUM_THREADS" => "128",
+        "OPENBLAS_NUM_THREADS" => "1"
+    ),
+    "--project=/gpfs/home/acad/ucl-modl/yimzhang/Eliashberg"
+)
+```
+
+This only needs to be done once unless you want to rename the kernel or change
+its thread count.
+
+## Connect from VSCode
+
+The cleanest setup is to connect VSCode directly to the compute node, not the
+front-end node. A typical local `~/.ssh/config` looks like:
+
+```sshconfig
+Host lucia-login
+    HostName <login-host>
+    User yimzhang
+
+Host lucia-job
+    HostName <compute-node-hostname>
+    User yimzhang
+    ProxyJump lucia-login
+```
+
+The compute node hostname can be obtained with:
+
+```bash
+hostname
+```
+
+inside the interactive shell running on the allocation.
+
+In VSCode:
+
+1. Use `Remote-SSH: Connect to Host`.
+2. Connect to `lucia-job`.
+3. Open `/gpfs/home/acad/ucl-modl/yimzhang/Eliashberg`.
+4. Open `examples/BCS.ipynb`.
+5. Select the kernel named `Julia Eliashberg 128T`.
+
+## Why This Is Better Than a Front-End Jupyter Server
+
+Running a notebook server on `frontal01` may appear to work, but the Julia
+kernel will then also run on the front-end node unless you explicitly redirect
+it. That defeats the purpose of requesting a large interactive allocation.
+
+If the kernel should use the allocated cores, the notebook process and the Julia
+kernel both need to live on the compute node.
+
+## First Notebook Cell: Sanity Check
+
+Before launching a heavy calculation, verify that the kernel is on the correct
+host and sees the right thread count.
+
+```julia
+using LinearAlgebra
+using Distributed
+
+println("hostname = ", readchomp(`hostname`))
+println("threads = ", Threads.nthreads())
+println("workers = ", nworkers())
+println("BLAS threads = ", BLAS.get_num_threads())
+println("SLURM_JOB_ID = ", get(ENV, "SLURM_JOB_ID", "unset"))
+println("SLURM_CPUS_PER_TASK = ", get(ENV, "SLURM_CPUS_PER_TASK", "unset"))
+```
+
+For the recommended workflow, you typically want:
+
+- `hostname` equal to the compute node
+- `Threads.nthreads() == 128`
+- `nworkers() == 0`
+- `BLAS.get_num_threads() == 1`
+
+## Single-Kernel Threaded Workflow
+
+For most notebook use, start simple:
+
+- one Julia process
+- many Julia threads
+- no extra distributed workers
+
+This is often sufficient because `Eliashberg.jl` already contains a threaded
+reduce layer. In this mode, no extra initialization is needed once the kernel is
+running with `JULIA_NUM_THREADS=128`.
+
+## When to Add Distributed Workers
+
+Use extra Julia workers only if you are running large parameter scans and want a
+distributed map over the outer parameter space. In that case, do not also keep
+128 threads per worker, or you will oversubscribe the node badly.
+
+A more balanced hybrid setup is something like:
+
+- `JULIA_NUM_THREADS=8`
+- `addprocs(8; exeflags="--project=/gpfs/home/acad/ucl-modl/yimzhang/Eliashberg")`
+
+Then initialize workers inside the notebook:
+
+```julia
+using Distributed
+
+addprocs(8; exeflags="--project=/gpfs/home/acad/ucl-modl/yimzhang/Eliashberg")
+
+@everywhere begin
+    using Eliashberg
+    using StaticArrays
+end
+```
+
+This mode is more useful for outer parameter sweeps than for a single dense
+linear-algebra solve.
+
+## Running `Eliashberg.jl` in a Notebook
+
+Typical notebook initialization:
+
+```julia
+using Pkg
+Pkg.activate("/gpfs/home/acad/ucl-modl/yimzhang/Eliashberg")
+
+using Eliashberg
+using StaticArrays
+```
+
+Then a BCS workflow can follow the new solver/plot split:
+
+```julia
+lattice = ChainLattice(1.0)
+model = TightBinding(lattice, 1.0, -0.3)
+interaction = ConstantInteraction(-2.5)
+field = BCSReducedPairing(:s_wave)
+kgrid = generate_1d_kgrid(256)
+kpath = generate_kpath(lattice; n_pts_per_segment=80)
+Ts = range(0.05, 0.25, length=4)
+
+band_data = compute_renormalized_band_data(Ts, field, model, interaction, kgrid, kpath)
+fig = plot_renormalized_bands(
+    Ts,
+    kpath,
+    band_data.bare_bands,
+    band_data.hole_bands,
+    band_data.particle_bands,
+    band_data.gaps
+)
+```
+
+For collective-mode scans:
+
+```julia
+collective_data = compute_collective_mode_spectral_data(
+    0.1,
+    field,
+    model,
+    interaction,
+    kgrid,
+    kpath;
+    n_omegas=120,
+    eta=0.02
+)
+
+fig = plot_collective_modes(
+    kpath,
+    collective_data.omegas,
+    collective_data.spectral_matrix;
+    pair_breaking_edge=collective_data.pair_breaking_edge
+)
+```
+
+## Session Lifetime and Debug Queues
+
+If you work on a debug queue with a short wall-time limit, the following pieces
+persist across jobs:
+
+- the installed `IJulia` package
+- the installed kernelspec such as `Julia Eliashberg 128T`
+- your local SSH configuration
+
+What does not persist is the running kernel process. For each new allocation you
+still need to:
+
+1. request a new job,
+2. enter the new compute node,
+3. reconnect VSCode to that node,
+4. re-open the notebook kernel.
+
+You do not need to rerun `installkernel(...)` every time.
+
+## Common Failure Modes
+
+### The notebook opens, but `hostname` says `frontal01`
+
+You are connected to the front-end node rather than the compute node. Re-enter
+the allocation with `srun --pty bash` and reconnect VSCode to the compute host.
+
+### The kernel appears, but `Threads.nthreads()` is `1`
+
+The selected kernelspec was not created with `JULIA_NUM_THREADS`, or you chose a
+different Julia kernel. Reinstall or reselect the kernel.
+
+### VSCode cannot connect to `http://localhost:8888`
+
+That usually affects the explicit Jupyter-server workflow rather than the
+recommended direct-kernel workflow. If you do use a Jupyter server, the URL must
+include the token, for example:
+
+```text
+http://127.0.0.1:8888/?token=111111
+```
+
+For the VSCode Remote-SSH workflow described here, you normally do not need to
+manually connect to a separate server URL at all.
+
+## Practical Recommendation
+
+For day-to-day development on Lucia:
+
+- use `--ntasks=1 --cpus-per-task=<N>` for notebook work,
+- connect VSCode directly to the allocated compute node,
+- use a project-local `IJulia` kernel,
+- validate `hostname` and `Threads.nthreads()` in the first cell,
+- only add `Distributed` workers when a parameter scan truly benefits from a
+  second level of parallelism.
