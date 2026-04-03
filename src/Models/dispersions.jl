@@ -22,18 +22,18 @@ struct TightBinding{D} <: ElectronicDispersion{D}
 end
 
 """
-    SpinfulDispersion{D,M} <: ElectronicDispersion{D}
+    SpinorDispersion{D,M} <: ElectronicDispersion{D}
 
 Opt-in wrapper that promotes an existing bare electronic dispersion into a
 spin-degenerate basis. The wrapped model keeps its original orbital structure,
 while `ε(k)` is lifted to a block-diagonal Hamiltonian with explicit spin-up and
 spin-down sectors.
 """
-struct SpinfulDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
+struct SpinorDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
     bare::M
 end
 
-SpinfulDispersion(model::SpinfulDispersion) = model
+SpinorDispersion(model::SpinorDispersion) = model
 
 """
     MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}

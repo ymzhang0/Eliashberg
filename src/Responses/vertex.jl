@@ -12,10 +12,10 @@ const _σ₃_static = @SMatrix [σ₃[1, 1] σ₃[1, 2]; σ₃[2, 1] σ₃[2, 2]
 
 abstract type SpinVertexStyle end
 struct SpinlessVertexStyle <: SpinVertexStyle end
-struct SpinfulVertexStyle <: SpinVertexStyle end
+struct SpinorVertexStyle <: SpinVertexStyle end
 
 _spin_vertex_style(::ElectronicDispersion) = SpinlessVertexStyle()
-_spin_vertex_style(::SpinfulDispersion) = SpinfulVertexStyle()
+_spin_vertex_style(::SpinorDispersion) = SpinorVertexStyle()
 
 spin_direction(::ExchangeChannel{Dir}) where {Dir} = Dir
 spin_direction(::SpinDensityWave{D,Dir}) where {D,Dir} = Dir
@@ -53,23 +53,23 @@ function vertex_matrix(model::ElectronicDispersion, k::SVector, field::SpinDensi
 end
 
 _density_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector) = 1.0
-_density_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector) =
+_density_vertex(::SpinorVertexStyle, model::ElectronicDispersion, k::SVector) =
     _spin_operator_for_model(model, k, _σ₀_static)
 
 _exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:z}) = 1.0
 _exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:x}) = _spinless_spin_flip_error(:x)
 _exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:y}) = _spinless_spin_flip_error(:y)
 _exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:transverse}) = _spinless_spin_flip_error(:transverse)
-_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:z}) =
+_exchange_vertex(::SpinorVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:z}) =
     _spin_operator_for_model(model, k, _σ₃_static)
-_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:x}) =
+_exchange_vertex(::SpinorVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:x}) =
     _spin_operator_for_model(model, k, _σ₁_static)
-_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:y}) =
+_exchange_vertex(::SpinorVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:y}) =
     _spin_operator_for_model(model, k, _σ₂_static)
-_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:transverse}) =
+_exchange_vertex(::SpinorVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:transverse}) =
     _spin_operator_for_model(model, k, _σ₁_static)
 
-function _spin_operator_for_model(model::SpinfulDispersion{D}, k::SVector{D,Float64}, pauli::StaticMatrix{2,2}) where {D}
+function _spin_operator_for_model(model::SpinorDispersion{D}, k::SVector{D,Float64}, pauli::StaticMatrix{2,2}) where {D}
     bare_block = _matrix_data(ε(k, model.bare))
     return _spin_operator(bare_block, pauli)
 end
@@ -111,7 +111,7 @@ function _spin_operator(block::AbstractMatrix{TB}, pauli::StaticMatrix{2,2,TP}) 
 end
 
 function _spinless_spin_flip_error(direction::Symbol)
-    throw(ArgumentError("Spin direction $direction requires a SpinfulDispersion basis."))
+    throw(ArgumentError("Spin direction $direction requires a SpinorDispersion basis."))
 end
 
 """

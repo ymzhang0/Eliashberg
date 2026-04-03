@@ -165,7 +165,7 @@ function _block_diagonal(A::AbstractMatrix{TA}, B::AbstractMatrix{TB}) where {TA
     return Hermitian(matrix)
 end
 
-function ε(k::SVector{D,Float64}, model::SpinfulDispersion{D}) where {D}
+function ε(k::SVector{D,Float64}, model::SpinorDispersion{D}) where {D}
     bare_H = _matrix_data(ε(k, model.bare))
     return _block_diagonal(bare_H, bare_H)
 end

@@ -56,10 +56,10 @@ end
 normal_state_basis(model::ElectronicDispersion{D}, field::AuxiliaryField) where {D} = model
 normal_state_basis(model::ElectronicDispersion{D}, field::ChargeDensityWave{D}) where {D} =
     ParticleHoleNormalDispersion{D,typeof(model),typeof(field)}(model, field)
-normal_state_basis(model::SpinfulDispersion{D}, field::SpinDensityWave{D}) where {D} =
+normal_state_basis(model::SpinorDispersion{D}, field::SpinDensityWave{D}) where {D} =
     ParticleHoleNormalDispersion{D,typeof(model),typeof(field)}(model, field)
 normal_state_basis(model::ElectronicDispersion{D}, field::SpinDensityWave{D}) where {D} =
-    normal_state_basis(SpinfulDispersion(model), field)
+    normal_state_basis(SpinorDispersion(model), field)
 normal_state_basis(model::ElectronicDispersion{D}, field::BCSReducedPairing) where {D} = NormalNambuDispersion{D,typeof(model)}(model)
 normal_state_basis(model::ElectronicDispersion{D}, field::FFLOPairing{D}) where {D} = FFLONormalDispersion{D,typeof(model)}(model, field.q)
 normal_state_basis(model::ElectronicDispersion{D}, field::PairDensityWave{D}) where {D} = PDWNormalDispersion{D,typeof(model)}(model, field.q)
@@ -94,8 +94,8 @@ function vertex_matrix(model::ParticleHoleNormalDispersion{D}, k::SVector{D,Floa
     return _particle_hole_order_vertex(vertex_matrix(model.bare, k, ExchangeChannel(Dir)))
 end
 
-_spin_vertex_style(::NormalNambuDispersion{D,M}) where {D,M<:SpinfulDispersion{D}} = SpinfulVertexStyle()
-_spin_operator_for_model(model::NormalNambuDispersion{D,M}, k::SVector{D,Float64}, pauli::StaticMatrix{2,2}) where {D,M<:SpinfulDispersion{D}} =
+_spin_vertex_style(::NormalNambuDispersion{D,M}) where {D,M<:SpinorDispersion{D}} = SpinorVertexStyle()
+_spin_operator_for_model(model::NormalNambuDispersion{D,M}, k::SVector{D,Float64}, pauli::StaticMatrix{2,2}) where {D,M<:SpinorDispersion{D}} =
     _spin_operator_for_model(model.bare, k, pauli)
 
 function _particle_hole_order_vertex(coupling::StaticMatrix{N,N,T}) where {N,T}
