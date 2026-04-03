@@ -164,6 +164,32 @@ using Makie
     @test isfinite(real(chi_q))
     @test isfinite(imag(chi_q))
 
+    spinful_line_model = SpinfulDispersion(one_d_model)
+    spinful_hk = ε(SVector{1,Float64}(0.1), spinful_line_model)
+    bare_energy = ε(SVector{1,Float64}(0.1), one_d_model)[1, 1]
+    @test size(spinful_hk) == (2, 2)
+    @test Matrix(spinful_hk) ≈ [bare_energy 0.0; 0.0 bare_energy]
+
+    @test vertex_matrix(one_d_model, DirectChannel()) == 1.0
+    @test vertex_matrix(one_d_model, ExchangeChannel()) == 1.0
+    @test_throws ArgumentError vertex_matrix(one_d_model, ExchangeChannel(:x))
+    @test Matrix(vertex_matrix(spinful_line_model, DirectChannel())) == Matrix(σ₀)
+    @test Matrix(vertex_matrix(spinful_line_model, ExchangeChannel(:x))) == Matrix(σ₁)
+    @test Matrix(vertex_matrix(spinful_line_model, ExchangeChannel(:y))) == Matrix(σ₂)
+    @test Matrix(vertex_matrix(spinful_line_model, ExchangeChannel(:z))) == Matrix(σ₃)
+
+    transverse_chi = GeneralizedSusceptibility(spinful_line_model, line_grid, ExchangeChannel(:transverse), 0.1)
+    transverse_val = transverse_chi(SVector{1,Float64}(0.2))
+    @test isfinite(real(transverse_val))
+    @test isfinite(imag(transverse_val))
+
+    sdw = SpinDensityWave(SVector{1,Float64}(0.2), :x)
+    sdw_basis = normal_state_basis(one_d_model, sdw)
+    @test sdw_basis isa Eliashberg.ParticleHoleNormalDispersion
+    @test sdw_basis.bare isa SpinfulDispersion
+    sdw_dispersion = MeanFieldDispersion(one_d_model, sdw, 0.2)
+    @test size(ε(SVector{1,Float64}(0.1), sdw_dispersion)) == (4, 4)
+
     landscape = scan_instability_landscape(model, grid, grid; T=0.1, η=1e-3)
     @test landscape isa Matrix{Float64}
     @test size(landscape) == (4, 4)

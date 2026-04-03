@@ -131,6 +131,45 @@ function ε(k::SVector{1,Float64}, model::SSHModel)
     return Hermitian(H)
 end
 
+_matrix_data(H::Hermitian) = parent(H)
+_matrix_data(H::AbstractMatrix) = H
+
+function _block_diagonal(A::StaticMatrix{N,N,TA}, B::StaticMatrix{N,N,TB}) where {N,TA,TB}
+    T = promote_type(TA, TB)
+    return Hermitian(SMatrix{2N,2N,T,4N*N}(ntuple(idx -> begin
+        row = (idx - 1) % (2N) + 1
+        col = (idx - 1) ÷ (2N) + 1
+        if row <= N && col <= N
+            return T(A[row, col])
+        elseif row > N && col > N
+            return T(B[row - N, col - N])
+        end
+        return zero(T)
+    end, 4N*N)))
+end
+
+function _block_diagonal(A::AbstractMatrix{TA}, B::AbstractMatrix{TB}) where {TA,TB}
+    size(A, 1) == size(A, 2) || throw(DimensionMismatch("Left block must be square."))
+    size(B, 1) == size(B, 2) || throw(DimensionMismatch("Right block must be square."))
+
+    T = promote_type(TA, TB)
+    if size(A) == (1, 1) && size(B) == (1, 1)
+        return Hermitian(@SMatrix [T(A[1, 1]) zero(T); zero(T) T(B[1, 1])])
+    end
+
+    n_left = size(A, 1)
+    n_right = size(B, 1)
+    matrix = zeros(T, n_left + n_right, n_left + n_right)
+    matrix[1:n_left, 1:n_left] = A
+    matrix[n_left+1:end, n_left+1:end] = B
+    return Hermitian(matrix)
+end
+
+function ε(k::SVector{D,Float64}, model::SpinfulDispersion{D}) where {D}
+    bare_H = _matrix_data(ε(k, model.bare))
+    return _block_diagonal(bare_H, bare_H)
+end
+
 function ε(
     k::SVector{D,Float64},
     model::RenormalizedDispersion{D}

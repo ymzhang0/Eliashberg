@@ -5,31 +5,114 @@
 # 泛型公式：H_MF = H_0 + phi * Γ
 # ============================================================================
 
-"""
-    vertex_matrix(k, field)
+const _σ₀_static = @SMatrix [σ₀[1, 1] σ₀[1, 2]; σ₀[2, 1] σ₀[2, 2]]
+const _σ₁_static = @SMatrix [σ₁[1, 1] σ₁[1, 2]; σ₁[2, 1] σ₁[2, 2]]
+const _σ₂_static = @SMatrix [σ₂[1, 1] σ₂[1, 2]; σ₂[2, 1] σ₂[2, 2]]
+const _σ₃_static = @SMatrix [σ₃[1, 1] σ₃[1, 2]; σ₃[2, 1] σ₃[2, 2]]
 
-1. Particle-Hole Channel Condensates (CDW, SDW 等)
-基矢: (c_k, c_{k+q})^T  (2x2 BZ 折叠基矢)
-物理：序参量 phi 直接将 k 和 k+q 态耦合，无额外动量依赖。
-"""
-function vertex_matrix(k::SVector{D,Float64}, field::ParticleHoleChannel{D}) where {D}
-    # 纯粹的非对角耦合
-    return Hermitian(@SMatrix [0.0 1.0; 
-                               1.0 0.0])
+abstract type SpinVertexStyle end
+struct SpinlessVertexStyle <: SpinVertexStyle end
+struct SpinfulVertexStyle <: SpinVertexStyle end
+
+_spin_vertex_style(::ElectronicDispersion) = SpinlessVertexStyle()
+_spin_vertex_style(::SpinfulDispersion) = SpinfulVertexStyle()
+
+spin_direction(::ExchangeChannel{Dir}) where {Dir} = Dir
+spin_direction(::SpinDensityWave{D,Dir}) where {D,Dir} = Dir
+
+vertex_matrix(::DirectChannel) = 1.0
+vertex_matrix(::ChargeDensityWave) = 1.0
+vertex_matrix(::ExchangeChannel{:z}) = 1.0
+vertex_matrix(::SpinDensityWave{D,:z}) where {D} = 1.0
+vertex_matrix(field::ExchangeChannel) = _spinless_spin_flip_error(spin_direction(field))
+vertex_matrix(field::SpinDensityWave) = _spinless_spin_flip_error(spin_direction(field))
+
+vertex_matrix(k::SVector, field::DirectChannel) = vertex_matrix(field)
+vertex_matrix(k::SVector, field::ChargeDensityWave) = vertex_matrix(field)
+vertex_matrix(k::SVector, field::ExchangeChannel) = vertex_matrix(field)
+vertex_matrix(k::SVector, field::SpinDensityWave) = vertex_matrix(field)
+
+function vertex_matrix(model::ElectronicDispersion{D}, field::ParticleHoleChannel) where {D}
+    return vertex_matrix(model, zero(SVector{D,Float64}), field)
 end
 
-# 粒子-空穴响应探针在 susceptibility 泡泡图里仍然退化为标量权重
-vertex_matrix(::ParticleHoleChannel) = 1.0
+function vertex_matrix(model::ElectronicDispersion, k::SVector, ::DirectChannel)
+    return _density_vertex(_spin_vertex_style(model), model, k)
+end
 
-# 电荷密度探针 (c^† c)，在单带正常态下顶点为 1.0
-vertex_matrix(::DirectChannel) = 1.0
+function vertex_matrix(model::ElectronicDispersion, k::SVector, ::ChargeDensityWave)
+    return vertex_matrix(model, k, DirectChannel())
+end
 
-# 自旋密度探针 (S_z)。在单带且无自旋显式矩阵的模型下，泡泡图的标量权重也为 1.0
-vertex_matrix(::ExchangeChannel) = 1.0
+function vertex_matrix(model::ElectronicDispersion, k::SVector, field::ExchangeChannel{Dir}) where {Dir}
+    return _exchange_vertex(_spin_vertex_style(model), model, k, Val(Dir))
+end
 
-# 兜底方法：以防未来 susceptibilities.jl 被修改为强制传入 k
-vertex_matrix(k::SVector, ::DirectChannel) = 1.0
-vertex_matrix(k::SVector, ::ExchangeChannel) = 1.0
+function vertex_matrix(model::ElectronicDispersion, k::SVector, field::SpinDensityWave{D,Dir}) where {D,Dir}
+    return _exchange_vertex(_spin_vertex_style(model), model, k, Val(Dir))
+end
+
+_density_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector) = 1.0
+_density_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector) =
+    _spin_operator_for_model(model, k, _σ₀_static)
+
+_exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:z}) = 1.0
+_exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:x}) = _spinless_spin_flip_error(:x)
+_exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:y}) = _spinless_spin_flip_error(:y)
+_exchange_vertex(::SpinlessVertexStyle, ::ElectronicDispersion, ::SVector, ::Val{:transverse}) = _spinless_spin_flip_error(:transverse)
+_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:z}) =
+    _spin_operator_for_model(model, k, _σ₃_static)
+_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:x}) =
+    _spin_operator_for_model(model, k, _σ₁_static)
+_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:y}) =
+    _spin_operator_for_model(model, k, _σ₂_static)
+_exchange_vertex(::SpinfulVertexStyle, model::ElectronicDispersion, k::SVector, ::Val{:transverse}) =
+    _spin_operator_for_model(model, k, _σ₁_static)
+
+function _spin_operator_for_model(model::SpinfulDispersion{D}, k::SVector{D,Float64}, pauli::StaticMatrix{2,2}) where {D}
+    bare_block = _matrix_data(ε(k, model.bare))
+    return _spin_operator(bare_block, pauli)
+end
+
+function _spin_operator(block::StaticMatrix{N,N,TB}, pauli::StaticMatrix{2,2,TP}) where {N,TB,TP}
+    T = promote_type(TB, TP)
+    return Hermitian(SMatrix{2N,2N,T,4N*N}(ntuple(idx -> begin
+        row = (idx - 1) % (2N) + 1
+        col = (idx - 1) ÷ (2N) + 1
+        spin_row = row <= N ? 1 : 2
+        spin_col = col <= N ? 1 : 2
+        orbital_row = row <= N ? row : row - N
+        orbital_col = col <= N ? col : col - N
+        orbital_row == orbital_col || return zero(T)
+        return T(pauli[spin_row, spin_col])
+    end, 4N*N)))
+end
+
+function _spin_operator(block::AbstractMatrix{TB}, pauli::StaticMatrix{2,2,TP}) where {TB,TP}
+    n_orbitals = size(block, 1)
+    size(block, 1) == size(block, 2) || throw(DimensionMismatch("Spin operator requires a square orbital block."))
+
+    T = promote_type(TB, TP)
+    if n_orbitals == 1
+        return Hermitian(@SMatrix [T(pauli[1, 1]) T(pauli[1, 2]); T(pauli[2, 1]) T(pauli[2, 2])])
+    end
+
+    matrix = zeros(T, 2 * n_orbitals, 2 * n_orbitals)
+    for spin_row in 1:2, spin_col in 1:2
+        coeff = T(pauli[spin_row, spin_col])
+        iszero(coeff) && continue
+        row_offset = (spin_row - 1) * n_orbitals
+        col_offset = (spin_col - 1) * n_orbitals
+        @inbounds for orbital in 1:n_orbitals
+            matrix[row_offset + orbital, col_offset + orbital] = coeff
+        end
+    end
+    return Hermitian(matrix)
+end
+
+function _spinless_spin_flip_error(direction::Symbol)
+    throw(ArgumentError("Spin direction $direction requires a SpinfulDispersion basis."))
+end
 
 """
 2. Standard BCS Reduced Pairing
@@ -77,6 +160,10 @@ function vertex_matrix(k::SVector{D,Float64}, field::PairDensityWave{D}) where {
         fk_minus 0.0      0.0
     ])
 end
+
+vertex_matrix(::ElectronicDispersion, k::SVector{D,Float64}, field::BCSReducedPairing) where {D} = vertex_matrix(k, field)
+vertex_matrix(::ElectronicDispersion, k::SVector{D,Float64}, field::FFLOPairing{D}) where {D} = vertex_matrix(k, field)
+vertex_matrix(::ElectronicDispersion, k::SVector{D,Float64}, field::PairDensityWave{D}) where {D} = vertex_matrix(k, field)
 
 # ----------------------------------------------------------------------------
 # Gap Form Factors

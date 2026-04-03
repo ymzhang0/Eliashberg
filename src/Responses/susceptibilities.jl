@@ -52,7 +52,7 @@ function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D
 
     eig_k = band_structure(kernel.chi.model, k)
     eig_kq = band_structure(kernel.chi.model, k + kernel.fluct.q)
-    vertex = _susceptibility_vertex(kernel.chi.field, k)
+    vertex = _susceptibility_vertex(kernel.chi.model, kernel.chi.field, k)
 
     for m in eachindex(eig_k.values)
         for n in eachindex(eig_kq.values)
@@ -80,10 +80,7 @@ function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D
     return response_sum
 end
 
-_susceptibility_vertex(field::ParticleHoleChannel, k::SVector) = vertex_matrix(field)
-_susceptibility_vertex(field::BCSReducedPairing, k::SVector) = vertex_matrix(k, field)
-_susceptibility_vertex(field::FFLOPairing, k::SVector) = vertex_matrix(k, field)
-_susceptibility_vertex(field::PairDensityWave, k::SVector) = vertex_matrix(k, field)
+_susceptibility_vertex(model::ElectronicDispersion, field::AuxiliaryField, k::SVector) = vertex_matrix(model, k, field)
 
 function _fermi_weight(energy::Float64, temperature::Float64)
     scaled = energy / temperature

@@ -22,6 +22,20 @@ struct TightBinding{D} <: ElectronicDispersion{D}
 end
 
 """
+    SpinfulDispersion{D,M} <: ElectronicDispersion{D}
+
+Opt-in wrapper that promotes an existing bare electronic dispersion into a
+spin-degenerate basis. The wrapped model keeps its original orbital structure,
+while `ε(k)` is lifted to a block-diagonal Hamiltonian with explicit spin-up and
+spin-down sectors.
+"""
+struct SpinfulDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
+    bare::M
+end
+
+SpinfulDispersion(model::SpinfulDispersion) = model
+
+"""
     MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}
 
 Multi-orbital tight-binding model defined on a `Crystal{D}` with an explicit

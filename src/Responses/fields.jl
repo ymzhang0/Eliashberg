@@ -15,12 +15,15 @@
 struct DirectChannel <: ParticleHoleChannel{Any} end
 
 """
-    ExchangeChannel{D} <: ParticleHoleChannel{D}
+    ExchangeChannel{Dir} <: ParticleHoleChannel{Any}
 
 代表粒子-空穴交换通道 (Particle-Hole Exchange Channel)。
-对应自旋密度涨落 (Spin Density Fluctuations)。
+对应自旋密度涨落 (Spin Density Fluctuations)，
+耦合到自旋算符 `S^α`。`direction` 可取 `:z`, `:x`, `:y`, `:transverse`，
+默认是纵向的 `:z` 通道。
 """
-struct ExchangeChannel <: ParticleHoleChannel{Any} end
+struct ExchangeChannel{Dir} <: ParticleHoleChannel{Any} end
+ExchangeChannel(direction::Symbol=:z) = ExchangeChannel{_validate_spin_direction(direction)}()
 """
     ChargeDensityWave{D} <: ParticleHoleChannel{D}
 
@@ -30,6 +33,22 @@ struct ExchangeChannel <: ParticleHoleChannel{Any} end
 struct ChargeDensityWave{D} <: ParticleHoleChannel{D}
     q::SVector{D,Float64}
 end
+
+"""
+    SpinDensityWave{D,Dir} <: ParticleHoleChannel{D}
+
+代表宏观凝聚的自旋密度波序。
+它耦合到动量 `q` 处的自旋算符 `S^α(q)`，其中 `direction` 指定序参量方向，
+可取 `:z`, `:x`, `:y`, `:transverse`，默认 `:z`。
+"""
+struct SpinDensityWave{D,Dir} <: ParticleHoleChannel{D}
+    q::SVector{D,Float64}
+end
+
+SpinDensityWave(q::SVector{D,Float64}, direction::Symbol=:z) where {D} =
+    SpinDensityWave{D,_validate_spin_direction(direction)}(q)
+SpinDensityWave(q::SVector{D,<:Real}, direction::Symbol=:z) where {D} =
+    SpinDensityWave(SVector{D,Float64}(q), direction)
 
 """
     BCSReducedPairing <: AuxiliaryField
@@ -87,3 +106,8 @@ struct DynamicalFluctuation{D} <: AuxiliaryField
     ω::Float64
 end
 DynamicalFluctuation(q::SVector{D,<:Real}, ω::Real) where D = DynamicalFluctuation{D}(SVector{D,Float64}(q), Float64(ω))
+
+function _validate_spin_direction(direction::Symbol)
+    direction in (:z, :x, :y, :transverse) && return direction
+    throw(ArgumentError("Unsupported spin direction $direction. Use :z, :x, :y, or :transverse."))
+end

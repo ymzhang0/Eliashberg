@@ -14,7 +14,8 @@ using Distributed
 using SparseArrays
 
 # 1. Fundamental Constants and Linear Algebra (Base Tier)
-include("Constants.jl") # Also includes la.jl
+include("Constants.jl")
+include("la.jl")
 
 # 2. Abstract Tier (Topological Order - Only abstract types)
 include("Geometry/types.jl")
@@ -85,13 +86,13 @@ export build_spglib_cell, generate_irreducible_kgrid
 
 # Models
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction
-export FreeElectron, TightBinding, MultiOrbitalTightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
+export FreeElectron, TightBinding, SpinfulDispersion, MultiOrbitalTightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
 export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction
 export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction
 export ε, ω, V
 
 # Responses
-export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave
+export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
 export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
