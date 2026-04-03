@@ -118,8 +118,14 @@ end
 
 function _load_engine_runtime!(worker_id::Integer, project::AbstractString)
     Distributed.remotecall_wait(Core.eval, worker_id, Main, quote
-        import Pkg
-        Pkg.activate($project; io=Base.devnull)
+        try
+            import Pkg
+            Pkg.activate($project; io=Base.devnull)
+        catch err
+            if !(err isa ArgumentError)
+                rethrow()
+            end
+        end
         using Eliashberg
     end)
 end

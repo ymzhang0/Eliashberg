@@ -168,7 +168,9 @@ function compute_renormalized_band_data(
         renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
         bands = [real(band_structure(renormalized_dispersion, k).values) for k in kpath.points]
         hole_bands[:, idx] = [values[1] for values in bands]
-        particle_bands[:, idx] = [values[2] for values in bands]
+        if length(bands[1]) >= 2
+            particle_bands[:, idx] = [values[2] for values in bands]
+        end
         current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
     end
 
@@ -246,6 +248,8 @@ function compute_collective_mode_spectral_data(
     omegas = collect(range(0.0, omega_max, length=n_omegas))
     spectral_matrix = scan_rpa_spectral_function_hpc(
         bdg_dispersion,
+        interaction,
+        field,
         kgrid,
         qpath.points,
         omegas;

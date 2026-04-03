@@ -4,7 +4,30 @@
 # Auxiliary Field Concrete implementations
 # ----------------------------------------------------------------------------
 
-struct ChargeDensityWave{D} <: AuxiliaryField
+"""
+    DirectChannel{D} <: ParticleHoleChannel{D}
+
+代表粒子-空穴直接通道 (Particle-Hole Direct Channel)。
+物理上对应电荷密度涨落 (Charge Density Fluctuations)。
+由长程库仑排斥力 V(q) 驱动，
+在 q=0 处最强。
+"""
+struct DirectChannel <: ParticleHoleChannel{Any} end
+
+"""
+    ExchangeChannel{D} <: ParticleHoleChannel{D}
+
+代表粒子-空穴交换通道 (Particle-Hole Exchange Channel)。
+对应自旋密度涨落 (Spin Density Fluctuations)。
+"""
+struct ExchangeChannel <: ParticleHoleChannel{Any} end
+"""
+    ChargeDensityWave{D} <: ParticleHoleChannel{D}
+
+代表宏观凝聚的电荷密度波序。
+(物理上它是 DirectChannel 发生相变后的产物，基矢结构完全一致)
+"""
+struct ChargeDensityWave{D} <: ParticleHoleChannel{D}
     q::SVector{D,Float64}
 end
 

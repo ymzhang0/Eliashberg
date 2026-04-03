@@ -2,6 +2,7 @@
 
 # Auxiliary field types
 abstract type AuxiliaryField end
+abstract type ParticleHoleChannel{D} <: AuxiliaryField end
 
 # Propagator types
 abstract type Propagator end

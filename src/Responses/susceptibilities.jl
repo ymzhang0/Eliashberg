@@ -1,42 +1,5 @@
 # susceptibilities.jl
 
-# --- Vertex Matrix Interface ---
-"""
-    vertex_matrix(field::AuxiliaryField)
-
-Returns the symmetry-breaking coupling (vertex) matrix for computing quantum 
-coherence factors. Default is the identity matrix for density channels.
-"""
-vertex_matrix(::AuxiliaryField) = 1.0
-
-"""
-    vertex_matrix(::BCSReducedPairing)
-
-For standard BCS pairing, the order parameter couples electron and hole 
-components in a 2x2 Nambu space, corresponding to the Pauli-X matrix.
-"""
-vertex_matrix(::BCSReducedPairing) = SA[0.0 1.0; 1.0 0.0]
-
-"""
-    vertex_matrix(::FFLOPairing)
-
-For FFLO pairing, the order parameter couples the electron at `k` to the hole at `-k+q`
-in a 2x2 Nambu space. The vertex is identical to the BCS case in structure.
-"""
-vertex_matrix(::FFLOPairing) = SA[0.0 1.0; 1.0 0.0]
-
-"""
-    vertex_matrix(::PairDensityWave)
-
-For a standing-wave Pair Density Wave, the order parameter couples the electron at `k` 
-to holes at both `-k+q` and `-k-q` in a 3x3 extended Nambu space.
-"""
-vertex_matrix(::PairDensityWave) = SA[
-    0.0 1.0 1.0;
-    1.0 0.0 0.0;
-    1.0 0.0 0.0
-]
-
 # --- Generalized Susceptibility ---
 """
     GeneralizedSusceptibility{M, G, F}
@@ -76,20 +39,20 @@ function (chi::GeneralizedSusceptibility)(Q::SVector{D,<:Real}) where {D}
     return chi(DynamicalFluctuation(Q, 0.0))
 end
 
-struct SusceptibilityReductionKernel{C,F,V}
+struct SusceptibilityReductionKernel{C,F}
     chi::C
     fluct::F
-    vertex::V
 end
 
 SusceptibilityReductionKernel(chi::GeneralizedSusceptibility, fluct::DynamicalFluctuation) =
-    SusceptibilityReductionKernel(chi, fluct, vertex_matrix(chi.field))
+    SusceptibilityReductionKernel{typeof(chi),typeof(fluct)}(chi, fluct)
 
 function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D}
     response_sum = 0.0im
 
     eig_k = band_structure(kernel.chi.model, k)
     eig_kq = band_structure(kernel.chi.model, k + kernel.fluct.q)
+    vertex = _susceptibility_vertex(kernel.chi.field, k)
 
     for m in eachindex(eig_k.values)
         for n in eachindex(eig_kq.values)
@@ -98,7 +61,7 @@ function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D
 
             vec_m = eig_k.vectors[:, m]
             vec_n = eig_kq.vectors[:, n]
-            coherence = abs2(dot(vec_n, kernel.vertex * vec_m))
+            coherence = abs2(dot(vec_n, vertex * vec_m))
 
             coherence <= 1e-10 && continue
 
@@ -116,6 +79,11 @@ function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D
 
     return response_sum
 end
+
+_susceptibility_vertex(field::ParticleHoleChannel, k::SVector) = vertex_matrix(field)
+_susceptibility_vertex(field::BCSReducedPairing, k::SVector) = vertex_matrix(k, field)
+_susceptibility_vertex(field::FFLOPairing, k::SVector) = vertex_matrix(k, field)
+_susceptibility_vertex(field::PairDensityWave, k::SVector) = vertex_matrix(k, field)
 
 function _fermi_weight(energy::Float64, temperature::Float64)
     scaled = energy / temperature

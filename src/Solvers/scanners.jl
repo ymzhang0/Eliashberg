@@ -35,10 +35,29 @@ function (task::SpectralFunctionTask)(q::SVector{D,Float64}, omega::Real) where 
     return imag(task.susceptibility(DynamicalFluctuation(q, Float64(omega))))
 end
 
+struct RPASpectralFunctionTask{D, C, I<:Interaction}
+    susceptibility::C
+    interaction::I
+end
+
+function (task::RPASpectralFunctionTask{D})(q::SVector{D,Float64}, omega::Real) where {D}
+    # 1. 计算复数裸极化率 χ₀(q, ω)
+    chi0 = task.susceptibility(DynamicalFluctuation(q, Float64(omega)))
+    
+    # 2. 计算当前 q 下的库仑排斥力 V(q)
+    vq = V(q, task.interaction)
+    
+    # 3. RPA Dyson 方程：当 1 - V*Re(χ₀) 接近 0 时，虚部会产生极锐的等离激元共振峰
+    chi_rpa = chi0 / (1.0 - vq * chi0)
+    
+    return imag(chi_rpa)
+end
+
 function scan_instability_landscape(
     model::PhysicalModel,
     kgrid::KGrid{D},
     qgrid::KGrid{D};
+    field::AuxiliaryField=ChargeDensityWave(zero(SVector{D,Float64})),
     T=0.001,
     η=1e-3,
     bootstrap_workers::Bool=false,
@@ -46,7 +65,8 @@ function scan_instability_landscape(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    chi_functor = _charge_susceptibility(model, kgrid, T, η)
+    chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
+    
     @info "Scanning instability landscape over $(length(qgrid)) q-points..."
     axes = _parameter_axes(qgrid)
 
@@ -81,6 +101,8 @@ physics task and passes it to `Engine.distributed_map_grid`. Set
 """
 function scan_rpa_spectral_function_hpc(
     model::PhysicalModel,
+    interaction::Interaction, 
+    field::AuxiliaryField,
     kgrid::AbstractKGrid{D},
     qaxis::AbstractVector{SVector{D,Float64}},
     omegas::AbstractVector{<:Real};
@@ -91,7 +113,35 @@ function scan_rpa_spectral_function_hpc(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    chi_functor = _charge_susceptibility(model, kgrid, T, η)
+    # 🌟 使用明确代表电荷涨落的 DirectChannel
+    chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
+    
+    return Engine.distributed_map_grid(
+        RPASpectralFunctionTask{D, typeof(chi_functor), typeof(interaction)}(chi_functor, interaction),
+        qaxis,
+        omegas;
+        bootstrap_workers=bootstrap_workers,
+        n_workers=n_workers,
+        project=project,
+        restrict=restrict
+    )
+end
+
+function scan_rpa_spectral_function_hpc(
+    model::PhysicalModel,
+    kgrid::AbstractKGrid{D},
+    qaxis::AbstractVector{SVector{D,Float64}},
+    omegas::AbstractVector{<:Real};
+    field::AuxiliaryField=ChargeDensityWave(zero(SVector{D,Float64})),
+    T=0.001,
+    η=0.05,
+    bootstrap_workers::Bool=false,
+    n_workers::Integer=max(0, Threads.nthreads() - 1),
+    project::Union{Nothing,AbstractString}=Base.active_project(),
+    restrict::Bool=true
+) where {D}
+    chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
+
     return Engine.distributed_map_grid(
         SpectralFunctionTask(chi_functor),
         qaxis,
@@ -112,6 +162,8 @@ the internal grid with `GeneralizedSusceptibility`. Set
 """
 function scan_spectral_function(
     model::PhysicalModel,
+    interaction::Interaction, 
+    field::AuxiliaryField,
     kgrid::AbstractKGrid{D},
     qpath::KPath{D},
     omegas::AbstractVector{Float64};
@@ -125,9 +177,40 @@ function scan_spectral_function(
     @info "Scanning spectral function over $(length(qpath)) parameter samples and $(length(omegas)) frequency samples..."
     return scan_rpa_spectral_function_hpc(
         model,
+        interaction, 
+        field,
         kgrid,
         qpath.points,
         omegas;
+        T=T,
+        η=η,
+        bootstrap_workers=bootstrap_workers,
+        n_workers=n_workers,
+        project=project,
+        restrict=restrict
+    )
+end
+
+function scan_spectral_function(
+    model::PhysicalModel,
+    kgrid::AbstractKGrid{D},
+    qpath::KPath{D},
+    omegas::AbstractVector{Float64};
+    field::AuxiliaryField=ChargeDensityWave(zero(SVector{D,Float64})),
+    T=0.001,
+    η=0.05,
+    bootstrap_workers::Bool=false,
+    n_workers::Integer=max(0, Threads.nthreads() - 1),
+    project::Union{Nothing,AbstractString}=Base.active_project(),
+    restrict::Bool=true
+) where {D}
+    @info "Scanning spectral function over $(length(qpath)) parameter samples and $(length(omegas)) frequency samples..."
+    return scan_rpa_spectral_function_hpc(
+        model,
+        kgrid,
+        qpath.points,
+        omegas;
+        field=field,
         T=T,
         η=η,
         bootstrap_workers=bootstrap_workers,

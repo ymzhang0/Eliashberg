@@ -39,6 +39,7 @@ include("Responses/fields.jl")
 include("Responses/propagators.jl")
 include("Responses/smearings.jl")
 include("Responses/self_energies.jl")
+include("Responses/vertex.jl")
 
 # 4. Method & Logic Tier (Computational algorithms and dispatch)
 # Geometry methods
@@ -90,7 +91,7 @@ export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstant
 export ε, ω, V
 
 # Responses
-export AuxiliaryField, StaticMeanField, DynamicalFluctuation, ChargeDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave
+export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
 export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
