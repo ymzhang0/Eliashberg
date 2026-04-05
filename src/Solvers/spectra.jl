@@ -1,23 +1,3 @@
-"""
-    compute_dispersion_curve_data(disp::Dispersion, kgrid::KGrid{1})
-
-Compute line-plot data for a one-dimensional dispersion. The solver returns the
-sorted abscissa values and a dense matrix whose columns index bands.
-"""
-function compute_dispersion_curve_data(disp::Dispersion, kgrid::KGrid{1})
-    k_vals = [k[1] for k in kgrid.points]
-    perm = sortperm(k_vals)
-    k_sorted = k_vals[perm]
-    bands = [real(band_structure(disp, kgrid.points[i]).values) for i in perm]
-    num_bands = length(bands[1])
-    band_matrix = zeros(Float64, length(k_sorted), num_bands)
-
-    for band_idx in 1:num_bands
-        band_matrix[:, band_idx] = [values[band_idx] for values in bands]
-    end
-
-    return (; coordinates=k_sorted, bands=band_matrix)
-end
 
 """
     compute_dispersion_surface_data(disp::Dispersion, kgrid::KGrid{2})
@@ -40,12 +20,12 @@ function compute_dispersion_surface_data(disp::Dispersion, kgrid::KGrid{2})
 end
 
 """
-    compute_path_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
+    compute_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
 
 Compute band values along a path in parameter space. The returned dense matrix
 has one column per band and one row per path sample.
 """
-function compute_path_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
+function compute_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
     bands = [real(band_structure(disp, k).values) for k in kpath.points]
     num_bands = length(bands[1])
     band_matrix = zeros(Float64, length(kpath.points), num_bands)
@@ -54,7 +34,11 @@ function compute_path_band_data(disp::ElectronicDispersion, kpath::KPath{D}) whe
         band_matrix[:, band_idx] = [values[band_idx] for values in bands]
     end
 
-    return (; bands=band_matrix)
+    return BandStructureData(
+        kpath=kpath,
+        bands=band_matrix,
+        num_bands=num_bands
+    )
 end
 
 """
@@ -135,7 +119,13 @@ function compute_phase_transition_data(
         current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
     end
 
-    return (; free_energy, condensation_energy, order_parameters)
+    return PhaseDiagramData(
+        phis=Float64.(phis),
+        Ts=Float64.(Ts),
+        free_energy=free_energy,
+        condensation_energy=condensation_energy,
+        order_parameters=order_parameters
+    )
 end
 
 """
@@ -174,7 +164,14 @@ function compute_renormalized_band_data(
         current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
     end
 
-    return (; bare_bands=Float64.(bare_bands), hole_bands, particle_bands, gaps)
+    return RenormalizedBandData(
+        kpath=kpath,
+        bare_bands=Float64.(bare_bands),
+        hole_bands=hole_bands,
+        particle_bands=particle_bands,
+        gaps=gaps,
+        temperatures=Float64.(Ts)
+    )
 end
 
 """
@@ -262,5 +259,12 @@ function compute_collective_mode_spectral_data(
     )
 
     pair_breaking_edge = phi_gs > 0.0 ? 2.0 * phi_gs : nothing
-    return (; omegas, spectral_matrix, gap=phi_gs, pair_breaking_edge)
+    return SpectralMapData(
+        qpath=qpath,
+        omegas=omegas,
+        spectral_matrix=spectral_matrix,
+        gap=phi_gs,
+        pair_breaking_edge=pair_breaking_edge,
+        temperature=Float64(T_val)
+    )
 end

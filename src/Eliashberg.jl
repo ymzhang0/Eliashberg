@@ -46,6 +46,9 @@ include("Responses/vertex.jl")
 # Geometry methods
 include("Geometry/reciprocal_lattice.jl")
 
+# Response data objects
+include("Responses/data_types.jl")
+
 # Models methods
 include("Models/evaluators.jl")
 
@@ -96,13 +99,14 @@ export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, Exc
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
 export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
+export BandStructureData, PhaseDiagramData, RenormalizedBandData, SpectralMapData
 
 # Solvers
 export ApproximationLevel, ExactTrLn, RPA
 export Engine, GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLayout, AssemblySpectrum, DenseEigenSolver, SparseEigenSolverHook, bootstrap_engine_workers!, grid_samples, assemble_grid_vector, assemble_grid_matrix, assemble_sparse_grid_matrix, assemble_block_grid_matrix, assemble_sparse_block_grid_matrix, assemble_block_diagonal_matrix, assemble_sparse_block_diagonal_matrix, solve_assembled_eigensystem, integrate_grid, distributed_map_grid
 export SampledHamiltonianAssembly, assemble_sampled_hamiltonian, solve_sampled_hamiltonian
 export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
-export compute_dispersion_curve_data, compute_dispersion_surface_data, compute_path_band_data, compute_fermi_surface_volume
+export compute_dispersion_surface_data, compute_band_data, compute_fermi_surface_volume
 export compute_landscape_line_data, compute_landscape_axes, compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data
 
 # Visualization
