@@ -7,8 +7,8 @@ function test_viz(name, model, grid; kwargs...)
     println("Testing $name...")
     try
         fig = if grid isa KPath
-            band_data = compute_path_band_data(model, grid)
-            plot_band_structure(grid, band_data.bands; kwargs...)
+            band_data = compute_band_data(model, grid)
+            plot(band_data; kwargs...)
         elseif grid isa KGrid{2}
             surface_data = compute_dispersion_surface_data(model, grid)
             plot_dispersion_surface(surface_data.kxs, surface_data.kys, surface_data.energy_matrix; kwargs...)
@@ -22,8 +22,9 @@ function test_viz(name, model, grid; kwargs...)
                 kwargs...
             )
         elseif grid isa KGrid{1}
-            curve_data = compute_dispersion_curve_data(model, grid)
-            plot_dispersion_curves(curve_data.coordinates, curve_data.bands; kwargs...)
+            path = KPath(grid.points, grid.weights, [1, length(grid.points)], ["start", "end"])
+            band_data = compute_band_data(model, path)
+            plot(band_data; kwargs...)
         else
             throw(ArgumentError("Unsupported grid type $(typeof(grid)) for visualization test."))
         end

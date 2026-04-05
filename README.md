@@ -106,12 +106,12 @@ model = TightBinding(lattice, 1.0, 0.2, 0.0)
 kgrid = generate_reciprocal_lattice(lattice, 80, 80)
 kpath = generate_kpath(lattice; n_pts_per_segment=50)
 
-path_data = compute_path_band_data(model, kpath)
+path_data = compute_band_data(model, kpath)
 surface_data = compute_dispersion_surface_data(model, kgrid)
 
 fig1 = visualize_lattice(lattice)
 fig2 = visualize_reciprocal_space(lattice, kgrid)
-fig3 = plot_band_structure(kpath, path_data.bands)
+fig3 = plot(path_data)
 fig4 = plot_dispersion_surface(surface_data.kxs, surface_data.kys, surface_data.energy_matrix; E_Fermi=0.0)
 ```
 
@@ -139,15 +139,8 @@ phase_data = compute_phase_transition_data(phis, Ts, field, model, interaction, 
 kpath = generate_kpath(lattice)
 band_data = compute_renormalized_band_data(Ts, field, model, interaction, kgrid, kpath)
 
-fig = plot_phase_transition(phis, Ts, phase_data.condensation_energy, phase_data.order_parameters)
-bands_fig = plot_renormalized_bands(
-    Ts,
-    kpath,
-    band_data.bare_bands,
-    band_data.hole_bands,
-    band_data.particle_bands,
-    band_data.gaps
-)
+fig = plot(phase_data)
+bands_fig = plot(band_data)
 ```
 
 ### Charge-density-wave channel

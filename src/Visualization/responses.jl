@@ -1,6 +1,6 @@
 # src/Visualization/responses.jl
 
-function plot_phase_transition(
+function _plot_phase_transition(
     phis::AbstractVector{<:Real},
     Ts::AbstractVector{<:Real},
     condensation_energy::AbstractMatrix{<:Real},
@@ -38,6 +38,14 @@ function plot_phase_transition(
     hlines!(ax2, [0.0], color=:black, linestyle=:dash, linewidth=1)
     return fig
 end
+
+"""
+    plot_phase_transition(data::PhaseDiagramData; axis_left=(;), axis_right=(;))
+
+Plot a phase-diagram response object using its stored axes and observables.
+"""
+plot_phase_transition(data::PhaseDiagramData; kwargs...) =
+    _plot_phase_transition(data.phis, data.Ts, data.condensation_energy, data.order_parameters; kwargs...)
 
 function plot_landscape(::Val{1}, qs::AbstractVector{<:Real}, landscape_vector::AbstractVector{<:Real}; axis=(;), kwargs...)
     length(qs) == length(landscape_vector) || throw(DimensionMismatch("Coordinate and value vectors must have the same length."))
@@ -77,6 +85,9 @@ function plot_spectral_function(qpath::KPath, omegas::AbstractVector{<:Real}, sp
     return fig
 end
 
+plot_spectral_function(data::SpectralMapData; kwargs...) =
+    plot_spectral_function(data.qpath, data.omegas, data.spectral_matrix; kwargs...)
+
 function plot_zeeman_pairing_landscape(
     q_vals::AbstractVector{<:Real},
     condensation_energy::AbstractVector{<:Real},
@@ -109,11 +120,13 @@ function plot_zeeman_pairing_landscape(
     return fig
 end
 
-function plot_collective_modes(
+function _plot_collective_modes(
     qpath::KPath,
     omegas::AbstractVector{<:Real},
     spectral_matrix::AbstractMatrix{<:Real};
-    pair_breaking_edge::Union{Nothing,Real}=nothing
+    pair_breaking_edge::Union{Nothing,Real}=nothing,
+    axis=(;),
+    colormap=:magma
 )
     size(spectral_matrix) == (length(qpath.points), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
     distances = path_distances(qpath)
@@ -124,10 +137,11 @@ function plot_collective_modes(
         title=L"Superconducting Excitation Spectrum $\mathrm{Im}\chi(q, \omega)$",
         xlabel="Momentum Transfer q",
         ylabel=L"Frequency $\omega$",
-        xticks=(tick_positions, qpath.node_labels)
+        xticks=(tick_positions, qpath.node_labels),
+        axis...
     )
 
-    hm = heatmap!(ax, distances, omegas, spectral_matrix, colormap=:magma)
+    hm = heatmap!(ax, distances, omegas, spectral_matrix, colormap=colormap)
     Colorbar(fig[1, 2], hm, label=L"Spectral Weight $\mathrm{Im}\chi$")
 
     if !isnothing(pair_breaking_edge)
@@ -138,8 +152,27 @@ function plot_collective_modes(
     return fig
 end
 
-visualize_phase_transition(args...; kwargs...) = plot_phase_transition(args...; kwargs...)
+"""
+    plot_collective_modes(data::SpectralMapData)
+
+Plot a collective-mode spectral map from a typed response object.
+"""
+plot_collective_modes(data::SpectralMapData; kwargs...) =
+    _plot_collective_modes(
+        data.qpath,
+        data.omegas,
+        data.spectral_matrix;
+        pair_breaking_edge=data.pair_breaking_edge,
+        kwargs...
+    )
+
+visualize_phase_transition(data::PhaseDiagramData; kwargs...) =
+    plot_phase_transition(data; kwargs...)
 visualize_landscape(args...; kwargs...) = plot_landscape(args...; kwargs...)
 visualize_spectral_function(args...; kwargs...) = plot_spectral_function(args...; kwargs...)
 visualize_zeeman_pairing_landscape(args...; kwargs...) = plot_zeeman_pairing_landscape(args...; kwargs...)
-visualize_collective_modes(args...; kwargs...) = plot_collective_modes(args...; kwargs...)
+visualize_collective_modes(data::SpectralMapData; kwargs...) =
+    plot_collective_modes(data; kwargs...)
+
+Makie.plot(data::PhaseDiagramData; kwargs...) = plot_phase_transition(data; kwargs...)
+Makie.plot(data::SpectralMapData; kwargs...) = plot_collective_modes(data; kwargs...)

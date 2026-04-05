@@ -41,7 +41,7 @@ end
 
 Plot a band structure along a labelled path in parameter space.
 """
-function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
+function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, colors=Makie.wong_colors(), axis=(;), kwargs...)
     size(band_matrix, 1) == length(kpath.points) || throw(DimensionMismatch("Band matrix row count must match the number of path samples."))
     distances = path_distances(kpath)
     tick_positions = distances[kpath.node_indices]
@@ -51,16 +51,20 @@ function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; 
     ax = Axis(fig[1, 1]; ylabel="Energy E(k)", title="$(length(first(kpath.points)))D Band Structure",
         xticks=(tick_positions, tick_labels), xgridvisible=false, axis...)
 
-    vlines!(ax, tick_positions, color=:gray, linestyle=:dot, linewidth=1.5)
+    vlines!(ax, tick_positions, color=(:gray, 0.5), linestyle=:dot, linewidth=1.5)
 
     for band_idx in axes(band_matrix, 2)
-        lines!(ax, distances, band_matrix[:, band_idx]; linewidth=2.5, kwargs...)
+        c = colors[mod1(band_idx, length(colors))]
+        lines!(ax, distances, band_matrix[:, band_idx], color=c; linewidth=2.5, kwargs...)
     end
 
-    hlines!(ax, [E_Fermi], color=:black, linestyle=:dash, linewidth=1.5)
+    hlines!(ax, [E_Fermi], color=(:black, 0.7), linestyle=:dash, linewidth=1.5)
     xlims!(ax, distances[1], distances[end])
     return fig
 end
+
+plot_band_structure(data::BandStructureData; kwargs...) =
+    plot_band_structure(data.kpath, data.bands; kwargs...)
 
 """
     plot_fermi_surface(kxs, kys, kzs, energy_volume; E_Fermi=0.0, axis=(;), kwargs...)
@@ -92,12 +96,7 @@ function plot_fermi_surface(
     return fig
 end
 
-"""
-    plot_renormalized_bands(Ts, kpath, bare_bands, hole_bands, particle_bands, gaps; band_limits=(-2.5, 2.5))
-
-Plot temperature-indexed renormalized band panels from precomputed spectral data.
-"""
-function plot_renormalized_bands(
+function _plot_renormalized_bands(
     Ts::AbstractVector{<:Real},
     kpath::KPath,
     bare_bands::AbstractVector{<:Real},
@@ -147,6 +146,22 @@ function plot_renormalized_bands(
     return fig
 end
 
+"""
+    plot_renormalized_bands(data::RenormalizedBandData; band_limits=(-2.5, 2.5))
+
+Plot temperature-indexed renormalized band panels from a typed response object.
+"""
+plot_renormalized_bands(data::RenormalizedBandData; kwargs...) =
+    _plot_renormalized_bands(
+        data.temperatures,
+        data.kpath,
+        data.bare_bands,
+        data.hole_bands,
+        data.particle_bands,
+        data.gaps;
+        kwargs...
+    )
+
 visualize_dispersion(k_coords::AbstractVector{<:Real}, band_matrix::AbstractMatrix{<:Real}; kwargs...) =
     plot_dispersion_curves(k_coords, band_matrix; kwargs...)
 
@@ -156,6 +171,9 @@ visualize_dispersion(kxs::AbstractVector{<:Real}, kys::AbstractVector{<:Real}, e
 visualize_dispersion(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; kwargs...) =
     plot_band_structure(kpath, band_matrix; kwargs...)
 
+visualize_dispersion(data::BandStructureData; kwargs...) =
+    plot_band_structure(data; kwargs...)
+
 visualize_dispersion(
     kxs::AbstractVector{<:Real},
     kys::AbstractVector{<:Real},
@@ -164,4 +182,8 @@ visualize_dispersion(
     kwargs...
 ) = plot_fermi_surface(kxs, kys, kzs, energy_volume; kwargs...)
 
-visualize_renormalized_bands(args...; kwargs...) = plot_renormalized_bands(args...; kwargs...)
+visualize_renormalized_bands(data::RenormalizedBandData; kwargs...) =
+    plot_renormalized_bands(data; kwargs...)
+
+Makie.plot(data::BandStructureData; kwargs...) = plot_band_structure(data; kwargs...)
+Makie.plot(data::RenormalizedBandData; kwargs...) = plot_renormalized_bands(data; kwargs...)

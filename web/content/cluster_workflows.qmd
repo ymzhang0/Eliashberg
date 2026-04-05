@@ -225,14 +225,7 @@ kpath = generate_kpath(lattice; n_pts_per_segment=80)
 Ts = range(0.05, 0.25, length=4)
 
 band_data = compute_renormalized_band_data(Ts, field, model, interaction, kgrid, kpath)
-fig = plot_renormalized_bands(
-    Ts,
-    kpath,
-    band_data.bare_bands,
-    band_data.hole_bands,
-    band_data.particle_bands,
-    band_data.gaps
-)
+fig = plot(band_data)
 ```
 
 For collective-mode scans:
@@ -249,12 +242,7 @@ collective_data = compute_collective_mode_spectral_data(
     eta=0.02
 )
 
-fig = plot_collective_modes(
-    kpath,
-    collective_data.omegas,
-    collective_data.spectral_matrix;
-    pair_breaking_edge=collective_data.pair_breaking_edge
-)
+fig = plot(collective_data)
 ```
 
 ## Session Lifetime and Debug Queues
