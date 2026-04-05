@@ -28,7 +28,7 @@ has one column per band and one row per path sample.
 function compute_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
     bands = [real(band_structure(disp, k).values) for k in kpath.points]
     num_bands = length(bands[1])
-    band_matrix = zeros(Float64, length(kpath.points), num_bands)
+    band_matrix = fill(NaN, length(kpath.points), num_bands)
 
     for band_idx in 1:num_bands
         band_matrix[:, band_idx] = [values[band_idx] for values in bands]
@@ -144,31 +144,40 @@ function compute_renormalized_band_data(
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess::Real=0.5
 )
-    bare_bands = [real(band_structure(model, k).values)[1] for k in kpath.points]
-    hole_bands = zeros(Float64, length(kpath.points), length(Ts))
-    particle_bands = zeros(Float64, length(kpath.points), length(Ts))
     gaps = zeros(Float64, length(Ts))
     current_guess = Float64(phi_guess)
 
-    for (idx, T) in enumerate(Ts)
+    # 1. 核心映射：对每一个温度 T，计算并返回一个 (N_kpoints, N_bands) 的矩阵
+    band_matrices = map(enumerate(Ts)) do (idx, T)
+        # 求解基态
         phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
         phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
         gaps[idx] = phi_gs
-
-        renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
-        bands = [real(band_structure(renormalized_dispersion, k).values) for k in kpath.points]
-        hole_bands[:, idx] = [values[1] for values in bands]
-        if length(bands[1]) >= 2
-            particle_bands[:, idx] = [values[2] for values in bands]
-        end
         current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
+
+        # 构造真实的重整化色散
+        renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
+        
+        # 计算该温度下路径上的所有本征值
+        # bands_k 是一个 Vector{SVector{N, Float64}}，N 会根据 field 自动变成 1, 2, 或 3
+        bands_k = [real(band_structure(renormalized_dispersion, k).values) for k in kpath.points]
+        
+        # 将 Vector{SVector} 沿着第一维度堆叠成 Matrix
+        return stack(bands_k, dims=1) 
     end
+
+    # 2. 自动升维：band_matrices 是一个包含多个 Matrix 的 Vector
+    # 再次使用 stack，直接将其变成一个 (N_kpoints, N_bands, N_Ts) 的 3D 数组！
+    renormalized_bands = stack(band_matrices)
+
+    # 3. 计算 Bare Bands (用于参考)
+    bare_bands_k = [real(band_structure(model, k).values) for k in kpath.points]
+    bare_bands = stack(bare_bands_k, dims=1)
 
     return RenormalizedBandData(
         kpath=kpath,
         bare_bands=Float64.(bare_bands),
-        hole_bands=hole_bands,
-        particle_bands=particle_bands,
+        renormalized_bands=Float64.(renormalized_bands),
         gaps=gaps,
         temperatures=Float64.(Ts)
     )

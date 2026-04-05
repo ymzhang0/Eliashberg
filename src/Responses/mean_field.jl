@@ -33,22 +33,6 @@ function MeanFieldDispersion(bare::M, field::F, phi::Real) where {D,M<:Electroni
 end
 
 
-function MeanFieldDispersion(bare::M, field::ParticleHoleChannel{D}, phi::Float64) where {D,M<:ElectronicDispersion{D}}
-    return MeanFieldDispersion{D,M,typeof(field)}(bare, field, phi)
-end
-
-function MeanFieldDispersion(bare::M, field::BCSReducedPairing, phi::Float64) where {D,M<:ElectronicDispersion{D}}
-    return MeanFieldDispersion{D,M,BCSReducedPairing}(bare, field, phi)
-end
-
-function MeanFieldDispersion(bare::M, field::FFLOPairing{D}, phi::Float64) where {D,M<:ElectronicDispersion{D}}
-    return MeanFieldDispersion{D,M,FFLOPairing{D}}(bare, field, phi)
-end
-
-function MeanFieldDispersion(bare::M, field::PairDensityWave{D}, phi::Float64) where {D,M<:ElectronicDispersion{D}}
-    return MeanFieldDispersion{D,M,PairDensityWave{D}}(bare, field, phi)
-end
-
 # ----------------------------------------------------------------------------
 # Basis Promotion Logic
 # ----------------------------------------------------------------------------
@@ -70,6 +54,7 @@ function ε(k::SVector{D,Float64}, model::ParticleHoleNormalDispersion{D}) where
     return _block_diagonal(Hk, Hkq)
 end
 
+# this is not a general construction for spinor superconducting states.
 function ε(k::SVector{D,Float64}, model::NormalNambuDispersion{D}) where {D}
     ek = real(ε(k, model.bare)[1, 1])
     e_minus_k = real(ε(-k, model.bare)[1, 1])

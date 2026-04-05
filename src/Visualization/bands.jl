@@ -99,16 +99,16 @@ end
 function _plot_renormalized_bands(
     Ts::AbstractVector{<:Real},
     kpath::KPath,
-    bare_bands::AbstractVector{<:Real},
-    hole_bands::AbstractMatrix{<:Real},
-    particle_bands::AbstractMatrix{<:Real},
+    bare_bands::AbstractMatrix{<:Real},
+    renormalized_bands::AbstractArray{<:Real,3},
     gaps::AbstractVector{<:Real};
-    band_limits=(-2.5, 2.5)
+    band_limits=(-2.5, 2.5),
+    colors=Makie.wong_colors()
 )
     n_path = length(kpath.points)
-    size(hole_bands) == (n_path, length(Ts)) || throw(DimensionMismatch("Hole-band matrix shape must be (length(kpath), length(Ts))."))
-    size(particle_bands) == (n_path, length(Ts)) || throw(DimensionMismatch("Particle-band matrix shape must be (length(kpath), length(Ts))."))
-    length(bare_bands) == n_path || throw(DimensionMismatch("Bare-band vector length must match the number of path samples."))
+    size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of path samples."))
+    size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of path samples."))
+    size(renormalized_bands, 3) == length(Ts) || throw(DimensionMismatch("Renormalized-band tensor third dimension must match the temperature axis."))
     length(gaps) == length(Ts) || throw(DimensionMismatch("Gap vector length must match the temperature axis."))
 
     distances = path_distances(kpath)
@@ -130,9 +130,18 @@ function _plot_renormalized_bands(
 
         hlines!(ax, [0.0], color=:gray, linestyle=:dash, linewidth=1)
         vlines!(ax, tick_positions, color=:lightgray, linestyle=:dot, linewidth=1.5)
-        lines!(ax, distances, bare_bands, color=:black, linestyle=:dot, alpha=0.4, linewidth=2, label="Bare Band")
-        lines!(ax, distances, hole_bands[:, idx], color=:royalblue, linewidth=3, label="Hole Band")
-        lines!(ax, distances, particle_bands[:, idx], color=:crimson, linewidth=3, label="Particle Band")
+
+        for band_idx in axes(bare_bands, 2)
+            label = band_idx == 1 ? "Bare Band" : nothing
+            lines!(ax, distances, bare_bands[:, band_idx], color=:black, linestyle=:dot, alpha=0.4, linewidth=2, label=label)
+        end
+
+        band_slice = @view renormalized_bands[:, :, idx]
+        for band_idx in axes(band_slice, 2)
+            color = colors[mod1(band_idx, length(colors))]
+            label = band_idx == 1 ? "Renormalized Band" : nothing
+            lines!(ax, distances, band_slice[:, band_idx], color=color, linewidth=3, label=label)
+        end
 
         ylims!(ax, band_limits...)
         xlims!(ax, distances[1], distances[end])
@@ -156,8 +165,7 @@ plot_renormalized_bands(data::RenormalizedBandData; kwargs...) =
         data.temperatures,
         data.kpath,
         data.bare_bands,
-        data.hole_bands,
-        data.particle_bands,
+        data.renormalized_bands,
         data.gaps;
         kwargs...
     )

@@ -238,7 +238,9 @@ using Makie
         line_grid,
         path
     )
-    @test size(renormalized_data.hole_bands) == (length(path), 1)
+    @test size(renormalized_data.bare_bands, 1) == length(path)
+    @test size(renormalized_data.renormalized_bands, 1) == length(path)
+    @test size(renormalized_data.renormalized_bands, 3) == 1
     renormalized_fig = plot(renormalized_data)
     @test renormalized_fig isa Figure
 

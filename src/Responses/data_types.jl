@@ -36,37 +36,34 @@ end
 
 Base.@kwdef struct RenormalizedBandData{D}
     kpath::KPath{D}
-    bare_bands::Vector{Float64}
-    hole_bands::Matrix{Float64}
-    particle_bands::Matrix{Float64}
+    bare_bands::Matrix{Float64}
+    renormalized_bands::Array{Float64,3}
     gaps::Vector{Float64}
     temperatures::Vector{Float64}
 
     function RenormalizedBandData{D}(
         kpath::KPath{D},
-        bare_bands::Vector{Float64},
-        hole_bands::Matrix{Float64},
-        particle_bands::Matrix{Float64},
+        bare_bands::Matrix{Float64},
+        renormalized_bands::Array{Float64,3},
         gaps::Vector{Float64},
         temperatures::Vector{Float64}
     ) where {D}
         n_path = length(kpath.points)
         n_temperatures = length(temperatures)
-        length(bare_bands) == n_path || throw(DimensionMismatch("Bare-band vector length must match the number of k-path samples."))
-        size(hole_bands) == (n_path, n_temperatures) || throw(DimensionMismatch("Hole-band matrix shape must be (length(kpath), length(temperatures))."))
-        size(particle_bands) == (n_path, n_temperatures) || throw(DimensionMismatch("Particle-band matrix shape must be (length(kpath), length(temperatures))."))
+        size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of k-path samples."))
+        size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of k-path samples."))
+        size(renormalized_bands, 3) == n_temperatures || throw(DimensionMismatch("Renormalized-band tensor third dimension must match the temperature axis length."))
         length(gaps) == n_temperatures || throw(DimensionMismatch("Gap vector length must match the temperature axis."))
-        return new{D}(kpath, bare_bands, hole_bands, particle_bands, gaps, temperatures)
+        return new{D}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
     end
 end
 RenormalizedBandData(
     kpath::KPath{D},
-    bare_bands::Vector{Float64},
-    hole_bands::Matrix{Float64},
-    particle_bands::Matrix{Float64},
+    bare_bands::Matrix{Float64},
+    renormalized_bands::Array{Float64,3},
     gaps::Vector{Float64},
     temperatures::Vector{Float64}
-) where {D} = RenormalizedBandData{D}(kpath, bare_bands, hole_bands, particle_bands, gaps, temperatures)
+) where {D} = RenormalizedBandData{D}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
 
 Base.@kwdef struct SpectralMapData{D}
     qpath::KPath{D}
