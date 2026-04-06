@@ -254,6 +254,18 @@ using Makie
     phase_fig = plot(phase_data)
     @test phase_fig isa Figure
 
+    phase_data_parallel = compute_phase_transition_data(
+        collect(range(0.0, 0.2, length=3)),
+        [0.1, 0.2],
+        BCSReducedPairing(:s_wave),
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid;
+        warm_start=false
+    )
+    @test size(phase_data_parallel.condensation_energy) == (3, 2)
+    @test length(phase_data_parallel.order_parameters) == 2
+
     renormalized_data = compute_renormalized_band_data(
         [0.1],
         BCSReducedPairing(:s_wave),
@@ -268,7 +280,20 @@ using Makie
     renormalized_fig = plot(renormalized_data)
     @test renormalized_fig isa Figure
 
+    renormalized_data_parallel = compute_renormalized_band_data(
+        [0.1],
+        BCSReducedPairing(:s_wave),
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid,
+        path;
+        warm_start=false
+    )
+    @test size(renormalized_data_parallel.renormalized_bands, 3) == 1
+    @test length(renormalized_data_parallel.gaps) == 1
+
     coexistence_field = CompositeField(ChargeDensityWave([0.0]), BCSReducedPairing(:s_wave))
+    coexistence_interaction = CompositeInteraction(ConstantInteraction(-1.0), ConstantInteraction(-1.0))
     coexistence_dispersion = MeanFieldDispersion(one_d_model, coexistence_field, [0.1, 0.2])
     @test size(ε(SVector{1,Float64}(0.1), coexistence_dispersion)) == (4, 4)
 
@@ -276,7 +301,7 @@ using Makie
         [0.05, 0.1],
         coexistence_field,
         one_d_model,
-        ConstantInteraction(-1.0),
+        coexistence_interaction,
         line_grid,
         ExactTrLn();
         T=0.1
@@ -286,7 +311,7 @@ using Makie
     coexistence_solution = solve_ground_state(
         coexistence_field,
         one_d_model,
-        ConstantInteraction(-1.0),
+        coexistence_interaction,
         line_grid,
         ExactTrLn();
         phi_guess=[0.05, 0.1],
@@ -299,7 +324,7 @@ using Makie
         [0.1],
         coexistence_field,
         one_d_model,
-        ConstantInteraction(-1.0),
+        coexistence_interaction,
         line_grid,
         path;
         phi_guess=[0.05, 0.1]
@@ -313,7 +338,7 @@ using Makie
         [-0.2, 0.0, 0.2],
         coexistence_field,
         one_d_model,
-        ConstantInteraction(-1.0),
+        coexistence_interaction,
         line_grid;
         T=0.1
     )

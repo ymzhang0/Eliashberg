@@ -41,14 +41,24 @@ end
 _quadratic_action_term(::Tuple{}, ::AbstractVector{<:Real}, ::Interaction, ::AbstractKGrid, ::Int) = 0.0
 
 function _quadratic_action_term(
+    ::Tuple{},
+    ::AbstractVector{<:Real},
+    ::Tuple{},
+    ::AbstractKGrid,
+    ::Int
+)
+    return 0.0
+end
+
+function _quadratic_action_term(
     fields::Tuple{F,Vararg{AuxiliaryField}},
     phis::AbstractVector{<:Real},
-    interaction::Interaction,
+    interactions::Tuple{I,Vararg{Interaction}},
     kgrid::AbstractKGrid,
     idx::Int
-) where {F<:AuxiliaryField}
-    current_term = _quadratic_action_term(phis[idx], first(fields), interaction, kgrid)
-    return current_term + _quadratic_action_term(Base.tail(fields), phis, interaction, kgrid, idx + 1)
+) where {F<:AuxiliaryField,I<:Interaction}
+    current_term = _quadratic_action_term(phis[idx], first(fields), first(interactions), kgrid)
+    return current_term + _quadratic_action_term(Base.tail(fields), phis, Base.tail(interactions), kgrid, idx + 1)
 end
 
 """
@@ -102,14 +112,15 @@ function evaluate_action(
     phis::AbstractVector{<:Real},
     field::CompositeField,
     model::ElectronicDispersion,
-    interaction::Interaction,
+    interaction::CompositeInteraction,
     kgrid::AbstractKGrid,
     ::ExactTrLn;
     T::Float64=1e-3
 )
     length(field) == length(phis) || throw(DimensionMismatch("Number of fields must match number of phis."))
+    length(field) == length(interaction) || throw(DimensionMismatch("Number of fields must match number of interactions."))
 
-    term1 = _quadratic_action_term(field.fields, phis, interaction, kgrid, 1)
+    term1 = _quadratic_action_term(field.fields, phis, interaction.interactions, kgrid, 1)
     mf_disp = MeanFieldDispersion(model, field, phis)
     tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
     tr_ln_sum = Engine.integrate_grid(tr_ln_kernel, kgrid)
@@ -121,7 +132,7 @@ function evaluate_action(
     phis::AbstractVector{<:Real},
     field::CompositeField,
     model::ElectronicDispersion,
-    interaction::Interaction,
+    interaction::CompositeInteraction,
     kgrid::AbstractKGrid,
     approx::ApproximationLevel;
     T::Float64=1e-3

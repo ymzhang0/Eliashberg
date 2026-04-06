@@ -42,6 +42,13 @@ struct ScreenedCoulombInteraction{
     polarization::P
 end
 
+struct CompositeInteraction{T<:Tuple} <: Interaction
+    interactions::T
+end
+CompositeInteraction(ints::Vararg{Interaction}) = CompositeInteraction(ints)
+
+Base.length(comp::CompositeInteraction) = length(comp.interactions)
+
 # Legacy chi methods removed.
 
 function V(

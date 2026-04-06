@@ -144,22 +144,38 @@ function compute_phase_transition_data(
     interaction::Interaction,
     kgrid::AbstractKGrid;
     approx::ApproximationLevel=ExactTrLn(),
-    phi_guess::Real=0.2
+    phi_guess::Real=0.2,
+    warm_start::Bool=true
 )
     free_energy = zeros(Float64, length(phis), length(Ts))
     condensation_energy = zeros(Float64, length(phis), length(Ts))
     order_parameters = zeros(Float64, length(Ts))
-    current_guess = Float64(phi_guess)
 
-    for (idx, T) in enumerate(Ts)
-        energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
-        free_energy[:, idx] = energy_curve
-        condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+    if warm_start
+        current_guess = Float64(phi_guess)
 
-        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
-        phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
-        order_parameters[idx] = phi_gs
-        current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
+        for (idx, T) in enumerate(Ts)
+            energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
+            free_energy[:, idx] = energy_curve
+            condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+
+            phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
+            phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+            order_parameters[idx] = phi_gs
+            current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
+        end
+    else
+        base_guess = Float64(phi_guess)
+
+        Threads.@threads for idx in eachindex(Ts)
+            T = Ts[idx]
+            energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
+            free_energy[:, idx] = energy_curve
+            condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+
+            phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=base_guess, T=T)
+            order_parameters[idx] = phi_gs < 1e-4 ? 0.0 : phi_gs
+        end
     end
 
     return PhaseDiagramData(
@@ -230,20 +246,35 @@ function compute_renormalized_band_data(
     kgrid::AbstractKGrid,
     kpath::KPath;
     approx::ApproximationLevel=ExactTrLn(),
-    phi_guess=0.5
+    phi_guess=0.5,
+    warm_start::Bool=true
 )
     gaps = _allocate_gap_storage(field, length(Ts))
     fallback_guess = _initial_phi_guess(field, phi_guess)
-    current_guess = fallback_guess
+    band_matrices = Vector{Matrix{Float64}}(undef, length(Ts))
 
-    band_matrices = map(enumerate(Ts)) do (idx, T)
-        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
-        phi_gs = _regularize_order_parameter(phi_gs)
-        _store_gap!(gaps, idx, phi_gs)
-        current_guess = _next_phi_guess(phi_gs, fallback_guess)
+    if warm_start
+        current_guess = fallback_guess
 
-        renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
-        return _band_matrix_along_path(renormalized_dispersion, kpath)
+        for (idx, T) in enumerate(Ts)
+            phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
+            phi_gs = _regularize_order_parameter(phi_gs)
+            _store_gap!(gaps, idx, phi_gs)
+            current_guess = _next_phi_guess(phi_gs, fallback_guess)
+
+            renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
+            band_matrices[idx] = _band_matrix_along_path(renormalized_dispersion, kpath)
+        end
+    else
+        Threads.@threads for idx in eachindex(Ts)
+            T = Ts[idx]
+            phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=fallback_guess, T=T)
+            phi_gs = _regularize_order_parameter(phi_gs)
+            _store_gap!(gaps, idx, phi_gs)
+
+            renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
+            band_matrices[idx] = _band_matrix_along_path(renormalized_dispersion, kpath)
+        end
     end
 
     renormalized_bands = stack(band_matrices)
@@ -306,22 +337,39 @@ function compute_zeeman_pairing_data(
     interaction::Interaction,
     kgrid::AbstractKGrid;
     approx::ApproximationLevel=ExactTrLn(),
-    phi_guess::Real=0.4
+    phi_guess::Real=0.4,
+    warm_start::Bool=true
 )
     dim = length(first(kgrid.points))
     minimal_energy = zeros(Float64, length(q_vals))
     optimal_gaps = zeros(Float64, length(q_vals))
-    current_guess = Float64(phi_guess)
 
-    for (idx, q) in enumerate(q_vals)
-        q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
-        fflo_field = FFLOPairing(q_vector, h_val)
-        phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T_val)
-        phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+    if warm_start
+        current_guess = Float64(phi_guess)
 
-        optimal_gaps[idx] = phi_gs
-        minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
-        current_guess = phi_gs > 0.05 ? phi_gs : max(Float64(phi_guess), 0.05)
+        for (idx, q) in enumerate(q_vals)
+            q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
+            fflo_field = FFLOPairing(q_vector, h_val)
+            phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T_val)
+            phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+
+            optimal_gaps[idx] = phi_gs
+            minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
+            current_guess = phi_gs > 0.05 ? phi_gs : max(Float64(phi_guess), 0.05)
+        end
+    else
+        base_guess = Float64(phi_guess)
+
+        Threads.@threads for idx in eachindex(q_vals)
+            q = q_vals[idx]
+            q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
+            fflo_field = FFLOPairing(q_vector, h_val)
+            phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=base_guess, T=T_val)
+            phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+
+            optimal_gaps[idx] = phi_gs
+            minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
+        end
     end
 
     zero_q = zero(SVector{dim,Float64})

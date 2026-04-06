@@ -90,7 +90,7 @@ export build_spglib_cell, generate_irreducible_kgrid
 # Models
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction
 export FreeElectron, TightBinding, SpinorDispersion, MultiOrbitalTightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
-export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction
+export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction, CompositeInteraction
 export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction
 export ε, ω, V
 
