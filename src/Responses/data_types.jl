@@ -1,5 +1,5 @@
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
-export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData
+export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
 
 Base.@kwdef struct BandStructureData{D}
     kpath::KPath{D}
@@ -101,36 +101,42 @@ Base.@kwdef struct PhaseDiagramData
     end
 end
 
-Base.@kwdef struct RenormalizedBandData{D}
+_validate_gap_storage(gaps::AbstractVector{<:Real}, n_temperatures::Int) =
+    length(gaps) == n_temperatures || throw(DimensionMismatch("Gap vector length must match the temperature axis."))
+
+_validate_gap_storage(gaps::AbstractMatrix{<:Real}, n_temperatures::Int) =
+    size(gaps, 2) == n_temperatures || throw(DimensionMismatch("Gap matrix column count must match the temperature axis length."))
+
+Base.@kwdef struct RenormalizedBandData{D,G<:AbstractArray{Float64}}
     kpath::KPath{D}
     bare_bands::Matrix{Float64}
     renormalized_bands::Array{Float64,3}
-    gaps::Vector{Float64}
+    gaps::G
     temperatures::Vector{Float64}
 
-    function RenormalizedBandData{D}(
+    function RenormalizedBandData{D,G}(
         kpath::KPath{D},
         bare_bands::Matrix{Float64},
         renormalized_bands::Array{Float64,3},
-        gaps::Vector{Float64},
+        gaps::G,
         temperatures::Vector{Float64}
-    ) where {D}
+    ) where {D,G<:AbstractArray{Float64}}
         n_path = length(kpath.points)
         n_temperatures = length(temperatures)
         size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of k-path samples."))
         size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of k-path samples."))
         size(renormalized_bands, 3) == n_temperatures || throw(DimensionMismatch("Renormalized-band tensor third dimension must match the temperature axis length."))
-        length(gaps) == n_temperatures || throw(DimensionMismatch("Gap vector length must match the temperature axis."))
-        return new{D}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
+        _validate_gap_storage(gaps, n_temperatures)
+        return new{D,G}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
     end
 end
 RenormalizedBandData(
     kpath::KPath{D},
     bare_bands::Matrix{Float64},
     renormalized_bands::Array{Float64,3},
-    gaps::Vector{Float64},
+    gaps::G,
     temperatures::Vector{Float64}
-) where {D} = RenormalizedBandData{D}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
+) where {D,G<:AbstractArray{Float64}} = RenormalizedBandData{D,G}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
 
 Base.@kwdef struct SpectralMapData{D}
     qpath::KPath{D}
@@ -183,6 +189,31 @@ Base.@kwdef struct ZeemanPairingData
             collect(Float64.(optimal_gaps)),
             Float64(optimal_q),
             Int(minimum_index)
+        )
+    end
+end
+
+Base.@kwdef struct CoexistenceLandscapeData
+    phis_1::Vector{Float64}
+    phis_2::Vector{Float64}
+    free_energy::Matrix{Float64}
+    field_1_type::String
+    field_2_type::String
+
+    function CoexistenceLandscapeData(
+        phis_1::AbstractVector{<:Real},
+        phis_2::AbstractVector{<:Real},
+        free_energy::AbstractMatrix{<:Real},
+        field_1_type::AbstractString,
+        field_2_type::AbstractString
+    )
+        size(free_energy) == (length(phis_1), length(phis_2)) || throw(DimensionMismatch("Free-energy matrix shape must be (length(phis_1), length(phis_2))."))
+        return new(
+            collect(Float64.(phis_1)),
+            collect(Float64.(phis_2)),
+            Float64.(free_energy),
+            String(field_1_type),
+            String(field_2_type)
         )
     end
 end

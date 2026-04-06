@@ -164,6 +164,12 @@ using Makie
     @test isfinite(real(chi_q))
     @test isfinite(imag(chi_q))
 
+    cdw_from_vector = ChargeDensityWave([π, π])
+    @test cdw_from_vector.q == SVector{2,Float64}(π, π)
+
+    cdw_from_tuple = ChargeDensityWave((π, π))
+    @test cdw_from_tuple.q == SVector{2,Float64}(π, π)
+
     spinor_line_model = SpinorDispersion(one_d_model)
     spinor_hk = ε(SVector{1,Float64}(0.1), spinor_line_model)
     bare_energy = ε(SVector{1,Float64}(0.1), one_d_model)[1, 1]
@@ -189,6 +195,24 @@ using Makie
     @test sdw_basis.bare isa SpinorDispersion
     sdw_dispersion = MeanFieldDispersion(one_d_model, sdw, 0.2)
     @test size(ε(SVector{1,Float64}(0.1), sdw_dispersion)) == (4, 4)
+
+    sdw_from_vector = SpinDensityWave([0.2], :y)
+    @test sdw_from_vector isa SpinDensityWave{1,:y}
+    @test sdw_from_vector.q == SVector{1,Float64}(0.2)
+
+    fflo_from_tuple = FFLOPairing((π, 0.0), 1)
+    @test fflo_from_tuple.q == SVector{2,Float64}(π, 0.0)
+    @test fflo_from_tuple.h == 1.0
+
+    pdw_from_vector = PairDensityWave([π, 0.0])
+    @test pdw_from_vector.q == SVector{2,Float64}(π, 0.0)
+
+    static_from_tuple = StaticMeanField((0, 0))
+    @test static_from_tuple.q == SVector{2,Float64}(0.0, 0.0)
+
+    fluct_from_vector = DynamicalFluctuation([π], 2)
+    @test fluct_from_vector.q == SVector{1,Float64}(π)
+    @test fluct_from_vector.ω == 2.0
 
     landscape = scan_instability_landscape(model, grid, grid; T=0.1, η=1e-3)
     @test landscape isa Matrix{Float64}
@@ -243,6 +267,67 @@ using Makie
     @test size(renormalized_data.renormalized_bands, 3) == 1
     renormalized_fig = plot(renormalized_data)
     @test renormalized_fig isa Figure
+
+    coexistence_field = CompositeField(ChargeDensityWave([0.0]), BCSReducedPairing(:s_wave))
+    coexistence_dispersion = MeanFieldDispersion(one_d_model, coexistence_field, [0.1, 0.2])
+    @test size(ε(SVector{1,Float64}(0.1), coexistence_dispersion)) == (4, 4)
+
+    coexistence_action = evaluate_action(
+        [0.05, 0.1],
+        coexistence_field,
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid,
+        ExactTrLn();
+        T=0.1
+    )
+    @test isfinite(coexistence_action)
+
+    coexistence_solution = solve_ground_state(
+        coexistence_field,
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid,
+        ExactTrLn();
+        phi_guess=[0.05, 0.1],
+        T=0.1
+    )
+    @test length(coexistence_solution) == 2
+    @test all(isfinite, coexistence_solution)
+
+    coexistence_band_data = compute_renormalized_band_data(
+        [0.1],
+        coexistence_field,
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid,
+        path;
+        phi_guess=[0.05, 0.1]
+    )
+    @test size(coexistence_band_data.gaps) == (2, 1)
+    @test size(coexistence_band_data.renormalized_bands, 3) == 1
+    @test plot(coexistence_band_data) isa Figure
+
+    coexistence_landscape = compute_coexistence_landscape(
+        [-0.1, 0.0, 0.1],
+        [-0.2, 0.0, 0.2],
+        coexistence_field,
+        one_d_model,
+        ConstantInteraction(-1.0),
+        line_grid;
+        T=0.1
+    )
+    @test coexistence_landscape isa CoexistenceLandscapeData
+    @test size(coexistence_landscape.free_energy) == (3, 3)
+    @test coexistence_landscape.field_1_type == string(typeof(coexistence_field[1]))
+    @test coexistence_landscape.field_2_type == string(typeof(coexistence_field[2]))
+
+    p_wave_vertex = vertex_matrix(
+        NormalNambuDispersion(one_d_model),
+        SVector{1,Float64}(0.1),
+        BCSReducedPairing(:p_wave)
+    )
+    @test size(parent(p_wave_vertex)) == (2, 2)
 
     collective_data = compute_collective_mode_spectral_data(
         0.1,

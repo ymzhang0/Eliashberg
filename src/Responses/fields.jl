@@ -34,6 +34,12 @@ struct ChargeDensityWave{D} <: ParticleHoleChannel{D}
     q::SVector{D,Float64}
 end
 
+_to_static_momentum(q::AbstractVector{<:Real}) = SVector{length(q),Float64}(q...)
+_to_static_momentum(q::Tuple{Vararg{Real}}) = SVector{length(q),Float64}(q...)
+
+ChargeDensityWave(q::AbstractVector{<:Real}) = ChargeDensityWave(_to_static_momentum(q))
+ChargeDensityWave(q::Tuple{Vararg{Real}}) = ChargeDensityWave(_to_static_momentum(q))
+
 """
     SpinDensityWave{D,Dir} <: ParticleHoleChannel{D}
 
@@ -49,6 +55,10 @@ SpinDensityWave(q::SVector{D,Float64}, direction::Symbol=:z) where {D} =
     SpinDensityWave{D,_validate_spin_direction(direction)}(q)
 SpinDensityWave(q::SVector{D,<:Real}, direction::Symbol=:z) where {D} =
     SpinDensityWave(SVector{D,Float64}(q), direction)
+SpinDensityWave(q::AbstractVector{<:Real}, direction::Symbol=:z) =
+    SpinDensityWave(_to_static_momentum(q), direction)
+SpinDensityWave(q::Tuple{Vararg{Real}}, direction::Symbol=:z) =
+    SpinDensityWave(_to_static_momentum(q), direction)
 
 """
     BCSReducedPairing <: AuxiliaryField
@@ -62,6 +72,22 @@ end
 BCSReducedPairing() = BCSReducedPairing(:s_wave)
 
 """
+    CompositeField{T<:Tuple} <: AuxiliaryField
+
+Container that groups multiple auxiliary fields into a single composite order.
+The fields are applied sequentially when constructing the nested mean-field
+Hamiltonian.
+"""
+struct CompositeField{T<:Tuple} <: AuxiliaryField
+    fields::T
+end
+CompositeField(fields::Vararg{AuxiliaryField}) = CompositeField(fields)
+
+Base.length(comp::CompositeField) = length(comp.fields)
+Base.iterate(comp::CompositeField, state=1) = iterate(comp.fields, state)
+Base.getindex(comp::CompositeField, i::Int) = comp.fields[i]
+
+"""
     FFLOPairing{D} <: AuxiliaryField
 
 Represents the Fulde-Ferrell (FF) state with a single center-of-mass momentum `q`.
@@ -73,6 +99,9 @@ struct FFLOPairing{D} <: AuxiliaryField
     h::Float64 # Zeeman magnetic field strength
 end
 FFLOPairing(q::SVector{D,Float64}, h::Float64=0.0) where {D} = FFLOPairing{D}(q, :s_wave, h)
+FFLOPairing(q::SVector{D,<:Real}, h::Real=0.0) where {D} = FFLOPairing(SVector{D,Float64}(q), Float64(h))
+FFLOPairing(q::AbstractVector{<:Real}, h::Real=0.0) = FFLOPairing(_to_static_momentum(q), Float64(h))
+FFLOPairing(q::Tuple{Vararg{Real}}, h::Real=0.0) = FFLOPairing(_to_static_momentum(q), Float64(h))
 
 """
     PairDensityWave{D} <: AuxiliaryField
@@ -85,6 +114,9 @@ struct PairDensityWave{D} <: AuxiliaryField
     symmetry::Symbol
 end
 PairDensityWave(q::SVector{D,Float64}) where {D} = PairDensityWave{D}(q, :s_wave)
+PairDensityWave(q::SVector{D,<:Real}) where {D} = PairDensityWave(SVector{D,Float64}(q))
+PairDensityWave(q::AbstractVector{<:Real}) = PairDensityWave(_to_static_momentum(q))
+PairDensityWave(q::Tuple{Vararg{Real}}) = PairDensityWave(_to_static_momentum(q))
 
 """
     StaticMeanField{D} <: AuxiliaryField
@@ -95,6 +127,8 @@ struct StaticMeanField{D} <: AuxiliaryField
     q::SVector{D,Float64}
 end
 StaticMeanField(q::SVector{S,<:Real}) where S = StaticMeanField{S}(SVector{S,Float64}(q))
+StaticMeanField(q::AbstractVector{<:Real}) = StaticMeanField(_to_static_momentum(q))
+StaticMeanField(q::Tuple{Vararg{Real}}) = StaticMeanField(_to_static_momentum(q))
 
 """
     DynamicalFluctuation{D} <: AuxiliaryField
@@ -106,6 +140,8 @@ struct DynamicalFluctuation{D} <: AuxiliaryField
     ω::Float64
 end
 DynamicalFluctuation(q::SVector{D,<:Real}, ω::Real) where D = DynamicalFluctuation{D}(SVector{D,Float64}(q), Float64(ω))
+DynamicalFluctuation(q::AbstractVector{<:Real}, ω::Real) = DynamicalFluctuation(_to_static_momentum(q), Float64(ω))
+DynamicalFluctuation(q::Tuple{Vararg{Real}}, ω::Real) = DynamicalFluctuation(_to_static_momentum(q), Float64(ω))
 
 function _validate_spin_direction(direction::Symbol)
     direction in (:z, :x, :y, :transverse) && return direction

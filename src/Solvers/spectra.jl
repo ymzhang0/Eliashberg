@@ -104,6 +104,38 @@ end
 Map temperature samples to free-energy curves and reduce each point through the
 effective-action solver. Returns pure arrays suitable for plotting.
 """
+function _evaluate_action_curve(
+    phis::AbstractVector{<:Real},
+    field::AuxiliaryField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid,
+    approx::ApproximationLevel;
+    T::Real
+)
+    values = zeros(Float64, length(phis))
+    temperature = Float64(T)
+
+    Threads.@threads for idx in eachindex(phis)
+        values[idx] = evaluate_action(Float64(phis[idx]), field, model, interaction, kgrid, approx; T=temperature)
+    end
+
+    return values
+end
+
+function _band_matrix_along_path(
+    disp::ElectronicDispersion,
+    kpath::KPath
+)
+    bands_k = Vector{Vector{Float64}}(undef, length(kpath.points))
+
+    Threads.@threads for idx in eachindex(kpath.points)
+        bands_k[idx] = collect(real.(band_structure(disp, kpath.points[idx]).values))
+    end
+
+    return stack(bands_k, dims=1)
+end
+
 function compute_phase_transition_data(
     phis::AbstractVector{<:Real},
     Ts::AbstractVector{<:Real},
@@ -120,7 +152,7 @@ function compute_phase_transition_data(
     current_guess = Float64(phi_guess)
 
     for (idx, T) in enumerate(Ts)
-        energy_curve = Float64.(evaluate_action(phis, field, model, interaction, kgrid, approx; T=T))
+        energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
         free_energy[:, idx] = energy_curve
         condensation_energy[:, idx] = energy_curve .- energy_curve[1]
 
@@ -139,6 +171,51 @@ function compute_phase_transition_data(
     )
 end
 
+function compute_phase_transition_data(
+    phis::AbstractVector{<:Real},
+    Ts::AbstractVector{<:Real},
+    field::CompositeField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid;
+    approx::ApproximationLevel=ExactTrLn(),
+    phi_guess=0.2
+)
+    throw(ArgumentError("compute_phase_transition_data supports a one-dimensional order-parameter scan. Use compute_coexistence_landscape for CompositeField scans."))
+end
+
+_allocate_gap_storage(::AuxiliaryField, n_temperatures::Int) = zeros(Float64, n_temperatures)
+_allocate_gap_storage(field::CompositeField, n_temperatures::Int) = zeros(Float64, length(field), n_temperatures)
+
+_initial_phi_guess(::AuxiliaryField, phi_guess::Real) = Float64(phi_guess)
+_initial_phi_guess(field::CompositeField, phi_guess::Real) = fill(Float64(phi_guess), length(field))
+
+function _initial_phi_guess(field::CompositeField, phi_guess::AbstractVector{<:Real})
+    length(field) == length(phi_guess) || throw(DimensionMismatch("Number of fields must match number of phi guesses."))
+    return Float64.(phi_guess)
+end
+
+_regularize_order_parameter(phi::Real) = abs(phi) < 1e-4 ? 0.0 : Float64(phi)
+_regularize_order_parameter(phis::AbstractVector{<:Real}) = [abs(Float64(phi)) < 1e-4 ? 0.0 : Float64(phi) for phi in phis]
+
+function _store_gap!(gaps::AbstractVector{<:Real}, idx::Int, phi::Real)
+    gaps[idx] = Float64(phi)
+    return gaps
+end
+
+function _store_gap!(gaps::AbstractMatrix{<:Real}, idx::Int, phis::AbstractVector{<:Real})
+    size(gaps, 1) == length(phis) || throw(DimensionMismatch("Gap storage row count must match the number of composite fields."))
+    gaps[:, idx] .= Float64.(phis)
+    return gaps
+end
+
+_next_phi_guess(phi::Real, fallback::Real) = abs(phi) > 0.0 ? Float64(phi) : max(Float64(fallback), 0.05)
+
+function _next_phi_guess(phis::AbstractVector{<:Real}, fallback::AbstractVector{<:Real})
+    length(phis) == length(fallback) || throw(DimensionMismatch("Gap vector length must match the fallback guess length."))
+    return [abs(Float64(phi)) > 0.0 ? Float64(phi) : max(Float64(fallback[idx]), 0.05) for (idx, phi) in enumerate(phis)]
+end
+
 """
     compute_renormalized_band_data(Ts, field, model, interaction, kgrid, kpath; approx=ExactTrLn(), phi_guess=0.5)
 
@@ -153,37 +230,25 @@ function compute_renormalized_band_data(
     kgrid::AbstractKGrid,
     kpath::KPath;
     approx::ApproximationLevel=ExactTrLn(),
-    phi_guess::Real=0.5
+    phi_guess=0.5
 )
-    gaps = zeros(Float64, length(Ts))
-    current_guess = Float64(phi_guess)
+    gaps = _allocate_gap_storage(field, length(Ts))
+    fallback_guess = _initial_phi_guess(field, phi_guess)
+    current_guess = fallback_guess
 
-    # 1. 核心映射：对每一个温度 T，计算并返回一个 (N_kpoints, N_bands) 的矩阵
     band_matrices = map(enumerate(Ts)) do (idx, T)
-        # 求解基态
         phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
-        phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
-        gaps[idx] = phi_gs
-        current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
+        phi_gs = _regularize_order_parameter(phi_gs)
+        _store_gap!(gaps, idx, phi_gs)
+        current_guess = _next_phi_guess(phi_gs, fallback_guess)
 
-        # 构造真实的重整化色散
         renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
-        
-        # 计算该温度下路径上的所有本征值
-        # bands_k 是一个 Vector{SVector{N, Float64}}，N 会根据 field 自动变成 1, 2, 或 3
-        bands_k = [real(band_structure(renormalized_dispersion, k).values) for k in kpath.points]
-        
-        # 将 Vector{SVector} 沿着第一维度堆叠成 Matrix
-        return stack(bands_k, dims=1) 
+        return _band_matrix_along_path(renormalized_dispersion, kpath)
     end
 
-    # 2. 自动升维：band_matrices 是一个包含多个 Matrix 的 Vector
-    # 再次使用 stack，直接将其变成一个 (N_kpoints, N_bands, N_Ts) 的 3D 数组！
     renormalized_bands = stack(band_matrices)
 
-    # 3. 计算 Bare Bands (用于参考)
-    bare_bands_k = [real(band_structure(model, k).values) for k in kpath.points]
-    bare_bands = stack(bare_bands_k, dims=1)
+    bare_bands = _band_matrix_along_path(model, kpath)
 
     return RenormalizedBandData(
         kpath=kpath,
@@ -191,6 +256,39 @@ function compute_renormalized_band_data(
         renormalized_bands=Float64.(renormalized_bands),
         gaps=gaps,
         temperatures=Float64.(Ts)
+    )
+end
+
+function compute_coexistence_landscape(
+    phis_1::AbstractVector{<:Real},
+    phis_2::AbstractVector{<:Real},
+    comp::CompositeField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid;
+    T::Real,
+    approx::ApproximationLevel=ExactTrLn()
+)
+    length(comp) == 2 || throw(DimensionMismatch("compute_coexistence_landscape requires a CompositeField with exactly two fields."))
+
+    free_energy = zeros(Float64, length(phis_1), length(phis_2))
+    temperature = Float64(T)
+
+    Threads.@threads for idx_1 in eachindex(phis_1)
+        phi_1 = phis_1[idx_1]
+        for (idx_2, phi_2) in enumerate(phis_2)
+            phi_point = SVector{2,Float64}(Float64(phi_1), Float64(phi_2))
+            free_energy[idx_1, idx_2] = evaluate_action(phi_point, comp, model, interaction, kgrid, approx; T=temperature)
+        end
+    end
+
+    field_1, field_2 = comp.fields
+    return CoexistenceLandscapeData(
+        phis_1,
+        phis_2,
+        free_energy,
+        string(typeof(field_1)),
+        string(typeof(field_2))
     )
 end
 

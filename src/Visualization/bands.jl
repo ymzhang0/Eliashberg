@@ -107,7 +107,7 @@ function _plot_renormalized_bands(
     kpath::KPath,
     bare_bands::AbstractMatrix{<:Real},
     renormalized_bands::AbstractArray{<:Real,3},
-    gaps::AbstractVector{<:Real};
+    gaps::AbstractArray{<:Real};
     band_limits=(-2.5, 2.5),
     colors=Makie.wong_colors()
 )
@@ -115,7 +115,7 @@ function _plot_renormalized_bands(
     size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of path samples."))
     size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of path samples."))
     size(renormalized_bands, 3) == length(Ts) || throw(DimensionMismatch("Renormalized-band tensor third dimension must match the temperature axis."))
-    length(gaps) == length(Ts) || throw(DimensionMismatch("Gap vector length must match the temperature axis."))
+    _validate_gap_storage(gaps, length(Ts))
 
     distances = path_distances(kpath)
     tick_positions = distances[kpath.node_indices]
@@ -125,7 +125,7 @@ function _plot_renormalized_bands(
     for (idx, T) in enumerate(Ts)
         is_first = idx == 1
         ax = Axis(fig[1, idx],
-            title="T = $(round(T, digits=2))   Δ = $(round(gaps[idx], digits=2))",
+            title=_renormalized_band_title(T, gaps, idx),
             titlesize=16,
             xticks=(tick_positions, labels),
             ylabel=is_first ? "Energy E(k)" : "",
@@ -159,6 +159,14 @@ function _plot_renormalized_bands(
 
     colgap!(fig.layout, 15)
     return fig
+end
+
+_renormalized_band_title(T::Real, gaps::AbstractVector{<:Real}, idx::Int) =
+    "T = $(round(T, digits=2))   Δ = $(round(gaps[idx], digits=2))"
+
+function _renormalized_band_title(T::Real, gaps::AbstractMatrix{<:Real}, idx::Int)
+    components = join((string(round(gap, digits=2)) for gap in gaps[:, idx]), ", ")
+    return "T = $(round(T, digits=2))   ϕ = [$components]"
 end
 
 """

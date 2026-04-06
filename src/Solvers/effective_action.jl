@@ -20,6 +20,37 @@ function (kernel::ExactTrLnContributionKernel)(k::SVector)
     return tr_ln_contribution
 end
 
+_field_wavevector(::AuxiliaryField, ::AbstractKGrid{D}) where {D} = zero(SVector{D,Float64})
+_field_wavevector(field::ChargeDensityWave{D}, ::AbstractKGrid{D}) where {D} = field.q
+_field_wavevector(field::SpinDensityWave{D}, ::AbstractKGrid{D}) where {D} = field.q
+_field_wavevector(field::FFLOPairing{D}, ::AbstractKGrid{D}) where {D} = field.q
+_field_wavevector(field::PairDensityWave{D}, ::AbstractKGrid{D}) where {D} = field.q
+_field_wavevector(field::StaticMeanField{D}, ::AbstractKGrid{D}) where {D} = field.q
+_field_wavevector(field::DynamicalFluctuation{D}, ::AbstractKGrid{D}) where {D} = field.q
+
+function _quadratic_action_term(
+    phi::Real,
+    field::AuxiliaryField,
+    interaction::Interaction,
+    kgrid::AbstractKGrid
+)
+    q_vec = _field_wavevector(field, kgrid)
+    return Float64(phi)^2 / abs(V(q_vec, interaction))
+end
+
+_quadratic_action_term(::Tuple{}, ::AbstractVector{<:Real}, ::Interaction, ::AbstractKGrid, ::Int) = 0.0
+
+function _quadratic_action_term(
+    fields::Tuple{F,Vararg{AuxiliaryField}},
+    phis::AbstractVector{<:Real},
+    interaction::Interaction,
+    kgrid::AbstractKGrid,
+    idx::Int
+) where {F<:AuxiliaryField}
+    current_term = _quadratic_action_term(phis[idx], first(fields), interaction, kgrid)
+    return current_term + _quadratic_action_term(Base.tail(fields), phis, interaction, kgrid, idx + 1)
+end
+
 """
     evaluate_action(phi, field, model, interaction, kgrid, ::ExactTrLn; T=1e-3)
 
@@ -38,15 +69,8 @@ function evaluate_action(
     ::ExactTrLn;
     T::Float64=1e-3
 )
-    # 1. 获取当前场的波矢
-    q_vec = hasproperty(field, :q) ? field.q : zero(first(kgrid))
+    term1 = _quadratic_action_term(phi, field, interaction, kgrid)
 
-    # 2. 获取相互作用强度（完美解耦：这里甚至可以传入虚频进行扩展）
-    V_total = V(q_vec, interaction)
-
-    term1 = phi^2 / abs(V_total)
-
-    # 3. 构造平均场重构的能带
     mf_disp = MeanFieldDispersion(model, field, phi)
     tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
     tr_ln_sum = Engine.integrate_grid(tr_ln_kernel, kgrid)
@@ -54,7 +78,7 @@ function evaluate_action(
     return term1 + tr_ln_sum
 end
 
-# RPA 版本的 action 评估同样清晰
+# RPA action evaluation for a single scalar order parameter
 function evaluate_action(
     phi::Float64,
     field::AuxiliaryField,
@@ -67,11 +91,42 @@ function evaluate_action(
     normal_model = normal_state_basis(model, field)
     chi0 = GeneralizedSusceptibility(normal_model, kgrid, field, T)
 
-    q_vec = hasproperty(field, :q) ? field.q : zero(first(kgrid))
+    q_vec = _field_wavevector(field, kgrid)
     V_total = V(q_vec, interaction)
     chi_val = chi0(q_vec)
 
     return (1.0 / abs(V_total) - real(chi_val)) * phi^2
+end
+
+function evaluate_action(
+    phis::AbstractVector{<:Real},
+    field::CompositeField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid,
+    ::ExactTrLn;
+    T::Float64=1e-3
+)
+    length(field) == length(phis) || throw(DimensionMismatch("Number of fields must match number of phis."))
+
+    term1 = _quadratic_action_term(field.fields, phis, interaction, kgrid, 1)
+    mf_disp = MeanFieldDispersion(model, field, phis)
+    tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
+    tr_ln_sum = Engine.integrate_grid(tr_ln_kernel, kgrid)
+
+    return term1 + tr_ln_sum
+end
+
+function evaluate_action(
+    phis::AbstractVector{<:Real},
+    field::CompositeField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid,
+    approx::ApproximationLevel;
+    T::Float64=1e-3
+)
+    throw(ArgumentError("CompositeField multivariate action is currently implemented only for ExactTrLn(), got $(typeof(approx))."))
 end
 
 """

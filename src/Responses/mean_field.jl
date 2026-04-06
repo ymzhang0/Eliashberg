@@ -32,6 +32,27 @@ function MeanFieldDispersion(bare::M, field::F, phi::Real) where {D,M<:Electroni
     return MeanFieldDispersion{D,M,F}(bare, field, Float64(phi))
 end
 
+function MeanFieldDispersion(
+    bare::ElectronicDispersion,
+    comp::CompositeField,
+    phis::AbstractVector{<:Real}
+)
+    length(comp) == length(phis) || throw(DimensionMismatch("Number of fields must match number of phis."))
+    return _nest_mean_field_dispersion(bare, comp.fields, phis, 1)
+end
+
+_nest_mean_field_dispersion(model::ElectronicDispersion, ::Tuple{}, ::AbstractVector{<:Real}, ::Int) = model
+
+function _nest_mean_field_dispersion(
+    model::ElectronicDispersion,
+    fields::Tuple{F,Vararg{AuxiliaryField}},
+    phis::AbstractVector{<:Real},
+    idx::Int
+) where {F<:AuxiliaryField}
+    next_model = MeanFieldDispersion(model, first(fields), Float64(phis[idx]))
+    return _nest_mean_field_dispersion(next_model, Base.tail(fields), phis, idx + 1)
+end
+
 
 # ----------------------------------------------------------------------------
 # Basis Promotion Logic
@@ -56,9 +77,13 @@ end
 
 # this is not a general construction for spinor superconducting states.
 function ε(k::SVector{D,Float64}, model::NormalNambuDispersion{D}) where {D}
-    ek = real(ε(k, model.bare)[1, 1])
-    e_minus_k = real(ε(-k, model.bare)[1, 1])
-    return Hermitian(@SMatrix [ek 0.0; 0.0 -e_minus_k])
+    # 动态获取底层模型 (可能是 1x1, 2x2 或更多) 的哈密顿量矩阵
+    Hk_mat = _matrix_data(ε(k, model.bare))
+    H_minus_k_mat = _matrix_data(ε(-k, model.bare))
+    
+    # 根据 Bogoliubov-de Gennes (BdG) 理论
+    # Nambu 空间的空穴支哈密顿量必须是 -H(-k)^T
+    return _block_diagonal(Hk_mat, -transpose(H_minus_k_mat))
 end
 
 function ε(::SVector{D,Float64}, ::FFLONormalDispersion{D}) where {D}
@@ -112,6 +137,48 @@ function _particle_hole_order_vertex(coupling::AbstractMatrix{T}) where {T}
     matrix = zeros(T, 2 * n, 2 * n)
     matrix[1:n, n+1:end] = coupling
     matrix[n+1:end, 1:n] = coupling
+    return Hermitian(matrix)
+end
+
+# 获取超导的顶点矩阵
+function vertex_matrix(model::NormalNambuDispersion{D}, k::SVector{D,Float64}, field::BCSReducedPairing) where {D}
+    fk = gap_form_factor(k, field)
+
+    bare_block = _matrix_data(ε(k, model.bare))
+    return _bcs_nambu_vertex(fk, bare_block)
+end
+
+function _bcs_nambu_vertex(fk::Number, ::StaticMatrix{N,N,TB}) where {N,TB}
+    T = promote_type(typeof(fk), TB)
+    return Hermitian(SMatrix{2N,2N,T,4N*N}(ntuple(idx -> begin
+        row = (idx - 1) % (2N) + 1
+        col = (idx - 1) ÷ (2N) + 1
+
+        if row <= N && col == N + row
+            return T(fk)
+        elseif row > N && col == row - N
+            return conj(T(fk))
+        end
+
+        return zero(T)
+    end, 4N*N)))
+end
+
+function _bcs_nambu_vertex(fk::Number, block::AbstractMatrix{TB}) where {TB}
+    size(block, 1) == size(block, 2) || throw(DimensionMismatch("BCS vertex requires a square normal-state block."))
+
+    n = size(block, 1)
+    T = promote_type(typeof(fk), TB)
+
+    if n == 1
+        return Hermitian(@SMatrix [zero(T) T(fk); conj(T(fk)) zero(T)])
+    end
+
+    matrix = zeros(T, 2n, 2n)
+    @inbounds for i in 1:n
+        matrix[i, n + i] = T(fk)
+        matrix[n + i, i] = conj(T(fk))
+    end
     return Hermitian(matrix)
 end
 

@@ -95,12 +95,12 @@ export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstant
 export ε, ω, V
 
 # Responses
-export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave
+export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave, CompositeField
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
 export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
-export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData
+export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
 
 # Solvers
 export ApproximationLevel, ExactTrLn, RPA
@@ -109,7 +109,7 @@ export SampledHamiltonianAssembly, assemble_sampled_hamiltonian, solve_sampled_h
 export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
 export compute_dispersion_surface_data, compute_band_data, compute_fermi_surface_volume
 export compute_landscape_line_data, compute_landscape_surface_data, compute_landscape_axes
-export compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data
+export compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data, compute_coexistence_landscape
 
 # Visualization
 export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plot_fermi_surface, plot_renormalized_bands
