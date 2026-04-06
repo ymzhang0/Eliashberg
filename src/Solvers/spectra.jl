@@ -16,7 +16,7 @@ function compute_dispersion_surface_data(disp::Dispersion, kgrid::KGrid{2})
         energy_matrix[ix[k[1]], iy[k[2]]] = values[1]
     end
 
-    return (; kxs, kys, energy_matrix)
+    return DispersionSurfaceData(kxs, kys, energy_matrix)
 end
 
 """
@@ -61,7 +61,7 @@ function compute_fermi_surface_volume(disp::ElectronicDispersion; n_pts::Integer
         end
     end
 
-    return (; kxs, kys, kzs, energy_volume)
+    return FermiSurfaceData(kxs, kys, kzs, energy_volume)
 end
 
 """
@@ -73,7 +73,7 @@ function compute_landscape_line_data(qgrid::KGrid{1}, landscape_vector::Abstract
     length(qgrid) == length(landscape_vector) || throw(DimensionMismatch("Landscape vector length must match the grid length."))
     qs = [q[1] for q in qgrid.points]
     perm = sortperm(qs)
-    return (; qs=qs[perm], values=Float64.(landscape_vector[perm]))
+    return LandscapeLineData(qs[perm], landscape_vector[perm])
 end
 
 """
@@ -85,6 +85,17 @@ function compute_landscape_axes(qgrid::KGrid{2})
     qxs = unique(sort([q[1] for q in qgrid.points]))
     qys = unique(sort([q[2] for q in qgrid.points]))
     return (; qxs, qys)
+end
+
+"""
+    compute_landscape_surface_data(qgrid::KGrid{2}, landscape_matrix::AbstractMatrix{<:Real})
+
+Wrap a two-dimensional instability landscape together with its rectangular axes
+into a typed object suitable for generic plotting.
+"""
+function compute_landscape_surface_data(qgrid::KGrid{2}, landscape_matrix::AbstractMatrix{<:Real})
+    axes = compute_landscape_axes(qgrid)
+    return LandscapeSurfaceData(axes.qxs, axes.qys, landscape_matrix)
 end
 
 """
@@ -220,7 +231,13 @@ function compute_zeeman_pairing_data(
     condensation_energy = minimal_energy .- normal_energy
     minimum_index = argmin(condensation_energy)
 
-    return (; condensation_energy, optimal_gaps, optimal_q=Float64(q_vals[minimum_index]), minimum_index)
+    return ZeemanPairingData(
+        q_vals,
+        condensation_energy,
+        optimal_gaps,
+        q_vals[minimum_index],
+        minimum_index
+    )
 end
 
 """

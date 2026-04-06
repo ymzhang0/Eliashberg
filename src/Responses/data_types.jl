@@ -1,4 +1,5 @@
-export BandStructureData, PhaseDiagramData, RenormalizedBandData, SpectralMapData
+export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
+export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData
 
 Base.@kwdef struct BandStructureData{D}
     kpath::KPath{D}
@@ -12,6 +13,72 @@ Base.@kwdef struct BandStructureData{D}
     end
 end
 BandStructureData(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int) where {D} = BandStructureData{D}(kpath, bands, num_bands)
+
+Base.@kwdef struct DispersionSurfaceData
+    kxs::Vector{Float64}
+    kys::Vector{Float64}
+    energy_matrix::Matrix{Float64}
+
+    function DispersionSurfaceData(
+        kxs::AbstractVector{<:Real},
+        kys::AbstractVector{<:Real},
+        energy_matrix::AbstractMatrix{<:Real}
+    )
+        size(energy_matrix) == (length(kxs), length(kys)) || throw(DimensionMismatch("Energy matrix shape must match the provided axes."))
+        return new(collect(Float64.(kxs)), collect(Float64.(kys)), Float64.(energy_matrix))
+    end
+end
+
+Base.@kwdef struct FermiSurfaceData
+    kxs::Vector{Float64}
+    kys::Vector{Float64}
+    kzs::Vector{Float64}
+    energy_volume::Array{Float32,3}
+
+    function FermiSurfaceData(
+        kxs::AbstractVector{<:Real},
+        kys::AbstractVector{<:Real},
+        kzs::AbstractVector{<:Real},
+        energy_volume::AbstractArray{<:Real,3}
+    )
+        size(energy_volume) == (length(kxs), length(kys), length(kzs)) || throw(DimensionMismatch("Volume shape must match the provided axes."))
+        return new(
+            collect(Float64.(kxs)),
+            collect(Float64.(kys)),
+            collect(Float64.(kzs)),
+            Float32.(energy_volume)
+        )
+    end
+end
+
+Base.@kwdef struct LandscapeLineData
+    qs::Vector{Float64}
+    values::Vector{Float64}
+
+    function LandscapeLineData(qs::AbstractVector{<:Real}, values::AbstractVector{<:Real})
+        length(qs) == length(values) || throw(DimensionMismatch("Coordinate and value vectors must have the same length."))
+        return new(collect(Float64.(qs)), collect(Float64.(values)))
+    end
+end
+
+Base.@kwdef struct LandscapeSurfaceData
+    qxs::Vector{Float64}
+    qys::Vector{Float64}
+    landscape_matrix::Matrix{Float64}
+
+    function LandscapeSurfaceData(
+        qxs::AbstractVector{<:Real},
+        qys::AbstractVector{<:Real},
+        landscape_matrix::AbstractMatrix{<:Real}
+    )
+        size(landscape_matrix) == (length(qxs), length(qys)) || throw(DimensionMismatch("Landscape matrix shape must match the provided axes."))
+        return new(
+            collect(Float64.(qxs)),
+            collect(Float64.(qys)),
+            Float64.(landscape_matrix)
+        )
+    end
+end
 
 Base.@kwdef struct PhaseDiagramData
     phis::Vector{Float64}
@@ -93,3 +160,29 @@ SpectralMapData(
     pair_breaking_edge::Union{Nothing,Float64},
     temperature::Float64
 ) where {D} = SpectralMapData{D}(qpath, omegas, spectral_matrix, gap, pair_breaking_edge, temperature)
+
+Base.@kwdef struct ZeemanPairingData
+    q_vals::Vector{Float64}
+    condensation_energy::Vector{Float64}
+    optimal_gaps::Vector{Float64}
+    optimal_q::Float64
+    minimum_index::Int
+
+    function ZeemanPairingData(
+        q_vals::AbstractVector{<:Real},
+        condensation_energy::AbstractVector{<:Real},
+        optimal_gaps::AbstractVector{<:Real},
+        optimal_q::Real,
+        minimum_index::Integer
+    )
+        length(q_vals) == length(condensation_energy) == length(optimal_gaps) || throw(DimensionMismatch("All FFLO data vectors must have the same length."))
+        1 <= minimum_index <= length(q_vals) || throw(BoundsError(q_vals, minimum_index))
+        return new(
+            collect(Float64.(q_vals)),
+            collect(Float64.(condensation_energy)),
+            collect(Float64.(optimal_gaps)),
+            Float64(optimal_q),
+            Int(minimum_index)
+        )
+    end
+end

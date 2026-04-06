@@ -57,6 +57,9 @@ function plot_landscape(::Val{1}, qs::AbstractVector{<:Real}, landscape_vector::
     return fig
 end
 
+plot_landscape(data::LandscapeLineData; kwargs...) =
+    plot_landscape(Val(1), data.qs, data.values; kwargs...)
+
 function plot_landscape(::Val{2}, qxs::AbstractVector{<:Real}, qys::AbstractVector{<:Real}, landscape_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
     size(landscape_matrix) == (length(qxs), length(qys)) || throw(DimensionMismatch("Landscape matrix shape must match the provided axes."))
 
@@ -67,6 +70,9 @@ function plot_landscape(::Val{2}, qxs::AbstractVector{<:Real}, qys::AbstractVect
     lines!(ax, [-π, π, π, -π, -π], [-π, -π, π, π, -π], color=:white, linestyle=:dash, alpha=0.5)
     return fig
 end
+
+plot_landscape(data::LandscapeSurfaceData; kwargs...) =
+    plot_landscape(Val(2), data.qxs, data.qys, data.landscape_matrix; kwargs...)
 
 function plot_spectral_function(qpath::KPath, omegas::AbstractVector{<:Real}, spectral_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
     size(spectral_matrix) == (length(qpath.points), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
@@ -92,7 +98,9 @@ function plot_zeeman_pairing_landscape(
     q_vals::AbstractVector{<:Real},
     condensation_energy::AbstractVector{<:Real},
     optimal_gaps::AbstractVector{<:Real};
-    minimum_index::Union{Nothing,Integer}=nothing
+    minimum_index::Union{Nothing,Integer}=nothing,
+    axis_left=(;),
+    axis_right=(;)
 )
     length(q_vals) == length(condensation_energy) == length(optimal_gaps) || throw(DimensionMismatch("All FFLO plotting arrays must have the same length."))
     highlighted_index = isnothing(minimum_index) ? argmin(condensation_energy) : minimum_index
@@ -101,7 +109,8 @@ function plot_zeeman_pairing_landscape(
     ax1 = Axis(fig[1, 1],
         xlabel=L"Center-of-Mass Momentum $q_x$",
         ylabel=L"Condensation Energy $\mathcal{F}(q) - \mathcal{F}_{\mathrm{normal}}$",
-        title="Magnetic Pairing Landscape"
+        title="Magnetic Pairing Landscape",
+        axis_left...
     )
 
     lines!(ax1, q_vals, condensation_energy, color=:royalblue, linewidth=3)
@@ -112,13 +121,23 @@ function plot_zeeman_pairing_landscape(
     ax2 = Axis(fig[1, 2],
         xlabel=L"Center-of-Mass Momentum $q_x$",
         ylabel=L"Optimal Gap $\Delta(q)$",
-        title="Order Parameter vs Momentum"
+        title="Order Parameter vs Momentum",
+        axis_right...
     )
 
     lines!(ax2, q_vals, optimal_gaps, color=:crimson, linewidth=3)
     scatter!(ax2, [q_vals[highlighted_index]], [optimal_gaps[highlighted_index]], color=:royalblue, markersize=12)
     return fig
 end
+
+plot_zeeman_pairing_landscape(data::ZeemanPairingData; kwargs...) =
+    plot_zeeman_pairing_landscape(
+        data.q_vals,
+        data.condensation_energy,
+        data.optimal_gaps;
+        minimum_index=data.minimum_index,
+        kwargs...
+    )
 
 function _plot_collective_modes(
     qpath::KPath,
@@ -174,5 +193,8 @@ visualize_zeeman_pairing_landscape(args...; kwargs...) = plot_zeeman_pairing_lan
 visualize_collective_modes(data::SpectralMapData; kwargs...) =
     plot_collective_modes(data; kwargs...)
 
+Makie.plot(data::LandscapeLineData; kwargs...) = plot_landscape(data; kwargs...)
+Makie.plot(data::LandscapeSurfaceData; kwargs...) = plot_landscape(data; kwargs...)
 Makie.plot(data::PhaseDiagramData; kwargs...) = plot_phase_transition(data; kwargs...)
 Makie.plot(data::SpectralMapData; kwargs...) = plot_collective_modes(data; kwargs...)
+Makie.plot(data::ZeemanPairingData; kwargs...) = plot_zeeman_pairing_landscape(data; kwargs...)

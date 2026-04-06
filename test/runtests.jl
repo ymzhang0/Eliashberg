@@ -21,3 +21,4 @@ using StaticArrays
 end
 
 include("test_refactor.jl")
+include("test_plot_dispatch.jl")

@@ -36,6 +36,9 @@ function plot_dispersion_surface(kxs::AbstractVector{<:Real}, kys::AbstractVecto
     return fig
 end
 
+plot_dispersion_surface(data::DispersionSurfaceData; kwargs...) =
+    plot_dispersion_surface(data.kxs, data.kys, data.energy_matrix; kwargs...)
+
 """
     plot_band_structure(kpath, band_matrix; E_Fermi=0.0, axis=(;), kwargs...)
 
@@ -95,6 +98,9 @@ function plot_fermi_surface(
         levels=iso_level, colormap=:viridis, alpha=0.5, transparency=true, kwargs...)
     return fig
 end
+
+plot_fermi_surface(data::FermiSurfaceData; kwargs...) =
+    plot_fermi_surface(data.kxs, data.kys, data.kzs, data.energy_volume; kwargs...)
 
 function _plot_renormalized_bands(
     Ts::AbstractVector{<:Real},
@@ -176,6 +182,9 @@ visualize_dispersion(k_coords::AbstractVector{<:Real}, band_matrix::AbstractMatr
 visualize_dispersion(kxs::AbstractVector{<:Real}, kys::AbstractVector{<:Real}, energy_matrix::AbstractMatrix{<:Real}; kwargs...) =
     plot_dispersion_surface(kxs, kys, energy_matrix; kwargs...)
 
+visualize_dispersion(data::DispersionSurfaceData; kwargs...) =
+    plot_dispersion_surface(data; kwargs...)
+
 visualize_dispersion(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; kwargs...) =
     plot_band_structure(kpath, band_matrix; kwargs...)
 
@@ -190,8 +199,13 @@ visualize_dispersion(
     kwargs...
 ) = plot_fermi_surface(kxs, kys, kzs, energy_volume; kwargs...)
 
+visualize_dispersion(data::FermiSurfaceData; kwargs...) =
+    plot_fermi_surface(data; kwargs...)
+
 visualize_renormalized_bands(data::RenormalizedBandData; kwargs...) =
     plot_renormalized_bands(data; kwargs...)
 
+Makie.plot(data::DispersionSurfaceData; kwargs...) = plot_dispersion_surface(data; kwargs...)
 Makie.plot(data::BandStructureData; kwargs...) = plot_band_structure(data; kwargs...)
+Makie.plot(data::FermiSurfaceData; kwargs...) = plot_fermi_surface(data; kwargs...)
 Makie.plot(data::RenormalizedBandData; kwargs...) = plot_renormalized_bands(data; kwargs...)
