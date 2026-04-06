@@ -5,6 +5,18 @@
 # ---------------------------------------------------------
 
 """
+    ε(k::Union{AbstractVector{<:Real}, Tuple{Vararg{Real}}}, model::Dispersion{D}) where {D}
+
+Convenience fallback method. Converts a standard array or tuple `k` into an `SVector{D, Float64}`
+and delegates to the highly optimized core `ε` methods. This allows users to evaluate
+the Hamiltonian interactively without importing StaticArrays.
+"""
+function ε(k::Union{AbstractVector{<:Real}, Tuple{Vararg{Real}}}, model::Dispersion{D}) where {D}
+    length(k) == D || throw(DimensionMismatch("Expected k-point of dimension $D, got $(length(k))"))
+    return ε(SVector{D, Float64}(k...), model)
+end
+
+"""
     ε(k::SVector{D, Float64}, model::TightBinding{D}) where {D}
 
 Evaluates the tight-binding Hamiltonian at momentum `k` using Fourier transform
