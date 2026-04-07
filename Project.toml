@@ -5,6 +5,7 @@ authors = ["ymzhang0 <zhangyiming1998@gmail.com>"]
 
 [deps]
 AtomsBase = "a963bdd2-2df7-4f54-a1ee-49d51e6be12a"
+Brillouin = "23470ee3-d0df-4052-8b1a-8cbd6363e7f0"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"

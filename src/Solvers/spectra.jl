@@ -26,9 +26,10 @@ Compute band values along a path in parameter space. The returned dense matrix
 has one column per band and one row per path sample.
 """
 function compute_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
-    bands = [real(band_structure(disp, k).values) for k in kpath.points]
+    points = path_points(kpath)
+    bands = [real(band_structure(disp, k).values) for k in points]
     num_bands = length(bands[1])
-    band_matrix = fill(NaN, length(kpath.points), num_bands)
+    band_matrix = fill(NaN, length(points), num_bands)
 
     for band_idx in 1:num_bands
         band_matrix[:, band_idx] = [values[band_idx] for values in bands]
@@ -127,10 +128,11 @@ function _band_matrix_along_path(
     disp::ElectronicDispersion,
     kpath::KPath
 )
-    bands_k = Vector{Vector{Float64}}(undef, length(kpath.points))
+    points = path_points(kpath)
+    bands_k = Vector{Vector{Float64}}(undef, length(points))
 
-    Threads.@threads for idx in eachindex(kpath.points)
-        bands_k[idx] = collect(real.(band_structure(disp, kpath.points[idx]).values))
+    Threads.@threads for idx in eachindex(points)
+        bands_k[idx] = collect(real.(band_structure(disp, points[idx]).values))
     end
 
     return stack(bands_k, dims=1)
@@ -420,7 +422,7 @@ function compute_collective_mode_spectral_data(
         interaction,
         field,
         kgrid,
-        qpath.points,
+        path_points(qpath),
         omegas;
         T=T_val,
         η=eta,

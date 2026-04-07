@@ -180,7 +180,7 @@ function scan_spectral_function(
         interaction, 
         field,
         kgrid,
-        qpath.points,
+        path_points(qpath),
         omegas;
         T=T,
         η=η,
@@ -208,7 +208,7 @@ function scan_spectral_function(
     return scan_rpa_spectral_function_hpc(
         model,
         kgrid,
-        qpath.points,
+        path_points(qpath),
         omegas;
         field=field,
         T=T,

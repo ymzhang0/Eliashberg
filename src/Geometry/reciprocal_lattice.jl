@@ -16,18 +16,7 @@ struct KGrid{D} <: AbstractKGrid{D}
     weights::Vector{Float64}
 end
 
-"""
-    KPath{D} <: AbstractKGrid{D}
-
-用于绘制能带图的高对称线路径。
-不仅包含 k 点，还记录了高对称点（拐点）的索引和标签。
-"""
-struct KPath{D} <: AbstractKGrid{D}
-    points::Vector{SVector{D,Float64}}
-    weights::Vector{Float64}
-    node_indices::Vector{Int}
-    node_labels::Vector{String}
-end
+const KPath = Brillouin.KPathInterpolant
 
 # ---------------------------------------------------------
 # Base Method Overloads for K-Grids
@@ -39,6 +28,43 @@ Base.getindex(g::AbstractKGrid, i::Int) = g.points[i]
 Base.firstindex(g::AbstractKGrid) = 1
 Base.lastindex(g::AbstractKGrid) = length(g.points)
 Base.eltype(::Type{<:AbstractKGrid{D}}) where {D} = SVector{D,Float64}
+
+path_branches(kpath::KPath) = getfield(kpath, :kpaths)
+
+function path_points(kpath::KPath{D}) where {D}
+    points = SVector{D,Float64}[]
+    for branch in path_branches(kpath)
+        append!(points, branch)
+    end
+    return points
+end
+
+function path_node_metadata(kpath::KPath)
+    node_indices = Int[]
+    node_labels = String[]
+    offset = 0
+
+    for (branch, labels) in zip(path_branches(kpath), getfield(kpath, :labels))
+        for idx in sort!(collect(keys(labels)))
+            push!(node_indices, offset + idx)
+            push!(node_labels, String(labels[idx]))
+        end
+        offset += length(branch)
+    end
+
+    return node_indices, node_labels
+end
+
+function path_branch_ranges(kpath::KPath)
+    ranges = UnitRange{Int}[]
+    start = 1
+    for branch in path_branches(kpath)
+        stop = start + length(branch) - 1
+        push!(ranges, start:stop)
+        start = stop + 1
+    end
+    return ranges
+end
 
 
 
@@ -217,6 +243,77 @@ function build_spglib_cell(system::AbstractSystem{3})
 end
 
 """
+    build_spglib_cell(lattice::AbstractLattice{3})
+
+Convert a standalone Bravais lattice into an `Spglib.SpglibCell` by attaching a
+single dummy atom at the origin. This is sufficient for space-group-based
+Bravais-lattice identification.
+"""
+function build_spglib_cell(lattice::AbstractLattice{3})
+    return Spglib.SpglibCell(
+        Matrix{Float64}(primitive_vectors(lattice)),
+        [SVector{3,Float64}(0.0, 0.0, 0.0)],
+        [1],
+    )
+end
+
+function _spacegroup_dataset(lattice::AbstractLattice{3})
+    return Spglib.get_dataset(build_spglib_cell(lattice))
+end
+
+function _bravais_from_spacegroup(spacegroup_number::Integer, international_symbol::AbstractString)
+    number = Int(spacegroup_number)
+    centering = uppercase(first(strip(international_symbol)))
+
+    if 1 <= number <= 2
+        return :aP
+    elseif 3 <= number <= 15
+        return centering in ('A', 'B', 'C', 'I') ? :mC : :mP
+    elseif 16 <= number <= 74
+        return if centering == 'F'
+            :oF
+        elseif centering == 'I'
+            :oI
+        elseif centering in ('A', 'B', 'C')
+            :oC
+        else
+            :oP
+        end
+    elseif 75 <= number <= 142
+        return centering == 'I' ? :tI : :tP
+    elseif 143 <= number <= 167
+        return centering == 'R' ? :hR : :hP
+    elseif 168 <= number <= 194
+        return :hP
+    elseif 195 <= number <= 230
+        return if centering == 'F'
+            :cF
+        elseif centering == 'I'
+            :cI
+        else
+            :cP
+        end
+    end
+
+    error("Unsupported international space-group number $number.")
+end
+
+"""
+    bravais_lattice(lattice::AbstractLattice{3})
+
+Identify the 3D Bravais lattice symbol (`:aP`, `:mP`, `:mC`, `:oP`, `:oC`,
+`:oI`, `:oF`, `:tP`, `:tI`, `:hP`, `:hR`, `:cP`, `:cI`, or `:cF`) using
+Spglib's space-group analysis.
+"""
+function bravais_lattice(lattice::AbstractLattice{3})
+    dataset = _spacegroup_dataset(lattice)
+    return _bravais_from_spacegroup(dataset.spacegroup_number, dataset.international_symbol)
+end
+
+bravais_lattice(crystal::Crystal{3}) = bravais_lattice(Lattice(primitive_vectors(crystal)))
+bravais_lattice(system::AbstractSystem{3}) = bravais_lattice(Crystal(system))
+
+"""
     generate_irreducible_kgrid(crystal::Crystal{3}, mesh::Vector{Int}; is_shift=[0, 0, 0])
 
 Generate a symmetry-reduced Brillouin-zone integration grid using
@@ -299,11 +396,13 @@ end
 Generates a 1D path in K-space connecting high-symmetry nodes for band structure plotting.
 """
 function generate_kpath(nodes::Vector{SVector{D,Float64}}, labels::Vector{String}; n_pts_per_segment=50) where {D}
-    points = SVector{D,Float64}[]
-    node_indices = Int[]
+    length(nodes) == length(labels) || throw(DimensionMismatch("`nodes` and `labels` must have the same length."))
+    n_pts_per_segment >= 1 || throw(ArgumentError("`n_pts_per_segment` must be at least 1."))
 
+    points = SVector{D,Float64}[]
+    node_labels = Dict{Int,Symbol}()
     current_idx = 1
-    push!(node_indices, current_idx)
+    node_labels[current_idx] = Symbol(labels[1])
 
     for i in 1:(length(nodes)-1)
         start_node = nodes[i]
@@ -316,14 +415,14 @@ function generate_kpath(nodes::Vector{SVector{D,Float64}}, labels::Vector{String
         end
 
         current_idx += n_pts_per_segment
-        push!(node_indices, current_idx)
+        node_labels[current_idx] = Symbol(labels[i + 1])
     end
 
     push!(points, nodes[end])
-    weights = zeros(length(points))
-
-    return KPath{D}(points, weights, node_indices, labels)
+    cartesian_basis = [SVector{D,Float64}(ntuple(i -> i == j ? 1.0 : 0.0, D)) for j in 1:D]
+    return KPath{D}([points], [node_labels], cartesian_basis, Ref(Brillouin.CARTESIAN))
 end
+
 function generate_kpath(lat::ChainLattice; n_pts_per_segment=50)
     a = lat.a
     b1 = SVector{1,Float64}(2π / a)
@@ -360,52 +459,19 @@ function generate_kpath(lat::HexagonalLattice; n_pts_per_segment=50)
     return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
 end
 
-function generate_kpath(lat::CubicLattice; n_pts_per_segment=50)
-    a = lat.a
-    b1 = SVector{3,Float64}(2π / a, 0.0, 0.0)
-    b2 = SVector{3,Float64}(0.0, 2π / a, 0.0)
-    b3 = SVector{3,Float64}(0.0, 0.0, 2π / a)
-    nodes = [
-        0.0 * b1 + 0.0 * b2 + 0.0 * b3, # Γ
-        0.5 * b1 + 0.0 * b2 + 0.0 * b3, # X
-        0.5 * b1 + 0.5 * b2 + 0.0 * b3, # M
-        0.5 * b1 + 0.5 * b2 + 0.5 * b3, # R
-        0.0 * b1 + 0.0 * b2 + 0.0 * b3  # Γ
-    ]
-    labels = ["Γ", "X", "M", "R", "Γ"]
-    return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
+function _standardized_direct_basis(lattice::AbstractLattice{3})
+    dataset = _spacegroup_dataset(lattice)
+    std_lattice = Matrix{Float64}(dataset.std_lattice)
+    return [SVector{3,Float64}(std_lattice[i, 1], std_lattice[i, 2], std_lattice[i, 3]) for i in 1:3], Int(dataset.spacegroup_number)
 end
 
-function generate_kpath(lat::BCCLattice; n_pts_per_segment=50)
-    a = lat.a
-    # 使用笛卡尔坐标系的伪倒格矢基底计算路径 (对应你之前的设定)
-    b1 = SVector{3,Float64}(2π / a, 0.0, 0.0)
-    b2 = SVector{3,Float64}(0.0, 2π / a, 0.0)
-    b3 = SVector{3,Float64}(0.0, 0.0, 2π / a)
-    nodes = [
-        0.0 * b1 + 0.0 * b2 + 0.0 * b3, # Γ (0,0,0)
-        0.0 * b1 + 0.0 * b2 + 1.0 * b3, # H (0,0,2π/a)
-        0.5 * b1 + 0.5 * b2 + 0.0 * b3, # N (π/a,π/a,0)
-        0.5 * b1 + 0.5 * b2 + 0.5 * b3, # P (π/a,π/a,π/a)
-        0.0 * b1 + 0.0 * b2 + 0.0 * b3  # Γ
-    ]
-    labels = ["Γ", "H", "N", "P", "Γ"]
-    return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
+function generate_kpath(lat::AbstractLattice{3}; n_pts_per_segment=50)
+    n_pts_per_segment >= 1 || throw(ArgumentError("`n_pts_per_segment` must be at least 1."))
+
+    direct_basis, sgnum = _standardized_direct_basis(lat)
+    kp = Brillouin.irrfbz_path(sgnum, direct_basis)
+    kp_cartesian = Brillouin.cartesianize(kp)
+    return Brillouin.splice(kp_cartesian, n_pts_per_segment - 1)
 end
 
-function generate_kpath(lat::FCCLattice; n_pts_per_segment=50)
-    a = lat.a
-    # 使用笛卡尔坐标系的伪倒格矢基底计算路径
-    b1 = SVector{3,Float64}(2π / a, 0.0, 0.0)
-    b2 = SVector{3,Float64}(0.0, 2π / a, 0.0)
-    b3 = SVector{3,Float64}(0.0, 0.0, 2π / a)
-    nodes = [
-        0.0 * b1 + 0.0 * b2 + 0.0 * b3, # Γ (0,0,0)
-        0.0 * b1 + 1.0 * b2 + 0.0 * b3, # X (0,2π/a,0)
-        0.5 * b1 + 1.0 * b2 + 0.0 * b3, # W (π/a,2π/a,0)
-        0.5 * b1 + 0.5 * b2 + 0.5 * b3, # L (π/a,π/a,π/a)
-        0.0 * b1 + 0.0 * b2 + 0.0 * b3  # Γ
-    ]
-    labels = ["Γ", "X", "W", "L", "Γ"]
-    return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
-end
+generate_kpath(crystal::Crystal{3}; n_pts_per_segment=50) = generate_kpath(Lattice(primitive_vectors(crystal)); n_pts_per_segment=n_pts_per_segment)

@@ -45,20 +45,24 @@ plot_dispersion_surface(data::DispersionSurfaceData; kwargs...) =
 Plot a band structure along a labelled path in parameter space.
 """
 function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, colors=Makie.wong_colors(), axis=(;), kwargs...)
-    size(band_matrix, 1) == length(kpath.points) || throw(DimensionMismatch("Band matrix row count must match the number of path samples."))
+    points = path_points(kpath)
+    size(band_matrix, 1) == length(points) || throw(DimensionMismatch("Band matrix row count must match the number of path samples."))
     distances = path_distances(kpath)
-    tick_positions = distances[kpath.node_indices]
-    tick_labels = kpath.node_labels
+    node_indices, tick_labels = path_node_metadata(kpath)
+    tick_positions = distances[node_indices]
+    branch_ranges = path_branch_ranges(kpath)
 
     fig = Figure(size=(800, 600))
-    ax = Axis(fig[1, 1]; ylabel="Energy E(k)", title="$(length(first(kpath.points)))D Band Structure",
+    ax = Axis(fig[1, 1]; ylabel="Energy E(k)", title="$(length(first(points)))D Band Structure",
         xticks=(tick_positions, tick_labels), xgridvisible=false, axis...)
 
     vlines!(ax, tick_positions, color=(:gray, 0.5), linestyle=:dot, linewidth=1.5)
 
     for band_idx in axes(band_matrix, 2)
         c = colors[mod1(band_idx, length(colors))]
-        lines!(ax, distances, band_matrix[:, band_idx], color=c; linewidth=2.5, kwargs...)
+        for range in branch_ranges
+            lines!(ax, distances[range], band_matrix[range, band_idx], color=c; linewidth=2.5, kwargs...)
+        end
     end
 
     hlines!(ax, [E_Fermi], color=(:black, 0.7), linestyle=:dash, linewidth=1.5)
@@ -111,15 +115,16 @@ function _plot_renormalized_bands(
     band_limits=(-2.5, 2.5),
     colors=Makie.wong_colors()
 )
-    n_path = length(kpath.points)
+    n_path = length(kpath)
     size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of path samples."))
     size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of path samples."))
     size(renormalized_bands, 3) == length(Ts) || throw(DimensionMismatch("Renormalized-band tensor third dimension must match the temperature axis."))
     _validate_gap_storage(gaps, length(Ts))
 
     distances = path_distances(kpath)
-    tick_positions = distances[kpath.node_indices]
-    labels = kpath.node_labels
+    node_indices, labels = path_node_metadata(kpath)
+    tick_positions = distances[node_indices]
+    branch_ranges = path_branch_ranges(kpath)
     fig = Figure(size=(1400, 420), fontsize=16)
 
     for (idx, T) in enumerate(Ts)
@@ -139,14 +144,18 @@ function _plot_renormalized_bands(
 
         for band_idx in axes(bare_bands, 2)
             label = band_idx == 1 ? "Bare Band" : nothing
-            lines!(ax, distances, bare_bands[:, band_idx], color=:black, linestyle=:dot, alpha=0.4, linewidth=2, label=label)
+            for (range_idx, range) in enumerate(branch_ranges)
+                lines!(ax, distances[range], bare_bands[range, band_idx], color=:black, linestyle=:dot, alpha=0.4, linewidth=2, label=(range_idx == 1 ? label : nothing))
+            end
         end
 
         band_slice = @view renormalized_bands[:, :, idx]
         for band_idx in axes(band_slice, 2)
             color = colors[mod1(band_idx, length(colors))]
             label = band_idx == 1 ? "Renormalized Band" : nothing
-            lines!(ax, distances, band_slice[:, band_idx], color=color, linewidth=3, label=label)
+            for (range_idx, range) in enumerate(branch_ranges)
+                lines!(ax, distances[range], band_slice[range, band_idx], color=color, linewidth=3, label=(range_idx == 1 ? label : nothing))
+            end
         end
 
         ylims!(ax, band_limits...)

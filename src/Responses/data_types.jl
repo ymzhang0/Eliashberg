@@ -7,7 +7,7 @@ Base.@kwdef struct BandStructureData{D}
     num_bands::Int
 
     function BandStructureData{D}(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int) where {D}
-        size(bands, 1) == length(kpath.points) || throw(DimensionMismatch("Band matrix row count must match the number of k-path samples."))
+        size(bands, 1) == length(kpath) || throw(DimensionMismatch("Band matrix row count must match the number of k-path samples."))
         size(bands, 2) == num_bands || throw(DimensionMismatch("Band matrix column count must match `num_bands`."))
         return new{D}(kpath, bands, num_bands)
     end
@@ -121,7 +121,7 @@ Base.@kwdef struct RenormalizedBandData{D,G<:AbstractArray{Float64}}
         gaps::G,
         temperatures::Vector{Float64}
     ) where {D,G<:AbstractArray{Float64}}
-        n_path = length(kpath.points)
+        n_path = length(kpath)
         n_temperatures = length(temperatures)
         size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of k-path samples."))
         size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of k-path samples."))
@@ -154,7 +154,7 @@ Base.@kwdef struct SpectralMapData{D}
         pair_breaking_edge::Union{Nothing,Float64},
         temperature::Float64
     ) where {D}
-        size(spectral_matrix) == (length(qpath.points), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
+        size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
         return new{D}(qpath, omegas, spectral_matrix, gap, pair_breaking_edge, temperature)
     end
 end

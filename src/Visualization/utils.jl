@@ -52,11 +52,20 @@ Return the cumulative path-length coordinate associated with each point in a
 piecewise-linear path.
 """
 function path_distances(path::KPath)
-    distances = zeros(length(path.points))
+    points = path_points(path)
+    distances = zeros(length(points))
+    offset = 0
     dist = 0.0
-    for idx in 2:length(path.points)
-        dist += norm(path.points[idx] - path.points[idx - 1])
-        distances[idx] = dist
+
+    for branch in path_branches(path)
+        if !isempty(branch)
+            distances[offset + 1] = dist
+            for idx in 2:length(branch)
+                dist += norm(branch[idx] - branch[idx - 1])
+                distances[offset + idx] = dist
+            end
+            offset += length(branch)
+        end
     end
     return distances
 end

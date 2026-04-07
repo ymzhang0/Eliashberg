@@ -75,10 +75,10 @@ plot_landscape(data::LandscapeSurfaceData; kwargs...) =
     plot_landscape(Val(2), data.qxs, data.qys, data.landscape_matrix; kwargs...)
 
 function plot_spectral_function(qpath::KPath, omegas::AbstractVector{<:Real}, spectral_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
-    size(spectral_matrix) == (length(qpath.points), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
+    size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
     distances = path_distances(qpath)
-    tick_positions = distances[qpath.node_indices]
-    tick_labels = qpath.node_labels
+    node_indices, tick_labels = path_node_metadata(qpath)
+    tick_positions = distances[node_indices]
 
     fig = Figure(size=(900, 600))
     ax = Axis(fig[1, 1]; ylabel=L"\omega", title="Dynamic Spectral Function " * L"A(q, \omega)",
@@ -147,16 +147,17 @@ function _plot_collective_modes(
     axis=(;),
     colormap=:magma
 )
-    size(spectral_matrix) == (length(qpath.points), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
+    size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
     distances = path_distances(qpath)
-    tick_positions = distances[qpath.node_indices]
+    node_indices, node_labels = path_node_metadata(qpath)
+    tick_positions = distances[node_indices]
 
     fig = Figure(size=(800, 500), fontsize=16)
     ax = Axis(fig[1, 1],
         title=L"Superconducting Excitation Spectrum $\mathrm{Im}\chi(q, \omega)$",
         xlabel="Momentum Transfer q",
         ylabel=L"Frequency $\omega$",
-        xticks=(tick_positions, qpath.node_labels),
+        xticks=(tick_positions, node_labels),
         axis...
     )
 

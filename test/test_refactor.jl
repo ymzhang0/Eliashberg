@@ -225,7 +225,11 @@ using Makie
     spectral_fig = plot_spectral_function(qpath, omegas, spectral)
     @test spectral_fig isa Figure
 
-    line_path = KPath(line_grid.points, line_grid.weights, [1, length(line_grid.points)], ["-π", "π"])
+    line_path = generate_kpath(
+        [first(line_grid.points), last(line_grid.points)],
+        ["-π", "π"];
+        n_pts_per_segment=length(line_grid.points) - 1,
+    )
     line_band_data = compute_band_data(one_d_model, line_path)
     @test size(line_band_data.bands, 1) == length(line_grid)
     dispersion_fig = plot(line_band_data)
@@ -337,6 +341,32 @@ Generated for testing
     finally
         isopen(tb_io) && close(tb_io)
         rm(tb_dir; force=true, recursive=true)
+    end
+
+    bravais_examples = [
+        (:aP, ibrav(14, 1.0; celldm2=1.1, celldm3=1.2, celldm4=0.15, celldm5=0.2, celldm6=0.25)),
+        (:mP, ibrav(12, 1.0; celldm2=1.2, celldm3=1.3, celldm4=0.2)),
+        (:mC, ibrav(13, 1.0; celldm2=1.2, celldm3=1.3, celldm4=0.2)),
+        (:oP, ibrav(8, 1.0; celldm2=1.2, celldm3=1.4)),
+        (:oC, ibrav(9, 1.0; celldm2=1.2, celldm3=1.4)),
+        (:oF, ibrav(10, 1.0; celldm2=1.2, celldm3=1.4)),
+        (:oI, ibrav(11, 1.0; celldm2=1.2, celldm3=1.4)),
+        (:tP, ibrav(6, 1.0; celldm3=1.4)),
+        (:tI, ibrav(7, 1.0; celldm3=1.4)),
+        (:hP, ibrav(4, 1.0; celldm3=1.6)),
+        (:hR, ibrav(5, 1.0; celldm4=0.2)),
+        (:cP, ibrav(1, 1.0)),
+        (:cF, ibrav(2, 1.0)),
+        (:cI, ibrav(3, 1.0)),
+    ]
+
+    for (expected_bravais, lat3d) in bravais_examples
+        @test bravais_lattice(lat3d) == expected_bravais
+        path3d = generate_kpath(lat3d; n_pts_per_segment=4)
+        @test path3d isa KPath{3}
+        node_indices, node_labels = Eliashberg.path_node_metadata(path3d)
+        @test length(node_indices) == length(node_labels)
+        @test length(path3d) > length(node_labels)
     end
 
     path = generate_kpath(ChainLattice(1.0); n_pts_per_segment=4)

@@ -5,6 +5,7 @@ using LinearAlgebra
 using StaticArrays
 using Makie
 using AtomsBase
+import Brillouin
 using Spglib
 using Unitful
 using PhysicalConstants.CODATA2022
@@ -88,7 +89,7 @@ export Lattice, Crystal, ChainLattice, SquareLattice, HexagonalLattice, CubicLat
 export ibrav, qe_lattice, cubic_p_lattice, cubic_f_lattice, cubic_i_lattice, hexagonal_p_lattice, trigonal_r_lattice, tetragonal_p_lattice, tetragonal_i_lattice
 export orthorhombic_p_lattice, orthorhombic_base_centered_lattice, orthorhombic_face_centered_lattice, orthorhombic_body_centered_lattice, monoclinic_p_lattice, monoclinic_base_centered_lattice, triclinic_lattice
 export scaled_positions, positions, append_atom!, set_scaled_positions!, set_positions!, set_cell!, cartesian_basis, generate_1d_kgrid, generate_2d_kgrid, generate_3d_kgrid, reciprocal_vectors, generate_reciprocal_lattice, generate_kpath
-export build_spglib_cell, generate_irreducible_kgrid
+export build_spglib_cell, bravais_lattice, generate_irreducible_kgrid
 
 # Models
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction
