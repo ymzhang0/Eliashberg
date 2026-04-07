@@ -121,6 +121,7 @@ using Unitful
     @test length(graphene_spectrum.values) == 2 * length(grid)
 
     one_d_model = TightBinding(ChainLattice(1.0), 1.0, 0.0)
+    @test one_d_model.lattice isa SMatrix{1,1,Float64,1}
     bdg_dispersion = MeanFieldDispersion(one_d_model, BCSReducedPairing(), 0.2)
     bdg_assembly = assemble_sampled_hamiltonian(line_grid, bdg_dispersion; matrix_format=:sparse)
     @test bdg_assembly.layout isa VariableBlockLayout
@@ -331,9 +332,11 @@ Generated for testing
         )
 
         tb_cell = cell_from_wannier90_tb(tb_file)
-        @test tb_cell.vectors == @SMatrix [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
+        @test Eliashberg.primitive_vectors(tb_cell) == @SMatrix [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
+        @test periodicity(tb_cell) == (true, true, true)
 
-        @test tb_data.cell.vectors == tb_cell.vectors
+        @test Eliashberg.primitive_vectors(tb_data.cell) == Eliashberg.primitive_vectors(tb_cell)
+        @test tb_data.lattice.vectors == Eliashberg.primitive_vectors(tb_cell)
 
         tb_periodic_cell = periodic_cell_from_wannier90_tb(tb_file; periodicity=(true, true, false))
         @test periodicity(tb_periodic_cell) == (true, true, false)
@@ -364,12 +367,13 @@ Generated for testing
 
         wannier_tb_model = build_model_from_wannier90(tb_file, 0.0)
         @test wannier_tb_model isa MultiOrbitalTightBinding{3}
+        @test wannier_tb_model.cell isa SMatrix{3,3,Float64,9}
         @test length(wannier_tb_model.hoppings) == 2
-        @test wannier_tb_model.cell.vectors == tb_cell.vectors
+        @test Eliashberg.primitive_vectors(wannier_tb_model.cell) == Eliashberg.primitive_vectors(tb_cell)
         @test wannier_tb_model.num_orbitals == 2
 
         wannier_system_model = MultiOrbitalTightBinding(slab_system, tb_data.hoppings, 0.0)
-        @test wannier_system_model.cell.vectors == tb_cell.vectors
+        @test Eliashberg.primitive_vectors(wannier_system_model.cell) == Eliashberg.primitive_vectors(tb_cell)
         @test wannier_system_model.num_orbitals == length(slab_system)
     finally
         isopen(tb_io) && close(tb_io)

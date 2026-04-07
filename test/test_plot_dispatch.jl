@@ -30,6 +30,11 @@ using StaticArrays
     @test size(surface_landscape_data.landscape_matrix) == (4, 4)
     @test plot(surface_landscape_data) isa Figure
 
+    cell2d = PeriodicCell(lattice2d; periodicity=(true, true))
+    reciprocal_plot = visualize_reciprocal_space(cell2d, generate_reciprocal_lattice(cell2d, 4, 4))
+    @test reciprocal_plot isa Figure
+    @test visualize_lattice(Eliashberg.primitive_vectors(lattice2d)) isa Figure
+
     zeeman_data = ZeemanPairingData(
         collect(range(-0.3, 0.3, length=3)),
         [-0.1, -0.2, -0.05],

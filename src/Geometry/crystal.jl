@@ -5,6 +5,7 @@ Return the column-major matrix whose columns are the primitive real-space basis
 vectors of the lattice-like object.
 """
 primitive_vectors(lattice::AbstractLattice) = getfield(lattice, :vectors)
+primitive_vectors(vectors::AbstractMatrix) = _coerce_lattice_matrix(vectors, _length_unit_or_default(vectors[1, 1]))
 periodicity(::AbstractLattice{D}) where {D} = ntuple(_ -> true, D)
 
 @inline _strip_length(value::Real, length_unit) = Float64(value)

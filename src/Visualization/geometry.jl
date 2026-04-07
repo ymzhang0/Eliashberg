@@ -12,7 +12,7 @@
 
 Visualizes a 1D real-space lattice chain.
 """
-function visualize_lattice(lattice::AbstractLattice{1}; extent=3, axis=(;), kwargs...)
+function _visualize_lattice_1d(vectors::AbstractMatrix{<:Number}; extent=3, axis=(;), kwargs...)
     # 把高度调低一点，因为是一维的，太高了显得空旷
     fig = Figure(size=(600, 200))
 
@@ -30,7 +30,7 @@ function visualize_lattice(lattice::AbstractLattice{1}; extent=3, axis=(;), kwar
         axis...
     )
 
-    a1 = lattice.vectors[1, 1]
+    a1 = vectors[1, 1]
 
     # 1. 画一条贯穿所有原子的中心轴线（充当真正的坐标轴）
     hlines!(ax, [0.0], color=:black, linewidth=1.5)
@@ -57,13 +57,15 @@ function visualize_lattice(lattice::AbstractLattice{1}; extent=3, axis=(;), kwar
     return fig
 end
 
+visualize_lattice(lattice::AbstractLattice{1}; extent=3, axis=(;), kwargs...) = _visualize_lattice_1d(primitive_vectors(lattice); extent=extent, axis=axis, kwargs...)
+
 """
     visualize_lattice(lattice::AbstractLattice{2}; extent=2, kwargs...)
 
 Visualizes a 2D real-space lattice with hollow sites, primitive vectors, 
 magnitudes, and the angle between them (without bounding boxes or grid lines).
 """
-function visualize_lattice(lattice::AbstractLattice{2}; extent=2, axis=(;), kwargs...)
+function _visualize_lattice_2d(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwargs...)
     fig = Figure(size=(600, 600))
 
     # 1. 彻底干掉边框、网格和坐标轴刻度
@@ -78,11 +80,11 @@ function visualize_lattice(lattice::AbstractLattice{2}; extent=2, axis=(;), kwar
         axis...
     )
 
-    a1 = lattice.vectors[:, 1]
-    a2 = lattice.vectors[:, 2]
+    a1 = vectors[:, 1]
+    a2 = vectors[:, 2]
 
     # Generate surrounding lattice points
-    pts = [lattice.vectors * SVector(i, j) for i in -extent:extent for j in -extent:extent]
+    pts = [vectors * SVector(i, j) for i in -extent:extent for j in -extent:extent]
     xs = [p[1] for p in pts]
     ys = [p[2] for p in pts]
 
@@ -134,13 +136,15 @@ function visualize_lattice(lattice::AbstractLattice{2}; extent=2, axis=(;), kwar
     return fig
 end
 
+visualize_lattice(lattice::AbstractLattice{2}; extent=2, axis=(;), kwargs...) = _visualize_lattice_2d(primitive_vectors(lattice); extent=extent, axis=axis, kwargs...)
+
 """
     visualize_lattice(lattice::AbstractLattice{3}; extent=1, kwargs...)
 
 Visualizes a 3D real-space lattice with hollow sites, primitive vectors, 
 magnitudes, and the angles between them (without bounding boxes or grids).
 """
-function visualize_lattice(lattice::AbstractLattice{3}; extent=1, axis=(;), kwargs...)
+function _visualize_lattice_3d(vectors::AbstractMatrix{<:Number}; extent=1, axis=(;), kwargs...)
     fig = Figure(size=(800, 800))
 
     # 1. 彻底干掉 3D 边框、网格和刻度标签
@@ -154,10 +158,10 @@ function visualize_lattice(lattice::AbstractLattice{3}; extent=1, axis=(;), kwar
         axis...
     )
 
-    a1, a2, a3 = lattice.vectors[:, 1], lattice.vectors[:, 2], lattice.vectors[:, 3]
+    a1, a2, a3 = vectors[:, 1], vectors[:, 2], vectors[:, 3]
 
     # Generate surrounding lattice points
-    pts = [lattice.vectors * SVector(i, j, k) for i in -extent:extent for j in -extent:extent for k in -extent:extent]
+    pts = [vectors * SVector(i, j, k) for i in -extent:extent for j in -extent:extent for k in -extent:extent]
 
     # 2. 空心原子：白底灰边
     scatter!(ax, [p[1] for p in pts], [p[2] for p in pts], [p[3] for p in pts];
@@ -217,6 +221,24 @@ function visualize_lattice(lattice::AbstractLattice{3}; extent=1, axis=(;), kwar
     return fig
 end
 
+visualize_lattice(lattice::AbstractLattice{3}; extent=1, axis=(;), kwargs...) = _visualize_lattice_3d(primitive_vectors(lattice); extent=extent, axis=axis, kwargs...)
+
+function visualize_lattice(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwargs...)
+    primitive = primitive_vectors(vectors)
+    D = size(primitive, 1)
+    if D == 1
+        return _visualize_lattice_1d(primitive; extent=extent, axis=axis, kwargs...)
+    elseif D == 2
+        return _visualize_lattice_2d(primitive; extent=extent, axis=axis, kwargs...)
+    elseif D == 3
+        return _visualize_lattice_3d(primitive; extent=extent, axis=axis, kwargs...)
+    end
+    throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
+end
+
+visualize_lattice(cell::PeriodicCell{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = visualize_lattice(primitive_vectors(cell); extent=extent, axis=axis, kwargs...)
+visualize_lattice(system::AbstractSystem{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = visualize_lattice(primitive_vectors(system); extent=extent, axis=axis, kwargs...)
+
 # ----------------------------------------------------------------------------
 # Reciprocal Space & K-Grid Visualizations
 # ----------------------------------------------------------------------------
@@ -226,7 +248,7 @@ end
 
 Visualizes the 1D reciprocal lattice and 1st Brillouin Zone.
 """
-function visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function _visualize_reciprocal_space_1d(b1::Real, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(600, 300))
     ax = Axis(fig[1, 1];
         title="1D Reciprocal Space & K-Grid",
@@ -240,8 +262,6 @@ function visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid::Union{Ab
         bottomspinevisible=false,  # 去掉下外框（因为我们要把轴画在原子上）
         axis...
     )
-    b1 = reciprocal_vectors(lattice)[1, 1]
-
     # Draw 1st Brillouin Zone boundaries
     vlines!(ax, [-b1 / 2, b1 / 2]; color=:black, linestyle=:dash, linewidth=2, label="1st BZ Boundaries")
 
@@ -257,18 +277,19 @@ function visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid::Union{Ab
     return fig
 end
 
+function visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+    return _visualize_reciprocal_space_1d(reciprocal_vectors(lattice)[1, 1], kgrid; axis=axis, kwargs...)
+end
+
 """
     visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid=nothing; kwargs...)
 
 Visualizes the 2D reciprocal lattice vectors and the primitive Brillouin Zone parallelogram.
 """
-function visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function _visualize_reciprocal_space_2d(b1, b2, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(700, 700))
     ax = Axis(fig[1, 1]; aspect=DataAspect(), title="2D Reciprocal Space & K-Grid",
         xlabel=L"k_x", ylabel=L"k_y", axis...)
-
-    B = reciprocal_vectors(lattice)
-    b1, b2 = B[:, 1], B[:, 2]
 
     # Centered primitive cell (Parallelogram spanning exactly one Brillouin Zone volume)
     cell_corners_x = [0.0, b1[1], b1[1] + b2[1], b2[1], 0.0] .- (b1[1] + b2[1]) / 2
@@ -290,18 +311,20 @@ function visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid::Union{Ab
     return fig
 end
 
+function visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+    B = reciprocal_vectors(lattice)
+    return _visualize_reciprocal_space_2d(B[:, 1], B[:, 2], kgrid; axis=axis, kwargs...)
+end
+
 """
     visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid=nothing; kwargs...)
 
 Visualizes the 3D reciprocal primitive vectors and the grid points inside the primitive cell.
 """
-function visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function _visualize_reciprocal_space_3d(b1, b2, b3, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(800, 800))
     ax = Axis3(fig[1, 1]; aspect=:data, title="3D Reciprocal Space & K-Grid",
         xlabel=L"k_x", ylabel=L"k_y", zlabel=L"k_z", axis...)
-
-    B = reciprocal_vectors(lattice)
-    b1, b2, b3 = B[:, 1], B[:, 2], B[:, 3]
 
     # Draw the 12 edges of the centered primitive parallelepiped
     # Vertices combinations: ±b1/2 ±b2/2 ±b3/2
@@ -332,3 +355,50 @@ function visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid::Union{Ab
 
     return fig
 end
+
+function visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+    B = reciprocal_vectors(lattice)
+    return _visualize_reciprocal_space_3d(B[:, 1], B[:, 2], B[:, 3], kgrid; axis=axis, kwargs...)
+end
+
+function _project_onto_plane(v1::SVector{D,Float64}, v2::SVector{D,Float64}) where {D}
+    e1 = normalize(v1)
+    orthogonal = v2 - dot(v2, e1) * e1
+    e2 = normalize(orthogonal)
+    projector(v) = SVector{2,Float64}(dot(v, e1), dot(v, e2))
+    return projector
+end
+
+function visualize_reciprocal_space(vectors::AbstractMatrix{<:Number}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+    reciprocal = reciprocal_vectors(vectors)
+    D = size(reciprocal, 1)
+    if D == 1
+        return _visualize_reciprocal_space_1d(reciprocal[1, 1], kgrid; axis=axis, kwargs...)
+    elseif D == 2
+        return _visualize_reciprocal_space_2d(reciprocal[:, 1], reciprocal[:, 2], kgrid; axis=axis, kwargs...)
+    elseif D == 3
+        return _visualize_reciprocal_space_3d(reciprocal[:, 1], reciprocal[:, 2], reciprocal[:, 3], kgrid; axis=axis, kwargs...)
+    end
+    throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
+end
+
+function visualize_reciprocal_space(cell::PeriodicCell, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+    rank = periodic_rank(cell)
+    basis = _periodic_reciprocal_basis(cell)
+    rank > 0 || throw(ArgumentError("Cannot visualize reciprocal space for a non-periodic cell."))
+    if rank == 1
+        b1 = norm(first(basis))
+        projected_grid = isnothing(kgrid) ? nothing : KGrid([SVector{1,Float64}(dot(k, normalize(first(basis)))) for k in kgrid.points], kgrid.weights)
+        return _visualize_reciprocal_space_1d(b1, projected_grid; axis=axis, kwargs...)
+    elseif rank == 2
+        projector = _project_onto_plane(basis[1], basis[2])
+        b1 = projector(basis[1])
+        b2 = projector(basis[2])
+        projected_grid = isnothing(kgrid) ? nothing : KGrid([projector(k) for k in kgrid.points], kgrid.weights)
+        return _visualize_reciprocal_space_2d(b1, b2, projected_grid; axis=axis, kwargs...)
+    end
+    return _visualize_reciprocal_space_3d(basis[1], basis[2], basis[3], kgrid; axis=axis, kwargs...)
+end
+
+visualize_reciprocal_space(system::AbstractSystem, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...) =
+    visualize_reciprocal_space(cell(system), kgrid; axis=axis, kwargs...)
