@@ -44,29 +44,110 @@ plot_dispersion_surface(data::DispersionSurfaceData; kwargs...) =
 
 Plot a band structure along a labelled path in parameter space.
 """
-function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, colors=Makie.wong_colors(), axis=(;), kwargs...)
+function _branch_ticks(
+    distances::AbstractVector{<:Real},
+    node_indices::AbstractVector{<:Integer},
+    node_labels::AbstractVector{<:AbstractString},
+    range::UnitRange{Int},
+)
+    ticks = Float64[]
+    labels = String[]
+
+    for (idx, label) in zip(node_indices, node_labels)
+        if first(range) <= idx <= last(range)
+            push!(ticks, distances[idx])
+            push!(labels, label)
+        end
+    end
+
+    return ticks, labels
+end
+
+function _branch_width(distances::AbstractVector{<:Real}, range::UnitRange{Int})
+    return max(distances[last(range)] - distances[first(range)], eps(Float64))
+end
+
+function _band_path_axes!(
+    grid::GridLayout,
+    distances::AbstractVector{<:Real},
+    node_indices::AbstractVector{<:Integer},
+    node_labels::AbstractVector{<:AbstractString},
+    branch_ranges::AbstractVector{<:UnitRange{Int}};
+    ylabel::AbstractString="",
+    title::AbstractString="",
+    axis=(;),
+)
+    branch_axes = Axis[]
+    nbranches = length(branch_ranges)
+
+    for (branch_idx, range) in enumerate(branch_ranges)
+        is_first = branch_idx == 1
+        is_last = branch_idx == nbranches
+        branch_ticks, branch_tick_labels = _branch_ticks(distances, node_indices, node_labels, range)
+
+        ax = Axis(
+            grid[1, branch_idx];
+            xticks=(branch_ticks, branch_tick_labels),
+            ylabel=is_first ? ylabel : "",
+            title=is_first ? title : "",
+            xgridvisible=false,
+            yticklabelsvisible=is_first,
+            yticksvisible=is_first,
+            leftspinevisible=is_first,
+            rightspinevisible=is_last,
+            axis...,
+        )
+        push!(branch_axes, ax)
+
+        xlims!(ax, distances[first(range)], distances[last(range)])
+        !isempty(branch_ticks) && vlines!(ax, branch_ticks, color=(:gray, 0.5), linestyle=:dot, linewidth=1.5)
+
+        if !is_first
+            hideydecorations!(ax, grid=false)
+        end
+
+        colsize!(grid, branch_idx, Auto(_branch_width(distances, range)))
+    end
+
+    colgap!(grid, 12)
+
+    for ax in branch_axes[2:end]
+        linkyaxes!(branch_axes[1], ax)
+    end
+
+    return branch_axes
+end
+
+function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, band_color=:royalblue, axis=(;), kwargs...)
     points = path_points(kpath)
     size(band_matrix, 1) == length(points) || throw(DimensionMismatch("Band matrix row count must match the number of path samples."))
     distances = path_distances(kpath)
     node_indices, tick_labels = path_node_metadata(kpath)
-    tick_positions = distances[node_indices]
     branch_ranges = path_branch_ranges(kpath)
 
     fig = Figure(size=(800, 600))
-    ax = Axis(fig[1, 1]; ylabel="Energy E(k)", title="$(length(first(points)))D Band Structure",
-        xticks=(tick_positions, tick_labels), xgridvisible=false, axis...)
-
-    vlines!(ax, tick_positions, color=(:gray, 0.5), linestyle=:dot, linewidth=1.5)
+    branch_grid = fig[1, 1] = GridLayout()
+    branch_axes = _band_path_axes!(
+        branch_grid,
+        distances,
+        node_indices,
+        tick_labels,
+        branch_ranges;
+        ylabel="Energy E(k)",
+        title="$(length(first(points)))D Band Structure",
+        axis=axis,
+    )
 
     for band_idx in axes(band_matrix, 2)
-        c = colors[mod1(band_idx, length(colors))]
-        for range in branch_ranges
-            lines!(ax, distances[range], band_matrix[range, band_idx], color=c; linewidth=2.5, kwargs...)
+        for (ax, range) in zip(branch_axes, branch_ranges)
+            lines!(ax, distances[range], band_matrix[range, band_idx], color=band_color; linewidth=2.5, kwargs...)
         end
     end
 
-    hlines!(ax, [E_Fermi], color=(:black, 0.7), linestyle=:dash, linewidth=1.5)
-    xlims!(ax, distances[1], distances[end])
+    for ax in branch_axes
+        hlines!(ax, [E_Fermi], color=(:black, 0.7), linestyle=:dash, linewidth=1.5)
+    end
+
     return fig
 end
 
@@ -113,7 +194,8 @@ function _plot_renormalized_bands(
     renormalized_bands::AbstractArray{<:Real,3},
     gaps::AbstractArray{<:Real};
     band_limits=(-2.5, 2.5),
-    colors=Makie.wong_colors()
+    bare_band_color=:black,
+    renormalized_band_color=:royalblue,
 )
     n_path = length(kpath)
     size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of path samples."))
@@ -123,46 +205,45 @@ function _plot_renormalized_bands(
 
     distances = path_distances(kpath)
     node_indices, labels = path_node_metadata(kpath)
-    tick_positions = distances[node_indices]
     branch_ranges = path_branch_ranges(kpath)
     fig = Figure(size=(1400, 420), fontsize=16)
 
     for (idx, T) in enumerate(Ts)
         is_first = idx == 1
-        ax = Axis(fig[1, idx],
-            title=_renormalized_band_title(T, gaps, idx),
-            titlesize=16,
-            xticks=(tick_positions, labels),
+        panel_grid = fig[1, idx] = GridLayout()
+        branch_axes = _band_path_axes!(
+            panel_grid,
+            distances,
+            node_indices,
+            labels,
+            branch_ranges;
             ylabel=is_first ? "Energy E(k)" : "",
-            xgridvisible=false,
-            yticksvisible=is_first,
-            yticklabelsvisible=is_first
+            title=_renormalized_band_title(T, gaps, idx),
+            axis=(; titlesize=16),
         )
-
-        hlines!(ax, [0.0], color=:gray, linestyle=:dash, linewidth=1)
-        vlines!(ax, tick_positions, color=:lightgray, linestyle=:dot, linewidth=1.5)
 
         for band_idx in axes(bare_bands, 2)
             label = band_idx == 1 ? "Bare Band" : nothing
-            for (range_idx, range) in enumerate(branch_ranges)
-                lines!(ax, distances[range], bare_bands[range, band_idx], color=:black, linestyle=:dot, alpha=0.4, linewidth=2, label=(range_idx == 1 ? label : nothing))
+            for (range_idx, (ax, range)) in enumerate(zip(branch_axes, branch_ranges))
+                lines!(ax, distances[range], bare_bands[range, band_idx], color=bare_band_color, linestyle=:dot, alpha=0.4, linewidth=2, label=(range_idx == 1 ? label : nothing))
             end
         end
 
         band_slice = @view renormalized_bands[:, :, idx]
         for band_idx in axes(band_slice, 2)
-            color = colors[mod1(band_idx, length(colors))]
             label = band_idx == 1 ? "Renormalized Band" : nothing
-            for (range_idx, range) in enumerate(branch_ranges)
-                lines!(ax, distances[range], band_slice[range, band_idx], color=color, linewidth=3, label=(range_idx == 1 ? label : nothing))
+            for (range_idx, (ax, range)) in enumerate(zip(branch_axes, branch_ranges))
+                lines!(ax, distances[range], band_slice[range, band_idx], color=renormalized_band_color, linewidth=3, label=(range_idx == 1 ? label : nothing))
             end
         end
 
-        ylims!(ax, band_limits...)
-        xlims!(ax, distances[1], distances[end])
+        for ax in branch_axes
+            hlines!(ax, [0.0], color=:gray, linestyle=:dash, linewidth=1)
+            ylims!(ax, band_limits...)
+        end
 
         if is_first
-            axislegend(ax, position=:lt, framevisible=false)
+            axislegend(first(branch_axes), position=:lt, framevisible=false)
         end
     end
 
