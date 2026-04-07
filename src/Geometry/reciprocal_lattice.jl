@@ -106,6 +106,115 @@ function generate_3d_kgrid(Nx::Int, Ny::Int, Nz::Int; kmin=(-π, -π, -π), kmax
     return KGrid(points, weights)
 end
 
+periodic_rank(cell_like) = count(periodicity(cell_like))
+
+_periodic_axes(cell_like) = findall(identity, collect(periodicity(cell_like)))
+
+function _periodic_reciprocal_basis(cell_like)
+    reciprocal = reciprocal_vectors(Lattice(primitive_vectors(cell_like)))
+    D = size(reciprocal, 1)
+    return [SVector{D,Float64}(reciprocal[:, axis]) for axis in _periodic_axes(cell_like)]
+end
+
+@inline _centered_fractional_coordinate(i::Int, n::Int) = (i - 1) / n - 0.5
+
+function _generate_periodic_kgrid(basis::AbstractVector{<:SVector{D,Float64}}, sizes::NTuple{N,Int}) where {D,N}
+    all(>(0), sizes) || throw(ArgumentError("All reciprocal-grid dimensions must be positive."))
+
+    ranges = ntuple(i -> 1:sizes[i], N)
+    points = Vector{SVector{D,Float64}}(undef, prod(sizes))
+    index = 1
+
+    for sample_indices in Iterators.product(ranges...)
+        point = zero(SVector{D,Float64})
+        for axis in 1:N
+            point += _centered_fractional_coordinate(sample_indices[axis], sizes[axis]) * basis[axis]
+        end
+        points[index] = point
+        index += 1
+    end
+
+    weights = fill(1.0 / prod(sizes), prod(sizes))
+    return KGrid(points, weights)
+end
+
+function _generate_periodic_kgrid_1d(basis::SVector{D,Float64}, Nx::Int) where {D}
+    Nx > 0 || throw(ArgumentError("The reciprocal-grid dimension must be positive."))
+    points = SVector{D,Float64}[]
+    for i in 1:Nx+1
+        push!(points, _centered_fractional_coordinate(i, Nx) * basis)
+    end
+    weights = fill(1.0 / (Nx + 1), Nx + 1)
+    return KGrid(points, weights)
+end
+
+function _generate_kpath_for_periodic_basis(basis::AbstractVector{<:SVector{D,Float64}}; n_pts_per_segment=50) where {D}
+    rank = length(basis)
+    rank in (1, 2) || throw(ArgumentError("Only 1D and 2D periodic bases should be handled by this helper."))
+
+    if rank == 1
+        b1 = basis[1]
+        return generate_kpath([zero(SVector{D,Float64}), 0.5 * b1], ["Γ", "X"]; n_pts_per_segment)
+    end
+
+    b1, b2 = basis
+    n1 = norm(b1)
+    n2 = norm(b2)
+    cosθ = dot(b1, b2) / (n1 * n2)
+
+    if isapprox(n1, n2; rtol=1e-5) && isapprox(abs(cosθ), 0.5; atol=5e-3)
+        nodes = [
+            zero(SVector{D,Float64}),
+            0.5 * b1,
+            (b1 + b2) / 3,
+            zero(SVector{D,Float64}),
+        ]
+        labels = ["Γ", "M", "K", "Γ"]
+    elseif isapprox(cosθ, 0.0; atol=5e-3)
+        if isapprox(n1, n2; rtol=1e-5)
+            nodes = [
+                zero(SVector{D,Float64}),
+                0.5 * b1,
+                0.5 * (b1 + b2),
+                zero(SVector{D,Float64}),
+            ]
+            labels = ["Γ", "X", "M", "Γ"]
+        else
+            nodes = [
+                zero(SVector{D,Float64}),
+                0.5 * b1,
+                0.5 * (b1 + b2),
+                0.5 * b2,
+                zero(SVector{D,Float64}),
+            ]
+            labels = ["Γ", "X", "S", "Y", "Γ"]
+        end
+    else
+        nodes = [
+            zero(SVector{D,Float64}),
+            0.5 * b1,
+            0.5 * (b1 + b2),
+            0.5 * b2,
+            zero(SVector{D,Float64}),
+        ]
+        labels = ["Γ", "X", "M", "Y", "Γ"]
+    end
+
+    return generate_kpath(nodes, labels; n_pts_per_segment)
+end
+
+function _generate_periodic_kpath(cell_like; n_pts_per_segment=50)
+    rank = periodic_rank(cell_like)
+    rank > 0 || throw(ArgumentError("Cannot generate a k-path for a structure with no periodic directions."))
+    rank <= 3 || throw(ArgumentError("Only periodic ranks up to 3 are supported."))
+
+    if rank == 3
+        return generate_kpath(Lattice(primitive_vectors(cell_like)); n_pts_per_segment)
+    end
+
+    return _generate_kpath_for_periodic_basis(_periodic_reciprocal_basis(cell_like); n_pts_per_segment)
+end
+
 # ---------------------------------------------------------
 # 1D Reciprocal Space
 # ---------------------------------------------------------
@@ -138,6 +247,18 @@ function generate_reciprocal_lattice(lattice::AbstractLattice{1}, Nx::Int)
 
     weights = fill(1.0 / (Nx + 1), Nx + 1)
     return KGrid(points, weights)
+end
+
+function generate_reciprocal_lattice(cell::PeriodicCell, sizes::Vararg{Int,N}) where {N}
+    periodic_rank(cell) == N || throw(ArgumentError("Expected $N sampling dimensions to match the $(periodic_rank(cell)) periodic directions in the provided cell."))
+    basis = _periodic_reciprocal_basis(cell)
+    return N == 1 ? _generate_periodic_kgrid_1d(first(basis), first(sizes)) : _generate_periodic_kgrid(basis, sizes)
+end
+
+function generate_reciprocal_lattice(system::AbstractSystem, sizes::Vararg{Int,N}) where {N}
+    periodic_rank(system) == N || throw(ArgumentError("Expected $N sampling dimensions to match the $(periodic_rank(system)) periodic directions in the provided system."))
+    basis = _periodic_reciprocal_basis(system)
+    return N == 1 ? _generate_periodic_kgrid_1d(first(basis), first(sizes)) : _generate_periodic_kgrid(basis, sizes)
 end
 
 # ---------------------------------------------------------
@@ -475,3 +596,5 @@ function generate_kpath(lat::AbstractLattice{3}; n_pts_per_segment=50)
 end
 
 generate_kpath(crystal::Crystal{3}; n_pts_per_segment=50) = generate_kpath(Lattice(primitive_vectors(crystal)); n_pts_per_segment=n_pts_per_segment)
+generate_kpath(cell::PeriodicCell; n_pts_per_segment=50) = _generate_periodic_kpath(cell; n_pts_per_segment)
+generate_kpath(system::AbstractSystem; n_pts_per_segment=50) = _generate_periodic_kpath(system; n_pts_per_segment)

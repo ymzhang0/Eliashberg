@@ -5,6 +5,8 @@ using Distributed
 using LinearAlgebra
 using SparseArrays
 using Makie
+using AtomsBase
+using Unitful
 
 @testset "Dimensionality-Agnostic Refactor" begin
     grid = generate_2d_kgrid(4, 4)
@@ -333,11 +335,42 @@ Generated for testing
 
         @test tb_data.cell.vectors == tb_cell.vectors
 
+        tb_periodic_cell = periodic_cell_from_wannier90_tb(tb_file; periodicity=(true, true, false))
+        @test periodicity(tb_periodic_cell) == (true, true, false)
+
+        slab_path = generate_kpath(tb_periodic_cell; n_pts_per_segment=4)
+        @test slab_path isa KPath{3}
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in Eliashberg.path_points(slab_path))
+
+        slab_grid = generate_reciprocal_lattice(tb_periodic_cell, 4, 3)
+        @test slab_grid isa KGrid{3}
+        @test length(slab_grid) == 12
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in slab_grid.points)
+
+        carbon_species = [ChemicalSpecies(:C), ChemicalSpecies(:C)]
+        slab_system = FastSystem(
+            tb_periodic_cell,
+            [
+                SVector(0.0u"Å", 0.0u"Å", 0.0u"Å"),
+                SVector(0.5u"Å", 0.5u"Å", 0.0u"Å"),
+            ],
+            carbon_species,
+            mass.(carbon_species),
+        )
+        @test periodic_rank(slab_system) == 2
+        system_path = generate_kpath(slab_system; n_pts_per_segment=4)
+        @test system_path isa KPath{3}
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in Eliashberg.path_points(system_path))
+
         wannier_tb_model = build_model_from_wannier90(tb_file, 0.0)
         @test wannier_tb_model isa MultiOrbitalTightBinding{3}
         @test length(wannier_tb_model.hoppings) == 2
         @test wannier_tb_model.cell.vectors == tb_cell.vectors
         @test wannier_tb_model.num_orbitals == 2
+
+        wannier_system_model = MultiOrbitalTightBinding(slab_system, tb_data.hoppings, 0.0)
+        @test wannier_system_model.cell.vectors == tb_cell.vectors
+        @test wannier_system_model.num_orbitals == length(slab_system)
     finally
         isopen(tb_io) && close(tb_io)
         rm(tb_dir; force=true, recursive=true)

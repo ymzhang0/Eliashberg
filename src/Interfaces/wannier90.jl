@@ -198,16 +198,17 @@ function parse_wannier90_hr(filename::String)
 end
 
 """
-    parse_wannier90_tb(filename::String)
+    parse_wannier90_tb(filename::String; periodicity=nothing)
 
 Parse a `wannier90_tb.dat` file and return a `NamedTuple` with the lattice
-vectors, the standalone `cell`, the number of Wannier orbitals, the sparse
-Hamiltonian entries, and the sparse position-operator matrix elements.
+vectors, the standalone internal `cell`, an `AtomsBase.PeriodicCell`, the
+number of Wannier orbitals, the sparse Hamiltonian entries, and the sparse
+position-operator matrix elements.
 
 The parser supports both the canonical Wannier90 grouped block layout and an
 inline layout where each entry repeats its `R` vector.
 """
-function parse_wannier90_tb(filename::String)
+function parse_wannier90_tb(filename::String; periodicity=nothing)
     open(filename, "r") do io
         readline(io) # Header/comment line.
 
@@ -217,6 +218,13 @@ function parse_wannier90_tb(filename::String)
             _parse_svector3_float(readline(io), filename, "lattice vector a3"),
         )
         cell = Lattice(lattice_vectors)
+        atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
+            periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
+        periodic_cell = PeriodicCell(
+            ;
+            cell_vectors=ntuple(i -> lattice_vectors[i] .* u"Å", 3),
+            periodicity=atomsbase_periodicity,
+        )
 
         num_wann = parse(Int, strip(readline(io)))
         nrpts = parse(Int, strip(readline(io)))
@@ -227,6 +235,8 @@ function parse_wannier90_tb(filename::String)
 
         return (
             cell = cell,
+            periodic_cell = periodic_cell,
+            periodicity = atomsbase_periodicity,
             lattice_vectors = lattice_vectors,
             num_wann = num_wann,
             hoppings = hoppings,
@@ -251,6 +261,31 @@ function cell_from_wannier90_tb(tb_data::NamedTuple)
 end
 
 """
+    periodic_cell_from_wannier90_tb(filename::String; periodicity=nothing)
+
+Build an `AtomsBase.PeriodicCell` directly from the lattice vectors stored in a
+`wannier90_tb.dat` file. Use `periodicity=(true, true, false)` for slab
+systems, for example.
+"""
+function periodic_cell_from_wannier90_tb(filename::String; periodicity=nothing)
+    return parse_wannier90_tb(filename; periodicity).periodic_cell
+end
+
+function periodic_cell_from_wannier90_tb(tb_data::NamedTuple; periodicity=nothing)
+    if hasproperty(tb_data, :periodic_cell) && isnothing(periodicity)
+        return tb_data.periodic_cell
+    end
+    hasproperty(tb_data, :lattice_vectors) || error("The provided Wannier90 TB data does not contain lattice vectors.")
+    atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
+        periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
+    return PeriodicCell(
+        ;
+        cell_vectors=ntuple(i -> tb_data.lattice_vectors[i] .* u"Å", 3),
+        periodicity=atomsbase_periodicity,
+    )
+end
+
+"""
     build_model_from_wannier90(filename::String, cell::AbstractLattice, EF::Float64)
 
 Construct a `MultiOrbitalTightBinding` model from either a `wannier90_hr.dat`
@@ -270,6 +305,14 @@ end
 
 function build_model_from_wannier90(filename::String, crystal::Crystal, EF::Float64)
     return build_model_from_wannier90(filename, Lattice(primitive_vectors(crystal)), EF)
+end
+
+function build_model_from_wannier90(filename::String, cell::PeriodicCell, EF::Float64)
+    return build_model_from_wannier90(filename, Lattice(cell), EF)
+end
+
+function build_model_from_wannier90(filename::String, system::AbstractSystem, EF::Float64)
+    return build_model_from_wannier90(filename, Lattice(system), EF)
 end
 
 """

@@ -82,8 +82,7 @@ end
 Build a `MultiOrbitalTightBinding` model from an `AtomsBase.AbstractSystem`.
 """
 function MultiOrbitalTightBinding(system::AbstractSystem{D}, hoppings, EF) where {D}
-    crystal = Crystal(system)
-    return MultiOrbitalTightBinding(Lattice(primitive_vectors(crystal)), length(crystal.atomic_symbols), hoppings, EF)
+    return MultiOrbitalTightBinding(Lattice(system), length(system), hoppings, EF)
 end
 
 """

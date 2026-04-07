@@ -5,6 +5,7 @@ Return the column-major matrix whose columns are the primitive real-space basis
 vectors of the lattice-like object.
 """
 primitive_vectors(lattice::AbstractLattice) = getfield(lattice, :vectors)
+periodicity(::AbstractLattice{D}) where {D} = ntuple(_ -> true, D)
 
 @inline _strip_length(value::Real, length_unit) = Float64(value)
 @inline _strip_length(value, length_unit) = Float64(ustrip(uconvert(length_unit, value)))
@@ -34,6 +35,20 @@ function _coerce_lattice_matrix(vectors::AbstractVector, length_unit)
     all(length(vector) == D for vector in vectors) || throw(ArgumentError("`cell` must contain exactly $D primitive vectors of length $D."))
     return SMatrix{D,D,Float64}(hcat((_strip_length_vector(vector, length_unit, Val(D)) for vector in vectors)...))
 end
+
+_length_unit_or_default(value::Real) = u"Å"
+_length_unit_or_default(value) = unit(value)
+
+_cell_length_unit(vectors::Tuple) = _length_unit_or_default(vectors[1][1])
+_cell_length_unit(vectors::AbstractVector) = _length_unit_or_default(vectors[1][1])
+_cell_length_unit(cell::PeriodicCell) = _cell_length_unit(cell_vectors(cell))
+_cell_length_unit(system::AbstractSystem) = _cell_length_unit(cell_vectors(system))
+
+function primitive_vectors(cell::PeriodicCell{D}) where {D}
+    return _coerce_lattice_matrix(cell_vectors(cell), _cell_length_unit(cell))
+end
+
+primitive_vectors(system::AbstractSystem) = primitive_vectors(cell(system))
 
 function _normalize_fractional_position(position, lattice, ::Val{D}; fractional, length_unit, wrap::Bool=true) where {D}
     coordinates = _strip_length_vector(position, length_unit, Val(D))
@@ -695,6 +710,26 @@ function Lattice(vectors; length_unit=u"Å")
     matrix = _coerce_lattice_matrix(vectors, length_unit)
     D = size(matrix, 1)
     return Lattice{D}(matrix)
+end
+
+Lattice(cell::PeriodicCell; length_unit=_cell_length_unit(cell)) = Lattice(cell_vectors(cell); length_unit)
+Lattice(system::AbstractSystem; length_unit=_cell_length_unit(system)) = Lattice(cell_vectors(system); length_unit)
+
+function PeriodicCell(lattice::AbstractLattice{D}; periodicity::NTuple{D,Bool}=ntuple(_ -> true, D), length_unit=u"Å") where {D}
+    vectors = ntuple(i -> primitive_vectors(lattice)[:, i] .* length_unit, D)
+    return PeriodicCell(; cell_vectors=vectors, periodicity)
+end
+
+function PeriodicCell(crystal::Crystal{D}; periodicity::NTuple{D,Bool}=ntuple(_ -> true, D), length_unit=u"Å") where {D}
+    return PeriodicCell(Lattice(primitive_vectors(crystal)); periodicity, length_unit)
+end
+
+function FastSystem(crystal::Crystal{D}; periodicity::NTuple{D,Bool}=ntuple(_ -> true, D), length_unit=u"Å") where {D}
+    atomsbase_cell = PeriodicCell(crystal; periodicity, length_unit)
+    positions = [position .* length_unit for position in cartesian_basis(crystal)]
+    species = [ChemicalSpecies(symbol) for symbol in crystal.atomic_symbols]
+    masses = mass.(species)
+    return FastSystem(atomsbase_cell, positions, species, masses)
 end
 
 struct ChainLattice <: AbstractLattice{1}
