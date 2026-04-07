@@ -96,7 +96,7 @@ export build_spglib_cell, bravais_lattice, generate_irreducible_kgrid, periodic_
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction
 export FreeElectron, TightBinding, SpinorDispersion, MultiOrbitalTightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
 export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction, CompositeInteraction
-export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction
+export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, MediatedInteraction
 export ε, ω, V
 export parse_wannier90_hr, parse_wannier90_tb, cell_from_wannier90_tb, periodic_cell_from_wannier90_tb, build_model_from_wannier90
 

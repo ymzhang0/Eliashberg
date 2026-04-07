@@ -42,6 +42,20 @@ struct ScreenedCoulombInteraction{
     polarization::P
 end
 
+"""
+    MediatedInteraction{B, C, V<:Interaction} <: Interaction
+
+A universal interface for effective electron-electron interactions mediated by a
+bosonic field with the form
+
+    V_eff(q) = V_bare(q) + |g(q)|^2 * D_boson(q)
+"""
+struct MediatedInteraction{B,C,V<:Interaction} <: Interaction
+    bare_V::V
+    boson_field::B
+    coupling::C
+end
+
 struct CompositeInteraction{T<:Tuple} <: Interaction
     interactions::T
 end
@@ -50,6 +64,56 @@ CompositeInteraction(ints::Vararg{Interaction}) = CompositeInteraction(ints)
 Base.length(comp::CompositeInteraction) = length(comp.interactions)
 
 # Legacy chi methods removed.
+
+function _nearest_grid_index(q::SVector{D,Float64}, qgrid::AbstractKGrid{D}) where {D}
+    length(qgrid) > 0 || throw(ArgumentError("Cannot evaluate a boson propagator on an empty q-grid."))
+
+    best_idx = firstindex(qgrid)
+    best_distance = norm(q - qgrid[best_idx])
+
+    for idx in (best_idx + 1):lastindex(qgrid)
+        distance = norm(q - qgrid[idx])
+        if distance < best_distance
+            best_idx = idx
+            best_distance = distance
+        end
+    end
+
+    return best_idx
+end
+
+function evaluate_boson_propagator(q::SVector{D,Float64}, boson_field) where {D}
+    applicable(boson_field, q) ||
+        throw(ArgumentError("No boson propagator evaluator is defined for $(typeof(boson_field))."))
+    return boson_field(q)
+end
+
+function evaluate_boson_propagator(
+    q::SVector{D,Float64},
+    boson_field::Tuple{<:AbstractKGrid{D},<:AbstractArray},
+) where {D}
+    qgrid, chi_array = boson_field
+    length(qgrid) == length(chi_array) ||
+        throw(DimensionMismatch("Susceptibility data length must match the q-grid length."))
+
+    idx = _nearest_grid_index(q, qgrid)
+    return chi_array[idx]
+end
+
+function evaluate_boson_propagator(
+    q::SVector{D,Float64},
+    boson_field::PhononDispersion{D},
+) where {D}
+    return -2.0 / ω(q, boson_field)
+end
+
+evaluate_coupling(::SVector{D,Float64}, coupling::Number) where {D} = coupling
+
+function evaluate_coupling(q::SVector{D,Float64}, coupling) where {D}
+    applicable(coupling, q) ||
+        throw(ArgumentError("Interaction coupling $(typeof(coupling)) must be a number or callable as g(q)."))
+    return coupling(q)
+end
 
 function V(
     interaction::ConstantInteraction,
@@ -166,6 +230,16 @@ function V(
     interaction::FanMigdalInteraction
 ) where {D}
     return 0.0
+end
+
+function V(
+    q::SVector{D,Float64},
+    interaction::MediatedInteraction
+) where {D}
+    bare_V = V(q, interaction.bare_V)
+    g = evaluate_coupling(q, interaction.coupling)
+    D_q = evaluate_boson_propagator(q, interaction.boson_field)
+    return bare_V + abs2(g) * D_q
 end
 
 function Σ(
