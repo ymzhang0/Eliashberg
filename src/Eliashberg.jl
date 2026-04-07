@@ -60,6 +60,7 @@ include("Models/evaluators.jl")
 # Responses methods
 include("Responses/mean_field.jl")
 include("Responses/susceptibilities.jl")
+include("Models/bosons.jl")
 
 # Numerical solvers and algorithms
 include("Solvers/integrals.jl")
@@ -86,7 +87,7 @@ export Å, a0, Ry, me, e, ε0, h, ħ, kB, c, Ry2J, Ry2eV, Ha2J, Ha2eV, kB2meV, k
 export σ₀, σ₁, σ₂, σ₃, pauli_matrices, γ⁰, γ¹, γ², γ³, gamma_matrices, commutator, anticommutator
 
 # Geometry
-export Lattice, Crystal, ChainLattice, SquareLattice, HexagonalLattice, CubicLattice, FCCLattice, BCCLattice, AbstractKGrid, KGrid, KPath
+export Crystal, ChainLattice, SquareLattice, HexagonalLattice, CubicLattice, FCCLattice, BCCLattice, AbstractKGrid, KGrid, KPath
 export ibrav, qe_lattice, cubic_p_lattice, cubic_f_lattice, cubic_i_lattice, hexagonal_p_lattice, trigonal_r_lattice, tetragonal_p_lattice, tetragonal_i_lattice
 export orthorhombic_p_lattice, orthorhombic_base_centered_lattice, orthorhombic_face_centered_lattice, orthorhombic_body_centered_lattice, monoclinic_p_lattice, monoclinic_base_centered_lattice, triclinic_lattice
 export scaled_positions, positions, append_atom!, set_scaled_positions!, set_positions!, set_cell!, cartesian_basis, generate_1d_kgrid, generate_2d_kgrid, generate_3d_kgrid, reciprocal_vectors, generate_reciprocal_lattice, generate_kpath
@@ -105,6 +106,7 @@ export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, Exc
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
 export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
+export RPABoson, CachedBoson, evaluate_boson_propagator, materialize_boson
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
 export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
 

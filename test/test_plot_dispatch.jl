@@ -30,8 +30,8 @@ using StaticArrays
     @test size(surface_landscape_data.landscape_matrix) == (4, 4)
     @test plot(surface_landscape_data) isa Figure
 
-    cell2d = PeriodicCell(lattice2d; periodicity=(true, true))
-    reciprocal_plot = visualize_reciprocal_space(cell2d, generate_reciprocal_lattice(cell2d, 4, 4))
+    @test lattice2d isa PeriodicCell{2}
+    reciprocal_plot = visualize_reciprocal_space(lattice2d, generate_reciprocal_lattice(lattice2d, 4, 4))
     @test reciprocal_plot isa Figure
     @test visualize_lattice(Eliashberg.primitive_vectors(lattice2d)) isa Figure
 

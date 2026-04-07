@@ -4,9 +4,11 @@
 Return the column-major matrix whose columns are the primitive real-space basis
 vectors of the lattice-like object.
 """
-primitive_vectors(lattice::AbstractLattice) = getfield(lattice, :vectors)
 primitive_vectors(vectors::AbstractMatrix) = _coerce_lattice_matrix(vectors, _length_unit_or_default(vectors[1, 1]))
-periodicity(::AbstractLattice{D}) where {D} = ntuple(_ -> true, D)
+
+_normalize_periodicity(periodicity, ::Val{D}) where {D} =
+    isnothing(periodicity) ? ntuple(_ -> true, D) :
+    periodicity isa Bool ? ntuple(_ -> periodicity, D) : Tuple(periodicity)
 
 @inline _strip_length(value::Real, length_unit) = Float64(value)
 @inline _strip_length(value, length_unit) = Float64(ustrip(uconvert(length_unit, value)))
@@ -15,7 +17,11 @@ function _strip_length_vector(vector_like, length_unit, ::Val{D}) where {D}
     return SVector{D,Float64}(ntuple(i -> _strip_length(vector_like[i], length_unit), D))
 end
 
-function _coerce_lattice_matrix(vectors::AbstractLattice, length_unit)
+function _coerce_lattice_matrix(vectors::PeriodicCell, length_unit)
+    return primitive_vectors(vectors)
+end
+
+function _coerce_lattice_matrix(vectors::AbstractSystem, length_unit)
     return primitive_vectors(vectors)
 end
 
@@ -42,6 +48,7 @@ _length_unit_or_default(value) = unit(value)
 
 _cell_length_unit(vectors::Tuple) = _length_unit_or_default(vectors[1][1])
 _cell_length_unit(vectors::AbstractVector) = _length_unit_or_default(vectors[1][1])
+_cell_length_unit(vectors::AbstractMatrix) = _length_unit_or_default(vectors[1, 1])
 _cell_length_unit(cell::PeriodicCell) = _cell_length_unit(cell_vectors(cell))
 _cell_length_unit(system::AbstractSystem) = _cell_length_unit(cell_vectors(system))
 
@@ -149,7 +156,7 @@ function _ibrav_keyword_docs(id::Integer)
 end
 
 function _ibrav_signature(id::Integer)
-    return id == 0 ? "Lattice(vectors)" : "ibrav($id, a; ...)"
+    return id == 0 ? "PeriodicCell(vectors)" : "ibrav($id, a; ...)"
 end
 
 function _ibrav_positional_specs(id::Integer)
@@ -178,7 +185,7 @@ function _ibrav_metadata(ibrav::Integer)
         -9 => (name="Orthorhombic base-centered (alternate)", required=(:celldm2, :celldm3), example="ibrav(-9, a; celldm2=b_a, celldm3=c_a)"),
         -5 => (name="Trigonal R, 3-fold axis <111>", required=(:celldm4,), example="ibrav(-5, a; celldm4=cosγ)"),
         -3 => (name="Cubic I (bcc), symmetric axis", required=(), example="ibrav(-3, a)"),
-        0 => (name="Free lattice", required=(), example="Lattice(vectors)"),
+        0 => (name="Free lattice", required=(), example="PeriodicCell(vectors)"),
         1 => (name="Cubic P (sc)", required=(), example="ibrav(1, a)"),
         2 => (name="Cubic F (fcc)", required=(), example="ibrav(2, a)"),
         3 => (name="Cubic I (bcc)", required=(), example="ibrav(3, a)"),
@@ -254,7 +261,7 @@ function _build_qe_lattice(ibrav::Integer, a::Real; celldm2=nothing, celldm3=not
     c = validated.celldm3 * a0
 
     if ibrav == 0
-        throw(ArgumentError("`ibrav=0` corresponds to a free cell. Use `Lattice(vectors)` or `Crystal(cell, atoms)` with explicit primitive vectors."))
+        throw(ArgumentError("`ibrav=0` corresponds to a free cell. Use `PeriodicCell(vectors)` or `Crystal(cell, atoms)` with explicit primitive vectors."))
     elseif ibrav == 1
         return [a0 0.0 0.0; 0.0 a0 0.0; 0.0 0.0 a0]
     elseif ibrav == 2
@@ -325,20 +332,20 @@ function _build_qe_lattice(ibrav::Integer, a::Real; celldm2=nothing, celldm3=not
 end
 
 """
-    Crystal{D} <: AbstractLattice{D}
-
 Unitless, statically typed internal crystal representation used by the core
 evaluation engine. The primitive real-space lattice vectors are stored as
 columns of `lattice`, while the multi-atom basis is stored in fractional
 coordinates.
 """
-mutable struct Crystal{D} <: AbstractLattice{D}
+mutable struct Crystal{D}
     lattice::SMatrix{D,D,Float64}
     fractional_positions::Vector{SVector{D,Float64}}
     atomic_symbols::Vector{Symbol}
 end
 
 primitive_vectors(crystal::Crystal) = crystal.lattice
+periodicity(::Crystal{D}) where {D} = ntuple(_ -> true, D)
+_coerce_lattice_matrix(vectors::Crystal, length_unit) = primitive_vectors(vectors)
 
 """
     scaled_positions(crystal::Crystal)
@@ -369,11 +376,12 @@ end
     Crystal(cell, positions, atomic_symbols; fractional=true, length_unit=u"Å")
 
 Construct a `Crystal` directly from primitive vectors, basis positions, and
-atomic symbols without going through `AtomsBase`. `cell` may be another
-`AbstractLattice`, a square matrix with primitive vectors as columns, or a
-tuple/vector of primitive vectors. Set `fractional=false` if the provided
-positions are Cartesian coordinates in the same units as `cell`. Plain Julia
-vectors and tuples are accepted and converted internally to `SVector`s.
+atomic symbols. `cell` may be an `AtomsBase.PeriodicCell`, an
+`AtomsBase.AbstractSystem`, another `Crystal`, a square matrix with
+primitive vectors as columns, or a tuple/vector of primitive vectors. Set
+`fractional=false` if the provided positions are Cartesian coordinates in the
+same units as `cell`. Plain Julia vectors and tuples are accepted and
+converted internally to `SVector`s.
 """
 function Crystal(cell, positions::AbstractVector, atomic_symbols::AbstractVector; fractional::Bool=true, length_unit=u"Å")
     length(positions) == length(atomic_symbols) || throw(DimensionMismatch("`positions` and `atomic_symbols` must have the same length."))
@@ -542,7 +550,8 @@ end
 """
     ibrav(id::Integer, a; kwargs...)
 
-Construct a QE-style `Lattice{3}` using `id` as the `ibrav` selector. This is
+Construct a QE-style `AtomsBase.PeriodicCell` using `id` as the `ibrav`
+selector. This is
 the unified entry point corresponding to `qe_lattice(id, a; kwargs...)`.
 """
 function ibrav(id::Integer, a; kwargs...)
@@ -552,7 +561,7 @@ end
 """
     qe_lattice(ibrav::Integer, a; celldm2=1.0, celldm3=1.0, celldm4=0.0, celldm5=0.0, celldm6=0.0)
 
-Construct a three-dimensional `Lattice{3}` using Quantum ESPRESSO's `ibrav`
+Construct a three-dimensional `AtomsBase.PeriodicCell` using Quantum ESPRESSO's `ibrav`
 convention. The optional `celldm2:celldm6` keyword arguments follow QE's
 definitions exactly:
 
@@ -564,8 +573,12 @@ definitions exactly:
 The required parameters depend on the selected `ibrav` and are validated
 before the primitive vectors are constructed.
 """
-function qe_lattice(ibrav::Integer, a; celldm2=nothing, celldm3=nothing, celldm4=nothing, celldm5=nothing, celldm6=nothing)
-    return Lattice(_build_qe_lattice(ibrav, a; celldm2, celldm3, celldm4, celldm5, celldm6))
+function qe_lattice(ibrav::Integer, a; celldm2=nothing, celldm3=nothing, celldm4=nothing, celldm5=nothing, celldm6=nothing, periodicity=nothing, length_unit=u"Å")
+    return PeriodicCell(
+        _build_qe_lattice(ibrav, a; celldm2, celldm3, celldm4, celldm5, celldm6);
+        periodicity=_normalize_periodicity(periodicity, Val(3)),
+        length_unit,
+    )
 end
 
 """
@@ -696,36 +709,19 @@ triclinic_lattice(a; b_a::Real, c_a::Real, cosbc::Real, cosac::Real, cosab::Real
 # ---------------------------------------------------------
 # 1D Lattices
 # ---------------------------------------------------------
-struct Lattice{D} <: AbstractLattice{D}
-    vectors::SMatrix{D,D,Float64}
-end
-
-"""
-    Lattice(vectors; length_unit=u"Å")
-
-Construct a generic `Lattice{D}` from a square matrix or a tuple/vector of
-primitive vectors stored as columns. Unitful lengths are converted to
-`length_unit` and stripped on construction.
-"""
-function Lattice(vectors; length_unit=u"Å")
+function PeriodicCell(vectors; periodicity=nothing, length_unit=_cell_length_unit(vectors))
     matrix = _coerce_lattice_matrix(vectors, length_unit)
     D = size(matrix, 1)
-    return Lattice{D}(matrix)
+    atomsbase_periodicity = _normalize_periodicity(periodicity, Val(D))
+    cell_basis = ntuple(i -> matrix[:, i] .* length_unit, D)
+    return PeriodicCell(; cell_vectors=cell_basis, periodicity=atomsbase_periodicity)
 end
 
-Lattice(cell::PeriodicCell; length_unit=_cell_length_unit(cell)) = Lattice(cell_vectors(cell); length_unit)
-Lattice(system::AbstractSystem; length_unit=_cell_length_unit(system)) = Lattice(cell_vectors(system); length_unit)
-
-function PeriodicCell(lattice::AbstractLattice{D}; periodicity::NTuple{D,Bool}=ntuple(_ -> true, D), length_unit=u"Å") where {D}
-    vectors = ntuple(i -> primitive_vectors(lattice)[:, i] .* length_unit, D)
-    return PeriodicCell(; cell_vectors=vectors, periodicity)
+function PeriodicCell(crystal::Crystal{D}; periodicity=nothing, length_unit=u"Å") where {D}
+    return PeriodicCell(primitive_vectors(crystal); periodicity, length_unit)
 end
 
-function PeriodicCell(crystal::Crystal{D}; periodicity::NTuple{D,Bool}=ntuple(_ -> true, D), length_unit=u"Å") where {D}
-    return PeriodicCell(Lattice(primitive_vectors(crystal)); periodicity, length_unit)
-end
-
-function FastSystem(crystal::Crystal{D}; periodicity::NTuple{D,Bool}=ntuple(_ -> true, D), length_unit=u"Å") where {D}
+function FastSystem(crystal::Crystal{D}; periodicity=nothing, length_unit=u"Å") where {D}
     atomsbase_cell = PeriodicCell(crystal; periodicity, length_unit)
     positions = [position .* length_unit for position in cartesian_basis(crystal)]
     species = [ChemicalSpecies(symbol) for symbol in crystal.atomic_symbols]
@@ -733,44 +729,20 @@ function FastSystem(crystal::Crystal{D}; periodicity::NTuple{D,Bool}=ntuple(_ ->
     return FastSystem(atomsbase_cell, positions, species, masses)
 end
 
-struct ChainLattice <: AbstractLattice{1}
-    a::Float64
-    vectors::SMatrix{1,1,Float64,1}
-end
-ChainLattice(a::Float64=1.0) = ChainLattice(a, SMatrix{1,1,Float64,1}(a))
+ChainLattice(a::Real=1.0; periodicity=nothing, length_unit=u"Å") = PeriodicCell(SMatrix{1,1,Float64,1}(Float64(a)); periodicity=_normalize_periodicity(periodicity, Val(1)), length_unit)
 
 # ---------------------------------------------------------
 # 2D Lattices
 # ---------------------------------------------------------
-struct SquareLattice <: AbstractLattice{2}
-    a::Float64
-    vectors::SMatrix{2,2,Float64,4}
-end
-SquareLattice(a::Float64=1.0) = SquareLattice(a, @SMatrix [a 0.0; 0.0 a])
+SquareLattice(a::Real=1.0; periodicity=nothing, length_unit=u"Å") = PeriodicCell(@SMatrix [Float64(a) 0.0; 0.0 Float64(a)]; periodicity=_normalize_periodicity(periodicity, Val(2)), length_unit)
 
-struct HexagonalLattice <: AbstractLattice{2}
-    a::Float64
-    vectors::SMatrix{2,2,Float64,4}
-end
-HexagonalLattice(a::Float64=1.0) = HexagonalLattice(a, @SMatrix [a a/2; 0.0 a*sqrt(3)/2])
+HexagonalLattice(a::Real=1.0; periodicity=nothing, length_unit=u"Å") = PeriodicCell(@SMatrix [Float64(a) Float64(a)/2; 0.0 Float64(a)*sqrt(3)/2]; periodicity=_normalize_periodicity(periodicity, Val(2)), length_unit)
 
 # ---------------------------------------------------------
 # 3D Lattices
 # ---------------------------------------------------------
-struct CubicLattice <: AbstractLattice{3}
-    a::Float64
-    vectors::SMatrix{3,3,Float64,9}
-end
-CubicLattice(a::Float64=1.0) = CubicLattice(a, @SMatrix [a 0.0 0.0; 0.0 a 0.0; 0.0 0.0 a])
+CubicLattice(a::Real=1.0; periodicity=nothing, length_unit=u"Å") = PeriodicCell(@SMatrix [Float64(a) 0.0 0.0; 0.0 Float64(a) 0.0; 0.0 0.0 Float64(a)]; periodicity=_normalize_periodicity(periodicity, Val(3)), length_unit)
 
-struct FCCLattice <: AbstractLattice{3}
-    a::Float64
-    vectors::SMatrix{3,3,Float64,9}
-end
-FCCLattice(a::Float64=1.0) = FCCLattice(a, @SMatrix [0.0 a/2 a/2; a/2 0.0 a/2; a/2 a/2 0.0])
+FCCLattice(a::Real=1.0; periodicity=nothing, length_unit=u"Å") = PeriodicCell(@SMatrix [0.0 Float64(a)/2 Float64(a)/2; Float64(a)/2 0.0 Float64(a)/2; Float64(a)/2 Float64(a)/2 0.0]; periodicity=_normalize_periodicity(periodicity, Val(3)), length_unit)
 
-struct BCCLattice <: AbstractLattice{3}
-    a::Float64
-    vectors::SMatrix{3,3,Float64,9}
-end
-BCCLattice(a::Float64=1.0) = BCCLattice(a, @SMatrix [-a/2 a/2 a/2; a/2 -a/2 a/2; a/2 a/2 -a/2])
+BCCLattice(a::Real=1.0; periodicity=nothing, length_unit=u"Å") = PeriodicCell(@SMatrix [-Float64(a)/2 Float64(a)/2 Float64(a)/2; Float64(a)/2 -Float64(a)/2 Float64(a)/2; Float64(a)/2 Float64(a)/2 -Float64(a)/2]; periodicity=_normalize_periodicity(periodicity, Val(3)), length_unit)

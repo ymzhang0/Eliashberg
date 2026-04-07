@@ -57,7 +57,7 @@ Wannier convention. For each hopping `(i, j, R, t)`, the phase factor depends
 only on the cell translation `R`.
 """
 function ε(k::SVector{D,Float64}, model::MultiOrbitalTightBinding{D}) where {D}
-    lattice = model.cell
+    lattice = primitive_vectors(model)
     n_basis = model.num_orbitals
     hamiltonian = zeros(ComplexF64, n_basis, n_basis)
 

@@ -152,6 +152,8 @@ using Unitful
     end
 
     lat = SquareLattice(1.0)
+    @test lat isa PeriodicCell{2}
+    @test periodicity(lat) == (true, true)
     model = TightBinding(lat, 1.0, 0.0, 0.0)
 
     k_test = SVector{2,Float64}(0.0, 0.0)
@@ -336,7 +338,7 @@ Generated for testing
         @test periodicity(tb_cell) == (true, true, true)
 
         @test Eliashberg.primitive_vectors(tb_data.cell) == Eliashberg.primitive_vectors(tb_cell)
-        @test tb_data.lattice.vectors == Eliashberg.primitive_vectors(tb_cell)
+        @test reduce(hcat, tb_data.lattice_vectors) == Eliashberg.primitive_vectors(tb_cell)
 
         tb_periodic_cell = periodic_cell_from_wannier90_tb(tb_file; periodicity=(true, true, false))
         @test periodicity(tb_periodic_cell) == (true, true, false)
@@ -344,11 +346,25 @@ Generated for testing
         slab_path = generate_kpath(tb_periodic_cell; n_pts_per_segment=4)
         @test slab_path isa KPath{3}
         @test all(isapprox(k[3], 0.0; atol=1e-10) for k in Eliashberg.path_points(slab_path))
+        slab_node_indices, slab_node_labels = Eliashberg.path_node_metadata(slab_path)
+        @test first(slab_node_labels) == "Γ"
+        @test last(slab_node_labels) == "Γ"
+        @test Set(slab_node_labels) == Set(["Γ", "X", "M"])
+        @test length(slab_node_indices) == 4
 
         slab_grid = generate_reciprocal_lattice(tb_periodic_cell, 4, 3)
         @test slab_grid isa KGrid{3}
         @test length(slab_grid) == 12
         @test all(isapprox(k[3], 0.0; atol=1e-10) for k in slab_grid.points)
+
+        xz_periodic_cell = periodic_cell_from_wannier90_tb(tb_file; periodicity=(true, false, true))
+        xz_grid = generate_reciprocal_lattice(xz_periodic_cell, 4, 3)
+        @test xz_grid isa KGrid{3}
+        @test all(isapprox(k[2], 0.0; atol=1e-10) for k in xz_grid.points)
+
+        xz_path = generate_kpath(xz_periodic_cell; n_pts_per_segment=4)
+        @test xz_path isa KPath{3}
+        @test all(isapprox(k[2], 0.0; atol=1e-10) for k in Eliashberg.path_points(xz_path))
 
         carbon_species = [ChemicalSpecies(:C), ChemicalSpecies(:C)]
         slab_system = FastSystem(
@@ -367,14 +383,50 @@ Generated for testing
 
         wannier_tb_model = build_model_from_wannier90(tb_file, 0.0)
         @test wannier_tb_model isa MultiOrbitalTightBinding{3}
-        @test wannier_tb_model.cell isa SMatrix{3,3,Float64,9}
+        @test wannier_tb_model.cell isa PeriodicCell{3}
+        @test periodicity(wannier_tb_model) == (true, true, true)
         @test length(wannier_tb_model.hoppings) == 2
-        @test Eliashberg.primitive_vectors(wannier_tb_model.cell) == Eliashberg.primitive_vectors(tb_cell)
+        @test Eliashberg.primitive_vectors(wannier_tb_model) == Eliashberg.primitive_vectors(tb_cell)
         @test wannier_tb_model.num_orbitals == 2
 
+        wannier_slab_model = build_model_from_wannier90(tb_file, 0.0, (true, true, false))
+        @test periodicity(wannier_slab_model) == (true, true, false)
+        @test periodicity(wannier_slab_model.cell) == (true, true, false)
+
         wannier_system_model = MultiOrbitalTightBinding(slab_system, tb_data.hoppings, 0.0)
-        @test Eliashberg.primitive_vectors(wannier_system_model.cell) == Eliashberg.primitive_vectors(tb_cell)
+        @test periodicity(wannier_system_model) == (true, true, false)
+        @test Eliashberg.primitive_vectors(wannier_system_model) == Eliashberg.primitive_vectors(tb_cell)
         @test wannier_system_model.num_orbitals == length(slab_system)
+
+        model_grid_rank = generate_reciprocal_lattice(wannier_system_model, 4, 3)
+        @test model_grid_rank isa KGrid{3}
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in model_grid_rank.points)
+
+        model_grid_ambient = generate_reciprocal_lattice(wannier_system_model, 4, 3, 1)
+        @test model_grid_ambient isa KGrid{3}
+        @test length(model_grid_ambient) == length(model_grid_rank)
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in model_grid_ambient.points)
+
+        model_path = generate_kpath(wannier_system_model; n_pts_per_segment=4)
+        @test model_path isa KPath{3}
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in Eliashberg.path_points(model_path))
+
+        graphene_tb = joinpath(dirname(@__DIR__), "examples", "graphene", "graphene_tb.dat")
+        graphene_model = build_model_from_wannier90(graphene_tb, -2.3042, (true, true, false))
+        @test periodicity(graphene_model) == (true, true, false)
+        @test periodicity(graphene_model.cell) == (true, true, false)
+
+        graphene_grid = generate_reciprocal_lattice(graphene_model.cell, 5, 5, 1)
+        @test graphene_grid isa KGrid{3}
+        @test length(graphene_grid) == 25
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in graphene_grid.points)
+
+        graphene_path = generate_kpath(graphene_model.cell; n_pts_per_segment=6)
+        graphene_node_indices, graphene_node_labels = Eliashberg.path_node_metadata(graphene_path)
+        @test graphene_path isa KPath{3}
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in Eliashberg.path_points(graphene_path))
+        @test graphene_node_labels == ["Γ", "M", "K", "Γ"]
+        @test length(graphene_node_indices) == 4
     finally
         isopen(tb_io) && close(tb_io)
         rm(tb_dir; force=true, recursive=true)
@@ -398,6 +450,7 @@ Generated for testing
     ]
 
     for (expected_bravais, lat3d) in bravais_examples
+        @test lat3d isa PeriodicCell{3}
         @test bravais_lattice(lat3d) == expected_bravais
         path3d = generate_kpath(lat3d; n_pts_per_segment=4)
         @test path3d isa KPath{3}

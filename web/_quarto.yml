@@ -10,6 +10,7 @@ book:
     - content/CH0.ipynb
     - content/CH1.ipynb
     - content/RPA.ipynb
+    - content/BCS.ipynb
 format:
   html:
     theme: flatly

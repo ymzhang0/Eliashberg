@@ -201,8 +201,7 @@ end
     parse_wannier90_tb(filename::String; periodicity=nothing)
 
 Parse a `wannier90_tb.dat` file and return a `NamedTuple` with the lattice
-vectors, an `AtomsBase.PeriodicCell` stored in `cell`, the internal
-compatibility `lattice`, the number of Wannier orbitals, the sparse
+vectors, an `AtomsBase.PeriodicCell` stored in `cell`, the number of Wannier orbitals, the sparse
 Hamiltonian entries, and the sparse position-operator matrix elements.
 
 The parser supports both the canonical Wannier90 grouped block layout and an
@@ -217,7 +216,6 @@ function parse_wannier90_tb(filename::String; periodicity=nothing)
             _parse_svector3_float(readline(io), filename, "lattice vector a2"),
             _parse_svector3_float(readline(io), filename, "lattice vector a3"),
         )
-        lattice = Lattice(lattice_vectors)
         atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
             periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
         cell = PeriodicCell(
@@ -235,7 +233,6 @@ function parse_wannier90_tb(filename::String; periodicity=nothing)
 
         return (
             cell = cell,
-            lattice = lattice,
             periodicity = atomsbase_periodicity,
             lattice_vectors = lattice_vectors,
             num_wann = num_wann,
@@ -289,22 +286,13 @@ function periodic_cell_from_wannier90_tb(tb_data::NamedTuple; periodicity=nothin
 end
 
 """
-    build_model_from_wannier90(filename::String, cell::AbstractLattice, EF::Float64)
+    build_model_from_wannier90(filename::String, cell, EF::Float64)
 
 Construct a `MultiOrbitalTightBinding` model from either a `wannier90_hr.dat`
-or `wannier90_tb.dat` file and a given lattice structure.
+or `wannier90_tb.dat` file and a given cell description. The preferred cell
+inputs are `AtomsBase.PeriodicCell`, `AtomsBase.AbstractSystem`, or a primitive
+vector matrix.
 """
-function build_model_from_wannier90(filename::String, cell::AbstractLattice, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename)
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
-    else
-        error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
-    end
-end
 
 function build_model_from_wannier90(filename::String, cell::AbstractMatrix{<:Number}, EF::Float64)
     if endswith(lowercase(basename(filename)), "_tb.dat")
@@ -323,15 +311,25 @@ function build_model_from_wannier90(filename::String, crystal::Crystal, EF::Floa
 end
 
 function build_model_from_wannier90(filename::String, cell::PeriodicCell, EF::Float64)
-    return build_model_from_wannier90(filename, primitive_vectors(cell), EF)
+    if endswith(lowercase(basename(filename)), "_tb.dat")
+        parsed = parse_wannier90_tb(filename; periodicity=periodicity(cell))
+        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+    elseif endswith(lowercase(basename(filename)), "_hr.dat")
+        num_wann, hoppings = parse_wannier90_hr(filename)
+        return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
+    end
+    error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
 end
 
 function build_model_from_wannier90(filename::String, system::AbstractSystem, EF::Float64)
-    return build_model_from_wannier90(filename, primitive_vectors(system), EF)
-end
-
-function MultiOrbitalTightBinding(cell::PeriodicCell, num_orbitals, hoppings, EF)
-    return MultiOrbitalTightBinding(primitive_vectors(cell), num_orbitals, hoppings, EF)
+    if endswith(lowercase(basename(filename)), "_tb.dat")
+        parsed = parse_wannier90_tb(filename; periodicity=periodicity(system))
+        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+    elseif endswith(lowercase(basename(filename)), "_hr.dat")
+        num_wann, hoppings = parse_wannier90_hr(filename)
+        return MultiOrbitalTightBinding(system, num_wann, hoppings, EF)
+    end
+    error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
 end
 
 """

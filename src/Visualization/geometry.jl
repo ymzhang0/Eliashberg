@@ -7,11 +7,6 @@
 # Real Space Lattice Visualizations
 # ----------------------------------------------------------------------------
 
-"""
-    visualize_lattice(lattice::AbstractLattice{1}; extent=3, kwargs...)
-
-Visualizes a 1D real-space lattice chain.
-"""
 function _visualize_lattice_1d(vectors::AbstractMatrix{<:Number}; extent=3, axis=(;), kwargs...)
     # 把高度调低一点，因为是一维的，太高了显得空旷
     fig = Figure(size=(600, 200))
@@ -57,14 +52,6 @@ function _visualize_lattice_1d(vectors::AbstractMatrix{<:Number}; extent=3, axis
     return fig
 end
 
-visualize_lattice(lattice::AbstractLattice{1}; extent=3, axis=(;), kwargs...) = _visualize_lattice_1d(primitive_vectors(lattice); extent=extent, axis=axis, kwargs...)
-
-"""
-    visualize_lattice(lattice::AbstractLattice{2}; extent=2, kwargs...)
-
-Visualizes a 2D real-space lattice with hollow sites, primitive vectors, 
-magnitudes, and the angle between them (without bounding boxes or grid lines).
-"""
 function _visualize_lattice_2d(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwargs...)
     fig = Figure(size=(600, 600))
 
@@ -136,14 +123,6 @@ function _visualize_lattice_2d(vectors::AbstractMatrix{<:Number}; extent=2, axis
     return fig
 end
 
-visualize_lattice(lattice::AbstractLattice{2}; extent=2, axis=(;), kwargs...) = _visualize_lattice_2d(primitive_vectors(lattice); extent=extent, axis=axis, kwargs...)
-
-"""
-    visualize_lattice(lattice::AbstractLattice{3}; extent=1, kwargs...)
-
-Visualizes a 3D real-space lattice with hollow sites, primitive vectors, 
-magnitudes, and the angles between them (without bounding boxes or grids).
-"""
 function _visualize_lattice_3d(vectors::AbstractMatrix{<:Number}; extent=1, axis=(;), kwargs...)
     fig = Figure(size=(800, 800))
 
@@ -221,8 +200,6 @@ function _visualize_lattice_3d(vectors::AbstractMatrix{<:Number}; extent=1, axis
     return fig
 end
 
-visualize_lattice(lattice::AbstractLattice{3}; extent=1, axis=(;), kwargs...) = _visualize_lattice_3d(primitive_vectors(lattice); extent=extent, axis=axis, kwargs...)
-
 function visualize_lattice(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwargs...)
     primitive = primitive_vectors(vectors)
     D = size(primitive, 1)
@@ -236,6 +213,7 @@ function visualize_lattice(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;)
     throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
 end
 
+visualize_lattice(crystal::Crystal{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = visualize_lattice(primitive_vectors(crystal); extent=extent, axis=axis, kwargs...)
 visualize_lattice(cell::PeriodicCell{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = visualize_lattice(primitive_vectors(cell); extent=extent, axis=axis, kwargs...)
 visualize_lattice(system::AbstractSystem{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = visualize_lattice(primitive_vectors(system); extent=extent, axis=axis, kwargs...)
 
@@ -243,11 +221,6 @@ visualize_lattice(system::AbstractSystem{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1
 # Reciprocal Space & K-Grid Visualizations
 # ----------------------------------------------------------------------------
 
-"""
-    visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid=nothing; kwargs...)
-
-Visualizes the 1D reciprocal lattice and 1st Brillouin Zone.
-"""
 function _visualize_reciprocal_space_1d(b1::Real, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(600, 300))
     ax = Axis(fig[1, 1];
@@ -277,15 +250,6 @@ function _visualize_reciprocal_space_1d(b1::Real, kgrid::Union{AbstractKGrid,Not
     return fig
 end
 
-function visualize_reciprocal_space(lattice::AbstractLattice{1}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
-    return _visualize_reciprocal_space_1d(reciprocal_vectors(lattice)[1, 1], kgrid; axis=axis, kwargs...)
-end
-
-"""
-    visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid=nothing; kwargs...)
-
-Visualizes the 2D reciprocal lattice vectors and the primitive Brillouin Zone parallelogram.
-"""
 function _visualize_reciprocal_space_2d(b1, b2, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(700, 700))
     ax = Axis(fig[1, 1]; aspect=DataAspect(), title="2D Reciprocal Space & K-Grid",
@@ -311,16 +275,6 @@ function _visualize_reciprocal_space_2d(b1, b2, kgrid::Union{AbstractKGrid,Nothi
     return fig
 end
 
-function visualize_reciprocal_space(lattice::AbstractLattice{2}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
-    B = reciprocal_vectors(lattice)
-    return _visualize_reciprocal_space_2d(B[:, 1], B[:, 2], kgrid; axis=axis, kwargs...)
-end
-
-"""
-    visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid=nothing; kwargs...)
-
-Visualizes the 3D reciprocal primitive vectors and the grid points inside the primitive cell.
-"""
 function _visualize_reciprocal_space_3d(b1, b2, b3, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     fig = Figure(size=(800, 800))
     ax = Axis3(fig[1, 1]; aspect=:data, title="3D Reciprocal Space & K-Grid",
@@ -356,11 +310,6 @@ function _visualize_reciprocal_space_3d(b1, b2, b3, kgrid::Union{AbstractKGrid,N
     return fig
 end
 
-function visualize_reciprocal_space(lattice::AbstractLattice{3}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
-    B = reciprocal_vectors(lattice)
-    return _visualize_reciprocal_space_3d(B[:, 1], B[:, 2], B[:, 3], kgrid; axis=axis, kwargs...)
-end
-
 function _project_onto_plane(v1::SVector{D,Float64}, v2::SVector{D,Float64}) where {D}
     e1 = normalize(v1)
     orthogonal = v2 - dot(v2, e1) * e1
@@ -381,6 +330,9 @@ function visualize_reciprocal_space(vectors::AbstractMatrix{<:Number}, kgrid::Un
     end
     throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
 end
+
+visualize_reciprocal_space(crystal::Crystal, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...) =
+    visualize_reciprocal_space(primitive_vectors(crystal), kgrid; axis=axis, kwargs...)
 
 function visualize_reciprocal_space(cell::PeriodicCell, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     rank = periodic_rank(cell)

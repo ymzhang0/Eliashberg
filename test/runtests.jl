@@ -1,9 +1,12 @@
 using Test
 using Eliashberg
 using StaticArrays
+using AtomsBase
 
 @testset "Eliashberg.jl Core" begin
     lat = ChainLattice(1.0)
+    @test lat isa PeriodicCell{1}
+    @test periodicity(lat) == (true,)
     grid = KGrid([SVector{1,Float64}(0.0)], [1.0])
     @test length(grid) == 1
 
@@ -22,3 +25,4 @@ end
 
 include("test_refactor.jl")
 include("test_plot_dispatch.jl")
+include("test_quantum_espresso.jl")

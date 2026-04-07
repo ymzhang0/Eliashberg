@@ -110,6 +110,12 @@ periodic_rank(cell_like) = count(periodicity(cell_like))
 
 _periodic_axes(cell_like) = findall(identity, collect(periodicity(cell_like)))
 
+function _periodic_direct_basis(cell_like)
+    direct = primitive_vectors(cell_like)
+    D = size(direct, 1)
+    return [SVector{D,Float64}(direct[:, axis]) for axis in _periodic_axes(cell_like)]
+end
+
 function _periodic_reciprocal_basis(cell_like)
     reciprocal = reciprocal_vectors(primitive_vectors(cell_like))
     D = size(reciprocal, 1)
@@ -148,59 +154,63 @@ function _generate_periodic_kgrid_1d(basis::SVector{D,Float64}, Nx::Int) where {
     return KGrid(points, weights)
 end
 
-function _generate_kpath_for_periodic_basis(basis::AbstractVector{<:SVector{D,Float64}}; n_pts_per_segment=50) where {D}
-    rank = length(basis)
-    rank in (1, 2) || throw(ArgumentError("Only 1D and 2D periodic bases should be handled by this helper."))
+function _ambient_plane_frame(v1::SVector{D,Float64}, v2::SVector{D,Float64}) where {D}
+    e1 = normalize(v1)
+    v2_orth = v2 - dot(v2, e1) * e1
+    norm(v2_orth) > 1e-10 || throw(ArgumentError("Periodic basis vectors must be linearly independent to define a 2D k-path plane."))
+    e2 = normalize(v2_orth)
+    return e1, e2
+end
 
-    if rank == 1
-        b1 = basis[1]
-        return generate_kpath([zero(SVector{D,Float64}), 0.5 * b1], ["Γ", "X"]; n_pts_per_segment)
-    end
+_project_to_plane(vector::SVector{D,Float64}, e1::SVector{D,Float64}, e2::SVector{D,Float64}) where {D} =
+    SVector{2,Float64}(dot(vector, e1), dot(vector, e2))
 
-    b1, b2 = basis
-    n1 = norm(b1)
-    n2 = norm(b2)
-    cosθ = dot(b1, b2) / (n1 * n2)
+_embed_from_plane(vector::SVector{2,Float64}, e1::SVector{D,Float64}, e2::SVector{D,Float64}) where {D} =
+    vector[1] * e1 + vector[2] * e2
+
+function _representative_2d_sgnum(Rs2d::AbstractVector{<:SVector{2,Float64}})
+    a1, a2 = Rs2d
+    n1 = norm(a1)
+    n2 = norm(a2)
+    cosθ = dot(a1, a2) / (n1 * n2)
 
     if isapprox(n1, n2; rtol=1e-5) && isapprox(abs(cosθ), 0.5; atol=5e-3)
-        nodes = [
-            zero(SVector{D,Float64}),
-            0.5 * b1,
-            (b1 + b2) / 3,
-            zero(SVector{D,Float64}),
-        ]
-        labels = ["Γ", "M", "K", "Γ"]
+        return 13 # hexagonal primitive
+    elseif isapprox(n1, n2; rtol=1e-5) && isapprox(cosθ, 0.0; atol=5e-3)
+        return 10 # square primitive
     elseif isapprox(cosθ, 0.0; atol=5e-3)
-        if isapprox(n1, n2; rtol=1e-5)
-            nodes = [
-                zero(SVector{D,Float64}),
-                0.5 * b1,
-                0.5 * (b1 + b2),
-                zero(SVector{D,Float64}),
-            ]
-            labels = ["Γ", "X", "M", "Γ"]
-        else
-            nodes = [
-                zero(SVector{D,Float64}),
-                0.5 * b1,
-                0.5 * (b1 + b2),
-                0.5 * b2,
-                zero(SVector{D,Float64}),
-            ]
-            labels = ["Γ", "X", "S", "Y", "Γ"]
-        end
-    else
-        nodes = [
-            zero(SVector{D,Float64}),
-            0.5 * b1,
-            0.5 * (b1 + b2),
-            0.5 * b2,
-            zero(SVector{D,Float64}),
-        ]
-        labels = ["Γ", "X", "M", "Y", "Γ"]
+        return 3 # primitive rectangular
+    elseif isapprox(n1, n2; rtol=1e-5)
+        return 5 # centered rectangular, supplied via primitive basis
     end
+    return 1 # oblique primitive
+end
 
-    return generate_kpath(nodes, labels; n_pts_per_segment)
+function _conventionalize_2d_basis(Rs2d::AbstractVector{<:SVector{2,Float64}}, sgnum::Integer)
+    a1, a2 = Rs2d
+    if sgnum == 13
+        return dot(a1, a2) < 0 ? [a1, -a2] : Rs2d
+    elseif sgnum == 5
+        return [a1 - a2, a1 + a2]
+    end
+    return Rs2d
+end
+
+function _embed_kpath(kpath::KPath{2}, e1::SVector{D,Float64}, e2::SVector{D,Float64}) where {D}
+    embedded_branches = [[_embed_from_plane(k, e1, e2) for k in branch] for branch in path_branches(kpath)]
+    labels = [copy(label_map) for label_map in getfield(kpath, :labels)]
+    cartesian_basis = [SVector{D,Float64}(ntuple(i -> i == j ? 1.0 : 0.0, D)) for j in 1:D]
+    return KPath{D}(embedded_branches, labels, cartesian_basis, Ref(Brillouin.CARTESIAN))
+end
+
+function _generate_periodic_kpath_2d(direct_basis::AbstractVector{<:SVector{D,Float64}}; n_pts_per_segment=50) where {D}
+    e1, e2 = _ambient_plane_frame(direct_basis[1], direct_basis[2])
+    Rs2d = [_project_to_plane(vector, e1, e2) for vector in direct_basis]
+    sgnum = _representative_2d_sgnum(Rs2d)
+    conventional_basis = _conventionalize_2d_basis(Rs2d, sgnum)
+    kp2d = Brillouin.irrfbz_path(sgnum, conventional_basis, Val(2))
+    kpi2d = Brillouin.splice(Brillouin.cartesianize(kp2d), n_pts_per_segment - 1)
+    return _embed_kpath(kpi2d, e1, e2)
 end
 
 function _generate_periodic_kpath(cell_like; n_pts_per_segment=50)
@@ -210,25 +220,17 @@ function _generate_periodic_kpath(cell_like; n_pts_per_segment=50)
 
     if rank == 3
         return generate_kpath(primitive_vectors(cell_like); n_pts_per_segment)
+    elseif rank == 2
+        return _generate_periodic_kpath_2d(_periodic_direct_basis(cell_like); n_pts_per_segment)
     end
 
-    return _generate_kpath_for_periodic_basis(_periodic_reciprocal_basis(cell_like); n_pts_per_segment)
+    b1 = first(_periodic_reciprocal_basis(cell_like))
+    return generate_kpath([zero(typeof(b1)), 0.5 * b1], ["Γ", "X"]; n_pts_per_segment)
 end
 
 # ---------------------------------------------------------
 # 1D Reciprocal Space
 # ---------------------------------------------------------
-
-"""
-    reciprocal_vectors(lattice::Lattice{1})
-
-Calculates the 1D reciprocal lattice vector.
-"""
-function reciprocal_vectors(lattice::AbstractLattice{1})
-    vectors = primitive_vectors(lattice)
-    a = vectors[1, 1]
-    return SMatrix{1,1,Float64,1}(2π / a)
-end
 
 function reciprocal_vectors(vectors::AbstractMatrix{<:Number})
     primitive = primitive_vectors(vectors)
@@ -260,25 +262,6 @@ function reciprocal_vectors(vectors::AbstractMatrix{<:Number})
     end
 
     throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
-end
-
-"""
-    generate_reciprocal_lattice(lattice::Lattice{1}, Nx::Int)
-
-Generates a 1D KGrid spanning the first Brillouin Zone.
-"""
-function generate_reciprocal_lattice(lattice::AbstractLattice{1}, Nx::Int)
-    B = reciprocal_vectors(lattice)
-    b1 = B[:, 1]
-
-    points = SVector{1,Float64}[]
-    for i in 1:Nx+1
-        u1 = (i - 1) / Nx - 0.5
-        push!(points, u1 * b1)
-    end
-
-    weights = fill(1.0 / (Nx + 1), Nx + 1)
-    return KGrid(points, weights)
 end
 
 function generate_reciprocal_lattice(vectors::AbstractMatrix{<:Number}, sizes::Vararg{Int,N}) where {N}
@@ -325,90 +308,20 @@ function generate_reciprocal_lattice(vectors::AbstractMatrix{<:Number}, sizes::V
 end
 
 function generate_reciprocal_lattice(cell::PeriodicCell, sizes::Vararg{Int,N}) where {N}
-    periodic_rank(cell) == N || throw(ArgumentError("Expected $N sampling dimensions to match the $(periodic_rank(cell)) periodic directions in the provided cell."))
+    resolved_sizes = _resolve_sampling_sizes(cell, sizes)
     basis = _periodic_reciprocal_basis(cell)
-    return N == 1 ? _generate_periodic_kgrid_1d(first(basis), first(sizes)) : _generate_periodic_kgrid(basis, sizes)
+    return length(resolved_sizes) == 1 ? _generate_periodic_kgrid_1d(first(basis), first(resolved_sizes)) : _generate_periodic_kgrid(basis, resolved_sizes)
 end
 
 function generate_reciprocal_lattice(system::AbstractSystem, sizes::Vararg{Int,N}) where {N}
-    periodic_rank(system) == N || throw(ArgumentError("Expected $N sampling dimensions to match the $(periodic_rank(system)) periodic directions in the provided system."))
+    resolved_sizes = _resolve_sampling_sizes(system, sizes)
     basis = _periodic_reciprocal_basis(system)
-    return N == 1 ? _generate_periodic_kgrid_1d(first(basis), first(sizes)) : _generate_periodic_kgrid(basis, sizes)
+    return length(resolved_sizes) == 1 ? _generate_periodic_kgrid_1d(first(basis), first(resolved_sizes)) : _generate_periodic_kgrid(basis, resolved_sizes)
 end
 
-# ---------------------------------------------------------
-# 2D Reciprocal Space
-# ---------------------------------------------------------
-
-"""
-    reciprocal_vectors(lattice::AbstractLattice{2})
-
-Calculates and returns the 2D reciprocal lattice vectors `b_i` which satisfy 
-the condition `a_i \\cdot b_j = 2\\pi \\delta_{ij}`.
-"""
-function reciprocal_vectors(lattice::AbstractLattice{2})
-    vectors = primitive_vectors(lattice)
-    a1 = vectors[:, 1]
-    a2 = vectors[:, 2]
-    area = a1[1] * a2[2] - a1[2] * a2[1]
-
-    b1 = SVector{2}(2π * a2[2] / area, -2π * a2[1] / area)
-    b2 = SVector{2}(-2π * a1[2] / area, 2π * a1[1] / area)
-    return @SMatrix [b1[1] b2[1];
-        b1[2] b2[2]]
-end
-
-"""
-    generate_reciprocal_lattice(lattice::AbstractLattice{2}, Nx::Int, Ny::Int)
-
-Generates a Monkhorst-Pack style KGrid spanning the first Brillouin Zone 
-defined by the reciprocal vectors of the given real-space `lattice`.
-"""
-function generate_reciprocal_lattice(lattice::AbstractLattice{2}, Nx::Int, Ny::Int)
-    B = reciprocal_vectors(lattice)
-    b1, b2 = B[:, 1], B[:, 2]
-
-    points = SVector{2,Float64}[]
-    # Generate points across the reciprocal basis vectors
-    for i in 1:Nx
-        for j in 1:Ny
-            # Map [0, 1) to [-0.5, 0.5) to center around Gamma point (0,0)
-            u1 = (i - 1) / Nx - 0.5
-            u2 = (j - 1) / Ny - 0.5
-            push!(points, u1 * b1 + u2 * b2)
-        end
-    end
-
-    weights = fill(1.0 / (Nx * Ny), Nx * Ny)
-    return KGrid(points, weights)
-end
-
-# ---------------------------------------------------------
-# 3D Reciprocal Space
-# ---------------------------------------------------------
-
-"""
-    reciprocal_vectors(lattice::AbstractLattice{3})
-
-Calculates the 3D reciprocal lattice vectors using the cross product formulas.
-"""
-function reciprocal_vectors(lattice::AbstractLattice{3})
-    vectors = primitive_vectors(lattice)
-    a1 = vectors[:, 1]
-    a2 = vectors[:, 2]
-    a3 = vectors[:, 3]
-
-    # Cell volume V = a1 · (a2 × a3)
-    V = dot(a1, cross(a2, a3))
-
-    b1 = 2π * cross(a2, a3) / V
-    b2 = 2π * cross(a3, a1) / V
-    b3 = 2π * cross(a1, a2) / V
-
-    return @SMatrix [b1[1] b2[1] b3[1];
-        b1[2] b2[2] b3[2];
-        b1[3] b2[3] b3[3]]
-end
+reciprocal_vectors(crystal::Crystal) = reciprocal_vectors(primitive_vectors(crystal))
+reciprocal_vectors(cell::PeriodicCell) = reciprocal_vectors(primitive_vectors(cell))
+reciprocal_vectors(system::AbstractSystem) = reciprocal_vectors(primitive_vectors(system))
 
 """
     build_spglib_cell(crystal::Crystal{3})
@@ -438,21 +351,6 @@ function build_spglib_cell(system::AbstractSystem{3})
     return build_spglib_cell(Crystal(system))
 end
 
-"""
-    build_spglib_cell(lattice::AbstractLattice{3})
-
-Convert a standalone Bravais lattice into an `Spglib.SpglibCell` by attaching a
-single dummy atom at the origin. This is sufficient for space-group-based
-Bravais-lattice identification.
-"""
-function build_spglib_cell(lattice::AbstractLattice{3})
-    return Spglib.SpglibCell(
-        Matrix{Float64}(primitive_vectors(lattice)),
-        [SVector{3,Float64}(0.0, 0.0, 0.0)],
-        [1],
-    )
-end
-
 function build_spglib_cell(vectors::AbstractMatrix{<:Number})
     primitive = primitive_vectors(vectors)
     size(primitive) == (3, 3) || throw(ArgumentError("Spglib support is only available for 3D primitive-vector matrices."))
@@ -463,13 +361,13 @@ function build_spglib_cell(vectors::AbstractMatrix{<:Number})
     )
 end
 
-function _spacegroup_dataset(lattice::AbstractLattice{3})
-    return Spglib.get_dataset(build_spglib_cell(lattice))
-end
-
 function _spacegroup_dataset(vectors::AbstractMatrix{<:Number})
     return Spglib.get_dataset(build_spglib_cell(vectors))
 end
+
+_spacegroup_dataset(cell::PeriodicCell{3}) = _spacegroup_dataset(primitive_vectors(cell))
+_spacegroup_dataset(system::AbstractSystem{3}) = _spacegroup_dataset(primitive_vectors(system))
+_spacegroup_dataset(crystal::Crystal{3}) = Spglib.get_dataset(build_spglib_cell(crystal))
 
 function _bravais_from_spacegroup(spacegroup_number::Integer, international_symbol::AbstractString)
     number = Int(spacegroup_number)
@@ -508,18 +406,6 @@ function _bravais_from_spacegroup(spacegroup_number::Integer, international_symb
     error("Unsupported international space-group number $number.")
 end
 
-"""
-    bravais_lattice(lattice::AbstractLattice{3})
-
-Identify the 3D Bravais lattice symbol (`:aP`, `:mP`, `:mC`, `:oP`, `:oC`,
-`:oI`, `:oF`, `:tP`, `:tI`, `:hP`, `:hR`, `:cP`, `:cI`, or `:cF`) using
-Spglib's space-group analysis.
-"""
-function bravais_lattice(lattice::AbstractLattice{3})
-    dataset = _spacegroup_dataset(lattice)
-    return _bravais_from_spacegroup(dataset.spacegroup_number, dataset.international_symbol)
-end
-
 function bravais_lattice(vectors::AbstractMatrix{<:Number})
     primitive = primitive_vectors(vectors)
     size(primitive) == (3, 3) || throw(ArgumentError("Bravais-lattice identification is only available for 3D primitive-vector matrices."))
@@ -529,7 +415,7 @@ end
 
 bravais_lattice(crystal::Crystal{3}) = bravais_lattice(primitive_vectors(crystal))
 bravais_lattice(cell::PeriodicCell{3}) = bravais_lattice(primitive_vectors(cell))
-bravais_lattice(system::AbstractSystem{3}) = bravais_lattice(Crystal(system))
+bravais_lattice(system::AbstractSystem{3}) = bravais_lattice(primitive_vectors(system))
 
 """
     generate_irreducible_kgrid(crystal::Crystal{3}, mesh::Vector{Int}; is_shift=[0, 0, 0])
@@ -584,31 +470,6 @@ function generate_irreducible_kgrid(system::AbstractSystem{3}, mesh::Vector{Int}
 end
 
 """
-    generate_reciprocal_lattice(lattice::AbstractLattice{3}, Nx::Int, Ny::Int, Nz::Int)
-
-Generates a 3D Monkhorst-Pack KGrid spanning the first Brillouin Zone.
-"""
-function generate_reciprocal_lattice(lattice::AbstractLattice{3}, Nx::Int, Ny::Int, Nz::Int)
-    B = reciprocal_vectors(lattice)
-    b1, b2, b3 = B[:, 1], B[:, 2], B[:, 3]
-
-    points = SVector{3,Float64}[]
-    for i in 1:Nx
-        for j in 1:Ny
-            for k in 1:Nz
-                u1 = (i - 1) / Nx - 0.5
-                u2 = (j - 1) / Ny - 0.5
-                u3 = (k - 1) / Nz - 0.5
-                push!(points, u1 * b1 + u2 * b2 + u3 * b3)
-            end
-        end
-    end
-
-    weights = fill(1.0 / (Nx * Ny * Nz), Nx * Ny * Nz)
-    return KGrid(points, weights)
-end
-
-"""
     generate_kpath(nodes::Vector{SVector{D,Float64}}, labels::Vector{String}; n_pts_per_segment=50)
 
 Generates a 1D path in K-space connecting high-symmetry nodes for band structure plotting.
@@ -641,61 +502,10 @@ function generate_kpath(nodes::Vector{SVector{D,Float64}}, labels::Vector{String
     return KPath{D}([points], [node_labels], cartesian_basis, Ref(Brillouin.CARTESIAN))
 end
 
-function generate_kpath(lat::ChainLattice; n_pts_per_segment=50)
-    a = lat.a
-    b1 = SVector{1,Float64}(2π / a)
-    nodes = [0.0 * b1, 0.5 * b1]
-    labels = ["Γ", "X"]
-    return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
-end
-
-function generate_kpath(lat::SquareLattice; n_pts_per_segment=50)
-    a = lat.a
-    b1 = SVector{2,Float64}(2π / a, 0.0)
-    b2 = SVector{2,Float64}(0.0, 2π / a)
-    nodes = [
-        0.0 * b1 + 0.0 * b2, # Γ
-        0.5 * b1 + 0.0 * b2, # X
-        0.5 * b1 + 0.5 * b2, # M
-        0.0 * b1 + 0.0 * b2  # Γ
-    ]
-    labels = ["Γ", "X", "M", "Γ"]
-    return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
-end
-
-function generate_kpath(lat::HexagonalLattice; n_pts_per_segment=50)
-    a = lat.a
-    b1 = SVector{2,Float64}(2π / a, 2π / (sqrt(3) * a))
-    b2 = SVector{2,Float64}(0.0, 4π / (sqrt(3) * a))
-    nodes = [
-        0.0 * b1 + 0.0 * b2,             # Γ
-        0.5 * b1 + 0.0 * b2,             # M
-        (1.0 / 3.0) * b1 + (1.0 / 3.0) * b2, # K
-        0.0 * b1 + 0.0 * b2              # Γ
-    ]
-    labels = ["Γ", "M", "K", "Γ"]
-    return generate_kpath(nodes, labels; n_pts_per_segment=n_pts_per_segment)
-end
-
-function _standardized_direct_basis(lattice::AbstractLattice{3})
-    dataset = _spacegroup_dataset(lattice)
-    std_lattice = Matrix{Float64}(dataset.std_lattice)
-    return [SVector{3,Float64}(std_lattice[i, 1], std_lattice[i, 2], std_lattice[i, 3]) for i in 1:3], Int(dataset.spacegroup_number)
-end
-
 function _standardized_direct_basis(vectors::AbstractMatrix{<:Number})
     dataset = _spacegroup_dataset(vectors)
     std_lattice = Matrix{Float64}(dataset.std_lattice)
     return [SVector{3,Float64}(std_lattice[i, 1], std_lattice[i, 2], std_lattice[i, 3]) for i in 1:3], Int(dataset.spacegroup_number)
-end
-
-function generate_kpath(lat::AbstractLattice{3}; n_pts_per_segment=50)
-    n_pts_per_segment >= 1 || throw(ArgumentError("`n_pts_per_segment` must be at least 1."))
-
-    direct_basis, sgnum = _standardized_direct_basis(lat)
-    kp = Brillouin.irrfbz_path(sgnum, direct_basis)
-    kp_cartesian = Brillouin.cartesianize(kp)
-    return Brillouin.splice(kp_cartesian, n_pts_per_segment - 1)
 end
 
 function generate_kpath(vectors::AbstractMatrix{<:Number}; n_pts_per_segment=50)
@@ -720,6 +530,25 @@ function generate_kpath(vectors::AbstractMatrix{<:Number}; n_pts_per_segment=50)
     throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
 end
 
-generate_kpath(crystal::Crystal{3}; n_pts_per_segment=50) = generate_kpath(primitive_vectors(crystal); n_pts_per_segment=n_pts_per_segment)
+generate_reciprocal_lattice(crystal::Crystal, sizes::Vararg{Int,N}) where {N} = generate_reciprocal_lattice(primitive_vectors(crystal), sizes...)
+generate_reciprocal_lattice(model::MultiOrbitalTightBinding, sizes::Vararg{Int,N}) where {N} = generate_reciprocal_lattice(periodic_cell(model), sizes...)
+generate_kpath(crystal::Crystal; n_pts_per_segment=50) = generate_kpath(primitive_vectors(crystal); n_pts_per_segment=n_pts_per_segment)
+generate_kpath(model::MultiOrbitalTightBinding; n_pts_per_segment=50) = generate_kpath(periodic_cell(model); n_pts_per_segment=n_pts_per_segment)
 generate_kpath(cell::PeriodicCell; n_pts_per_segment=50) = _generate_periodic_kpath(cell; n_pts_per_segment)
 generate_kpath(system::AbstractSystem; n_pts_per_segment=50) = _generate_periodic_kpath(system; n_pts_per_segment)
+function _resolve_sampling_sizes(cell_like, sizes::NTuple{N,Int}) where {N}
+    rank = periodic_rank(cell_like)
+    axes = _periodic_axes(cell_like)
+    ambient = length(periodicity(cell_like))
+
+    if N == rank
+        return sizes
+    elseif N == ambient
+        inactive_axes = setdiff(1:ambient, axes)
+        all(sizes[axis] == 1 for axis in inactive_axes) ||
+            throw(ArgumentError("Sampling sizes along non-periodic directions must be 1; got $(Tuple(sizes[axis] for axis in inactive_axes))."))
+        return ntuple(i -> sizes[axes[i]], rank)
+    end
+
+    throw(ArgumentError("Expected either $rank sampling dimensions for the periodic directions or $ambient sampling dimensions for the ambient cell, got $N."))
+end

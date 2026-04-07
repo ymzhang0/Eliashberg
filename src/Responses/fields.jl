@@ -119,6 +119,38 @@ PairDensityWave(q::AbstractVector{<:Real}) = PairDensityWave(_to_static_momentum
 PairDensityWave(q::Tuple{Vararg{Real}}) = PairDensityWave(_to_static_momentum(q))
 
 """
+    MomentumDependentPairing{D, T} <: AuxiliaryField
+
+代表一个完全由微观相互作用驱动的、在动量网格上具有连续分布的超导能隙。
+它不再依赖于任何先验的对称性假设 (如 :d_wave)。
+"""
+struct MomentumDependentPairing{D, T} <: AuxiliaryField
+    # 存储网格上每一个点的能隙值
+    gap_values::Vector{T} 
+end
+
+# 初始化的便利构造器：传入一个全 0 数组，或者给一点微小的随机噪声/d波种子破缺对称性
+function MomentumDependentPairing(kgrid::AbstractKGrid{D}; seed=:d_wave, amp=0.01) where {D}
+    gaps = zeros(ComplexF64, length(kgrid))
+    if seed == :random
+        for i in eachindex(gaps)
+            gaps[i] = amp * (rand() - 0.5 + im * (rand() - 0.5)) # 小随机复数扰动
+        end
+    elseif seed == :s_wave
+        for (i, k) in enumerate(kgrid.points)
+            gaps[i] = amp # s-wave 形状的初始能隙分布
+        end
+    elseif seed == :d_wave && D == 2
+        for (i, k) in enumerate(kgrid.points)
+            gaps[i] = amp * (cos(k[1]) - cos(k[2]))
+        end
+    else
+        @warn "Unsupported seed type $D dimension $seed for MomentumDependentPairing. Initializing with zeros."
+    end
+    return MomentumDependentPairing{D, ComplexF64}(gaps)
+end
+
+"""
     StaticMeanField{D} <: AuxiliaryField
 
 Represents a macroscopic, frozen condensate (e.g., T=0 CDW ground state).
