@@ -231,6 +231,114 @@ using Makie
     dispersion_fig = plot(line_band_data)
     @test dispersion_fig isa Figure
 
+    hr_dir = mktempdir()
+    hr_file = joinpath(hr_dir, "mock_hr.dat")
+    hr_io = open(hr_file, "w")
+    try
+        write(hr_io, """
+Generated for testing
+1
+1
+1
+0 0 0 1 1 -0.5 0.0
+""")
+        close(hr_io)
+
+        num_wann, hoppings = parse_wannier90_hr(hr_file)
+        @test num_wann == 1
+        @test length(hoppings) == 1
+        @test hoppings[1][1] == 1
+        @test hoppings[1][2] == 1
+        @test hoppings[1][3] == SVector{3,Int}(0, 0, 0)
+        @test hoppings[1][4] == -0.5 + 0.0im
+
+        crystal_3d = Crystal(CubicLattice(1.0), [:H => [0.0, 0.0, 0.0]])
+        wannier_model = build_model_from_wannier90(hr_file, crystal_3d, 0.0)
+        @test wannier_model isa MultiOrbitalTightBinding{3}
+        @test length(wannier_model.hoppings) == 1
+    finally
+        isopen(hr_io) && close(hr_io)
+        rm(hr_dir; force=true, recursive=true)
+    end
+
+    tb_dir = mktempdir()
+    tb_file = joinpath(tb_dir, "mock_tb.dat")
+    tb_io = open(tb_file, "w")
+    try
+        write(tb_io, """
+Generated for testing
+1.0 0.0 0.0
+0.0 1.0 0.0
+0.0 0.0 1.0
+2
+2
+1 2
+
+0 0 0
+1 1 0.0 0.0
+2 1 1.0e-7 0.0
+1 2 1.0 0.0
+2 2 0.0 0.0
+
+1 0 0
+1 1 2.0 0.0
+2 1 0.0 0.0
+1 2 0.0 0.0
+2 2 0.0 0.0
+
+0 0 0
+1 1 0.0 0.0 0.0 0.0 0.0 0.0
+2 1 0.0 0.0 0.0 0.0 0.0 0.0
+1 2 0.0 0.0 0.0 0.0 0.0 0.0
+2 2 0.2 0.0 0.0 0.0 0.0 0.0
+
+1 0 0
+1 1 0.0 0.0 0.0 0.0 2.0 0.0
+2 1 0.0 0.0 0.0 0.0 0.0 0.0
+1 2 0.0 0.0 0.0 0.0 0.0 0.0
+2 2 0.0 0.0 0.0 0.0 0.0 0.0
+""")
+        close(tb_io)
+
+        tb_data = parse_wannier90_tb(tb_file)
+        @test tb_data.num_wann == 2
+        @test tb_data.lattice_vectors[1] == SVector{3,Float64}(1.0, 0.0, 0.0)
+        @test tb_data.lattice_vectors[2] == SVector{3,Float64}(0.0, 1.0, 0.0)
+        @test tb_data.lattice_vectors[3] == SVector{3,Float64}(0.0, 0.0, 1.0)
+
+        @test length(tb_data.hoppings) == 2
+        @test tb_data.hoppings[1] == (1, 2, SVector{3,Int}(0, 0, 0), 1.0 + 0.0im)
+        @test tb_data.hoppings[2] == (1, 1, SVector{3,Int}(1, 0, 0), 1.0 + 0.0im)
+
+        @test length(tb_data.position_matrices) == 2
+        @test tb_data.position_matrices[1] == (
+            2,
+            2,
+            SVector{3,Int}(0, 0, 0),
+            SVector{3,ComplexF64}(0.2 + 0.0im, 0.0 + 0.0im, 0.0 + 0.0im),
+        )
+        @test tb_data.position_matrices[2] == (
+            1,
+            1,
+            SVector{3,Int}(1, 0, 0),
+            SVector{3,ComplexF64}(0.0 + 0.0im, 0.0 + 0.0im, 1.0 + 0.0im),
+        )
+
+        tb_cell = cell_from_wannier90_tb(tb_file)
+        @test tb_cell.vectors == @SMatrix [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
+
+        @test tb_data.cell.vectors == tb_cell.vectors
+
+        wannier_tb_model = build_model_from_wannier90(tb_file, 0.0)
+        @test wannier_tb_model isa MultiOrbitalTightBinding{3}
+        @test length(wannier_tb_model.hoppings) == 2
+        @test wannier_tb_model.cell.vectors == tb_cell.vectors
+        @test wannier_tb_model.num_orbitals == 2
+    finally
+        isopen(tb_io) && close(tb_io)
+        rm(tb_dir; force=true, recursive=true)
+    end
+
     path = generate_kpath(ChainLattice(1.0); n_pts_per_segment=4)
     path_band_data = compute_band_data(one_d_model, path)
     @test size(path_band_data.bands, 1) == length(path)

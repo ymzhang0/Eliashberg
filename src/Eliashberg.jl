@@ -35,6 +35,9 @@ include("Geometry/crystal.jl")
 include("Models/dispersions.jl")
 include("Models/interactions.jl")
 
+# Interfaces
+include("Interfaces/Interfaces.jl")
+
 # Responses
 include("Responses/fields.jl")
 include("Responses/propagators.jl")
@@ -93,6 +96,7 @@ export FreeElectron, TightBinding, SpinorDispersion, MultiOrbitalTightBinding, G
 export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction, CompositeInteraction
 export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction
 export ε, ω, V
+export parse_wannier90_hr, parse_wannier90_tb, cell_from_wannier90_tb, build_model_from_wannier90
 
 # Responses
 export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave, CompositeField

@@ -36,43 +36,54 @@ end
 SpinorDispersion(model::SpinorDispersion) = model
 
 """
-    MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}
+    MultiOrbitalTightBinding{D,L} <: ElectronicDispersion{D}
 
-Multi-orbital tight-binding model defined on a `Crystal{D}` with an explicit
-multi-atom basis. Each hopping is stored as
-`(atom_i, atom_j, cell_offset_R, t)` and is interpreted as a unique real-space
-term whose Hermitian partner is generated automatically in `ε(k)`.
+Multi-orbital tight-binding model defined on a Bravais `cell`. Each hopping is
+stored as `(orbital_i, orbital_j, cell_offset_R, t)` and is interpreted in the
+Wannier-style convention where the Bloch phase depends only on the lattice
+translation `R`.
 """
-struct MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}
-    crystal::Crystal{D}
+struct MultiOrbitalTightBinding{D,L<:AbstractLattice{D}} <: ElectronicDispersion{D}
+    cell::L
+    num_orbitals::Int
     hoppings::Vector{Tuple{Int,Int,SVector{D,Int},ComplexF64}}
     EF::Float64
 end
 
 """
-    MultiOrbitalTightBinding(crystal::Crystal{D}, hoppings, EF) where {D}
+    MultiOrbitalTightBinding(cell::AbstractLattice{D}, num_orbitals, hoppings, EF) where {D}
 
-Build a `MultiOrbitalTightBinding` model directly from the internal `Crystal`
-representation. All hoppings are normalized to the statically typed format
-used by the evaluator. The cell offsets in `hoppings` may be given as plain
-Julia vectors or tuples and are converted internally to `SVector{D,Int}`.
+Build a `MultiOrbitalTightBinding` model from a standalone lattice cell. All
+hoppings are normalized to the statically typed format used by the evaluator.
+The cell offsets in `hoppings` may be given as plain Julia vectors or tuples
+and are converted internally to `SVector{D,Int}`.
 """
-function MultiOrbitalTightBinding(crystal::Crystal{D}, hoppings, EF) where {D}
+function MultiOrbitalTightBinding(cell::AbstractLattice{D}, num_orbitals, hoppings, EF) where {D}
     typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
         (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
         for (atom_i, atom_j, cell_offset_R, t) in hoppings
     ]
-    return MultiOrbitalTightBinding{D}(crystal, typed_hoppings, Float64(EF))
+    return MultiOrbitalTightBinding{D,typeof(cell)}(cell, Int(num_orbitals), typed_hoppings, Float64(EF))
+end
+
+"""
+    MultiOrbitalTightBinding(crystal::Crystal{D}, hoppings, EF) where {D}
+
+Backward-compatible constructor that extracts only the lattice cell and orbital
+count from a `Crystal`.
+"""
+function MultiOrbitalTightBinding(crystal::Crystal{D}, hoppings, EF) where {D}
+    return MultiOrbitalTightBinding(Lattice(primitive_vectors(crystal)), length(crystal.atomic_symbols), hoppings, EF)
 end
 
 """
     MultiOrbitalTightBinding(system::AbstractSystem{D}, hoppings, EF) where {D}
 
-Build a `MultiOrbitalTightBinding` model from an `AtomsBase.AbstractSystem` by
-first converting the system into the internal `Crystal` representation.
+Build a `MultiOrbitalTightBinding` model from an `AtomsBase.AbstractSystem`.
 """
 function MultiOrbitalTightBinding(system::AbstractSystem{D}, hoppings, EF) where {D}
-    return MultiOrbitalTightBinding(Crystal(system), hoppings, EF)
+    crystal = Crystal(system)
+    return MultiOrbitalTightBinding(Lattice(primitive_vectors(crystal)), length(crystal.atomic_symbols), hoppings, EF)
 end
 
 """
