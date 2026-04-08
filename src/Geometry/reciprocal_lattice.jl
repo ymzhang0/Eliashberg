@@ -207,6 +207,17 @@ function _generate_periodic_kpath_2d(direct_basis::AbstractVector{<:SVector{D,Fl
     e1, e2 = _ambient_plane_frame(direct_basis[1], direct_basis[2])
     Rs2d = [_project_to_plane(vector, e1, e2) for vector in direct_basis]
     sgnum = _representative_2d_sgnum(Rs2d)
+    if sgnum == 13
+        reciprocal2d = reciprocal_vectors(reduce(hcat, Rs2d))
+        b1 = SVector{2,Float64}(reciprocal2d[:, 1])
+        b2 = SVector{2,Float64}(reciprocal2d[:, 2])
+        kp2d = generate_kpath(
+            [zero(SVector{2,Float64}), 0.5 * b1, (b1 + b2) / 3, zero(SVector{2,Float64})],
+            ["Γ", "M", "K", "Γ"];
+            n_pts_per_segment,
+        )
+        return _embed_kpath(kp2d, e1, e2)
+    end
     conventional_basis = _conventionalize_2d_basis(Rs2d, sgnum)
     kp2d = Brillouin.irrfbz_path(sgnum, conventional_basis, Val(2))
     kpi2d = Brillouin.splice(Brillouin.cartesianize(kp2d), n_pts_per_segment - 1)

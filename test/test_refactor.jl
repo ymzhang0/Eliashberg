@@ -416,6 +416,18 @@ Generated for testing
         @test periodicity(graphene_model) == (true, true, false)
         @test periodicity(graphene_model.cell) == (true, true, false)
 
+        graphene_tb_data = parse_wannier90_tb(graphene_tb; periodicity=(true, true, false))
+        graphene_k = SVector{3,Float64}(0.2, 0.1, 0.0)
+        graphene_expected = zeros(ComplexF64, graphene_tb_data.num_wann, graphene_tb_data.num_wann)
+        graphene_lattice = reduce(hcat, graphene_tb_data.lattice_vectors)
+        for orb in 1:graphene_tb_data.num_wann
+            graphene_expected[orb, orb] -= graphene_model.EF
+        end
+        for (m, n, R, t) in graphene_tb_data.hoppings
+            graphene_expected[m, n] += t * exp(im * dot(graphene_k, graphene_lattice * SVector{3,Float64}(R)))
+        end
+        @test Matrix(ε(graphene_k, graphene_model)) ≈ Matrix(Hermitian((graphene_expected + graphene_expected') / 2)) atol=1e-10
+
         graphene_grid = generate_reciprocal_lattice(graphene_model.cell, 5, 5, 1)
         @test graphene_grid isa KGrid{3}
         @test length(graphene_grid) == 25
@@ -424,9 +436,16 @@ Generated for testing
         graphene_path = generate_kpath(graphene_model.cell; n_pts_per_segment=6)
         graphene_node_indices, graphene_node_labels = Eliashberg.path_node_metadata(graphene_path)
         @test graphene_path isa KPath{3}
-        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in Eliashberg.path_points(graphene_path))
+        graphene_path_points = Eliashberg.path_points(graphene_path)
+        @test all(isapprox(k[3], 0.0; atol=1e-10) for k in graphene_path_points)
         @test graphene_node_labels == ["Γ", "M", "K", "Γ"]
         @test length(graphene_node_indices) == 4
+        graphene_reciprocal = Eliashberg.reciprocal_vectors(graphene_model.cell)
+        @test graphene_path_points[graphene_node_indices[2]] ≈ SVector{3,Float64}(graphene_reciprocal * SVector(0.5, 0.0, 0.0)) atol=1e-10
+        @test graphene_path_points[graphene_node_indices[3]] ≈ SVector{3,Float64}(graphene_reciprocal * SVector(1 / 3, 1 / 3, 0.0)) atol=1e-10
+        graphene_path_bands = [sort(real.(eigvals(Matrix(ε(k, graphene_model))))) for k in graphene_path_points]
+        graphene_path_gaps = [band_values[5] - band_values[4] for band_values in graphene_path_bands]
+        @test minimum(graphene_path_gaps) < 1e-4
     finally
         isopen(tb_io) && close(tb_io)
         rm(tb_dir; force=true, recursive=true)

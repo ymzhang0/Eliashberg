@@ -155,6 +155,93 @@ plot_band_structure(data::BandStructureData; kwargs...) =
     plot_band_structure(data.kpath, data.bands; kwargs...)
 
 """
+    plot_wannier90_band_structure(bands_filename::String; labelinfo_filename=nothing, kwargs...)
+
+Parse Wannier90 `*_band.dat` output and render it with the standard band
+structure plotter. A sibling `*.labelinfo.dat` file is picked up
+automatically when available.
+"""
+function plot_wannier90_band_structure(
+    bands_filename::String;
+    labelinfo_filename::Union{Nothing, AbstractString}=nothing,
+    kwargs...
+)
+    data = band_data_from_wannier90_bands(bands_filename; labelinfo_filename)
+    return plot_band_structure(data; kwargs...)
+end
+
+"""
+    plot_wannier90_tb_band_comparison(
+        comparison::Wannier90BandComparison;
+        model_label="TB model (shifted)",
+        reference_label="Wannier90 band.dat",
+        model_color=:royalblue,
+        reference_color=(:darkorange, 0.65),
+        linewidth=2.5,
+        markersize=4,
+        legend_position=:rb,
+        axis=(;),
+    )
+
+Overlay a reconstructed Wannier90 tight-binding model against the reference
+Wannier90 `*_band.dat` energies on the exact sampled path.
+"""
+function plot_wannier90_tb_band_comparison(
+    comparison::Wannier90BandComparison;
+    model_label::AbstractString="TB model (shifted)",
+    reference_label::AbstractString="Wannier90 band.dat",
+    model_color=:royalblue,
+    reference_color=(:darkorange, 0.65),
+    linewidth::Real=2.5,
+    markersize::Real=4,
+    legend_position=:rb,
+    axis=(;),
+)
+    reference = comparison.reference
+    shifted_model = comparison.shifted_model
+    distances = path_distances(reference.kpath)
+    node_indices, labels = path_node_metadata(reference.kpath)
+    branch_ranges = path_branch_ranges(reference.kpath)
+
+    fig = Figure(size=(900, 650))
+    branch_grid = fig[1, 1] = GridLayout()
+    branch_axes = _band_path_axes!(
+        branch_grid,
+        distances,
+        node_indices,
+        labels,
+        branch_ranges;
+        ylabel="Energy (eV)",
+        title="Wannier90 TB vs band.dat",
+        axis=axis,
+    )
+
+    for band_idx in axes(reference.bands, 2)
+        for (range_idx, (ax, range)) in enumerate(zip(branch_axes, branch_ranges))
+            lines!(
+                ax,
+                distances[range],
+                shifted_model.bands[range, band_idx];
+                color=model_color,
+                linewidth=linewidth,
+                label=(band_idx == 1 && range_idx == 1 ? model_label : nothing),
+            )
+            scatter!(
+                ax,
+                distances[range],
+                reference.bands[range, band_idx];
+                color=reference_color,
+                markersize=markersize,
+                label=(band_idx == 1 && range_idx == 1 ? reference_label : nothing),
+            )
+        end
+    end
+
+    axislegend(first(branch_axes), position=legend_position, framevisible=false)
+    return fig
+end
+
+"""
     plot_fermi_surface(kxs, kys, kzs, energy_volume; E_Fermi=0.0, axis=(;), kwargs...)
 
 Render an isosurface from a precomputed three-dimensional scalar field.
@@ -305,5 +392,6 @@ visualize_renormalized_bands(data::RenormalizedBandData; kwargs...) =
 
 Makie.plot(data::DispersionSurfaceData; kwargs...) = plot_dispersion_surface(data; kwargs...)
 Makie.plot(data::BandStructureData; kwargs...) = plot_band_structure(data; kwargs...)
+Makie.plot(data::Wannier90BandComparison; kwargs...) = plot_wannier90_tb_band_comparison(data; kwargs...)
 Makie.plot(data::FermiSurfaceData; kwargs...) = plot_fermi_surface(data; kwargs...)
 Makie.plot(data::RenormalizedBandData; kwargs...) = plot_renormalized_bands(data; kwargs...)

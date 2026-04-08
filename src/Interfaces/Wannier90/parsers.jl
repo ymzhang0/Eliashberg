@@ -1,5 +1,3 @@
-# src/Interfaces/wannier90.jl
-
 const WannierHopping = Tuple{Int, Int, SVector{3, Int}, ComplexF64}
 const WannierPositionElement = Tuple{Int, Int, SVector{3, Int}, SVector{3, ComplexF64}}
 
@@ -180,6 +178,26 @@ function _read_wannier90_tb_positions(io::IO, filename::AbstractString, num_wann
     return positions
 end
 
+_parse_wannier90_number(token::AbstractString, filename::AbstractString, context::AbstractString) =
+    try
+        parse(Float64, replace(strip(token), r"[dD]" => "e"))
+    catch err
+        throw(ArgumentError("Could not parse $context in $filename from token `$(strip(token))`: $(sprint(showerror, err))"))
+    end
+
+function _normalize_wannier90_label(label::AbstractString)
+    stripped = strip(label)
+    uppercase(stripped) in ("G", "GAMMA", "Γ") && return "Γ"
+    return stripped
+end
+
+function _wannier90_dimension_hint(node_coordinates::AbstractVector{<:SVector{3, Float64}}; tol::Float64=1e-10)
+    isempty(node_coordinates) && return 1
+    reference = first(node_coordinates)
+    varying_axes = count(axis -> any(abs(coords[axis] - reference[axis]) > tol for coords in node_coordinates), 1:3)
+    return max(varying_axes, 1)
+end
+
 """
     parse_wannier90_hr(filename::String)
 
@@ -188,7 +206,7 @@ hopping is stored as `(m, n, R, t)`.
 """
 function parse_wannier90_hr(filename::String)
     open(filename, "r") do io
-        readline(io) # Header/comment line.
+        readline(io)
         num_wann = parse(Int, strip(readline(io)))
         nrpts = parse(Int, strip(readline(io)))
         degeneracies = _read_wannier90_degeneracies(io, filename, nrpts)
@@ -209,7 +227,7 @@ inline layout where each entry repeats its `R` vector.
 """
 function parse_wannier90_tb(filename::String; periodicity=nothing)
     open(filename, "r") do io
-        readline(io) # Header/comment line.
+        readline(io)
 
         lattice_vectors = (
             _parse_svector3_float(readline(io), filename, "lattice vector a1"),
@@ -243,103 +261,152 @@ function parse_wannier90_tb(filename::String; periodicity=nothing)
 end
 
 """
-    cell_from_wannier90_tb(filename::String)
+    parse_wannier90_band_dat(filename::String)
 
-Build an `AtomsBase.PeriodicCell` directly from the lattice vectors stored in a
-`wannier90_tb.dat` file.
+Parse a Wannier90 interpolated `*_band.dat` file and return a `NamedTuple` with
+the cumulative path-distance coordinate and a dense `(num_kpoints, num_bands)`
+energy matrix. The parser expects the standard block layout where each band is
+written as a separate two-column section separated by blank lines.
 """
-function cell_from_wannier90_tb(filename::String; periodicity=nothing)
-    return parse_wannier90_tb(filename; periodicity).cell
-end
+function parse_wannier90_band_dat(filename::String)
+    blocks = Vector{Tuple{Vector{Float64}, Vector{Float64}}}()
+    current_distances = Float64[]
+    current_energies = Float64[]
 
-function cell_from_wannier90_tb(tb_data::NamedTuple; periodicity=nothing)
-    hasproperty(tb_data, :cell) || error("The provided Wannier90 TB data does not contain a cell field.")
-    if isnothing(periodicity)
-        return tb_data.cell
+    open(filename, "r") do io
+        while !eof(io)
+            line = readline(io)
+            if isempty(strip(line))
+                if !isempty(current_distances)
+                    push!(blocks, (current_distances, current_energies))
+                    current_distances = Float64[]
+                    current_energies = Float64[]
+                end
+                continue
+            end
+
+            fields = split(line)
+            length(fields) == 2 || error("Expected 2 columns in Wannier90 band file $filename.")
+            push!(current_distances, _parse_wannier90_number(fields[1], filename, "path distance"))
+            push!(current_energies, _parse_wannier90_number(fields[2], filename, "band energy"))
+        end
     end
-    return periodic_cell_from_wannier90_tb(tb_data; periodicity)
-end
 
-"""
-    periodic_cell_from_wannier90_tb(filename::String; periodicity=nothing)
+    isempty(current_distances) || push!(blocks, (current_distances, current_energies))
+    isempty(blocks) && error("Wannier90 band file $filename is empty.")
 
-Build an `AtomsBase.PeriodicCell` directly from the lattice vectors stored in a
-`wannier90_tb.dat` file. Use `periodicity=(true, true, false)` for slab
-systems, for example.
-"""
-function periodic_cell_from_wannier90_tb(filename::String; periodicity=nothing)
-    return parse_wannier90_tb(filename; periodicity).cell
-end
+    reference_distances, _ = first(blocks)
+    num_kpoints = length(reference_distances)
+    num_bands = length(blocks)
+    num_kpoints > 0 || error("Wannier90 band file $filename does not contain any k-point samples.")
 
-function periodic_cell_from_wannier90_tb(tb_data::NamedTuple; periodicity=nothing)
-    if hasproperty(tb_data, :cell) && isnothing(periodicity)
-        return tb_data.cell
+    bands = Matrix{Float64}(undef, num_kpoints, num_bands)
+    bands[:, 1] = first(blocks)[2]
+
+    for band_idx in 2:num_bands
+        distances, energies = blocks[band_idx]
+        length(distances) == num_kpoints || error("All Wannier90 band blocks in $filename must contain the same number of k-points.")
+        for idx in eachindex(distances)
+            isapprox(distances[idx], reference_distances[idx]; atol=1e-8, rtol=1e-8) ||
+                error("Inconsistent path-distance grid across band blocks in $filename.")
+        end
+        bands[:, band_idx] = energies
     end
-    hasproperty(tb_data, :lattice_vectors) || error("The provided Wannier90 TB data does not contain lattice vectors.")
-    atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
-        periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
-    return PeriodicCell(
-        ;
-        cell_vectors=ntuple(i -> tb_data.lattice_vectors[i] .* u"Å", 3),
-        periodicity=atomsbase_periodicity,
+
+    return (
+        distances = copy(reference_distances),
+        bands = bands,
+        num_kpoints = num_kpoints,
+        num_bands = num_bands,
     )
 end
 
 """
-    build_model_from_wannier90(filename::String, cell, EF::Float64)
+    parse_wannier90_kpoints(filename::String)
 
-Construct a `MultiOrbitalTightBinding` model from either a `wannier90_hr.dat`
-or `wannier90_tb.dat` file and a given cell description. The preferred cell
-inputs are `AtomsBase.PeriodicCell`, `AtomsBase.AbstractSystem`, or a primitive
-vector matrix.
+Parse a Wannier90 `*.kpt` file and return the fractional path samples together
+with their weights. The standard Wannier90 format stores the number of k-points
+on the first line followed by one four-column row per sample.
 """
+function parse_wannier90_kpoints(filename::String)
+    open(filename, "r") do io
+        num_kpoints = parse(Int, strip(_read_next_nonempty_line(io, filename)))
+        kpoints = Vector{SVector{3, Float64}}()
+        weights = Float64[]
+        sizehint!(kpoints, num_kpoints)
+        sizehint!(weights, num_kpoints)
 
-function build_model_from_wannier90(filename::String, cell::AbstractMatrix{<:Number}, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename)
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
-    else
-        error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
+        while !eof(io)
+            line = strip(readline(io))
+            isempty(line) && continue
+
+            fields = split(line)
+            length(fields) >= 3 || error("Expected at least 3 columns in Wannier90 k-point file $filename.")
+
+            push!(
+                kpoints,
+                SVector{3, Float64}(
+                    _parse_wannier90_number(fields[1], filename, "k-point x"),
+                    _parse_wannier90_number(fields[2], filename, "k-point y"),
+                    _parse_wannier90_number(fields[3], filename, "k-point z"),
+                ),
+            )
+            push!(weights, length(fields) >= 4 ? _parse_wannier90_number(fields[4], filename, "k-point weight") : 1.0)
+        end
+
+        length(kpoints) == num_kpoints ||
+            error("Wannier90 k-point file $filename declares $num_kpoints samples but contains $(length(kpoints)).")
+
+        return (
+            kpoints = kpoints,
+            weights = weights,
+            num_kpoints = num_kpoints,
+        )
     end
 end
 
-function build_model_from_wannier90(filename::String, crystal::Crystal, EF::Float64)
-    return build_model_from_wannier90(filename, primitive_vectors(crystal), EF)
-end
-
-function build_model_from_wannier90(filename::String, cell::PeriodicCell, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename; periodicity=periodicity(cell))
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
-    end
-    error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
-end
-
-function build_model_from_wannier90(filename::String, system::AbstractSystem, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename; periodicity=periodicity(system))
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(system, num_wann, hoppings, EF)
-    end
-    error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
-end
-
 """
-    build_model_from_wannier90(filename::String, EF::Float64)
+    parse_wannier90_labelinfo(filename::String)
 
-Construct a `MultiOrbitalTightBinding` model directly from a `wannier90_tb.dat`
-file using the standalone cell stored in the TB data.
+Parse a Wannier90 `*.labelinfo.dat` file and return the symmetry-point labels,
+their 1-based indices along the path, cumulative path distances, and the raw
+fractional coordinates recorded by Wannier90.
 """
-function build_model_from_wannier90(filename::String, EF::Float64, periodicity=nothing)
-    endswith(lowercase(basename(filename)), "_tb.dat") || error("A standalone cell can only be reconstructed from a Wannier90 TB file.")
-    parsed = parse_wannier90_tb(filename; periodicity)
-    return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+function parse_wannier90_labelinfo(filename::String)
+    node_labels = String[]
+    node_indices = Int[]
+    node_distances = Float64[]
+    node_coordinates = SVector{3, Float64}[]
+
+    open(filename, "r") do io
+        while !eof(io)
+            line = strip(readline(io))
+            isempty(line) && continue
+
+            fields = split(line)
+            length(fields) >= 6 || error("Expected at least 6 columns in Wannier90 labelinfo file $filename.")
+
+            push!(node_labels, _normalize_wannier90_label(fields[1]))
+            push!(node_indices, parse(Int, fields[2]))
+            push!(node_distances, _parse_wannier90_number(fields[3], filename, "label distance"))
+            push!(
+                node_coordinates,
+                SVector{3, Float64}(
+                    _parse_wannier90_number(fields[4], filename, "label kx"),
+                    _parse_wannier90_number(fields[5], filename, "label ky"),
+                    _parse_wannier90_number(fields[6], filename, "label kz"),
+                ),
+            )
+        end
+    end
+
+    isempty(node_labels) && error("Wannier90 labelinfo file $filename is empty.")
+
+    return (
+        node_labels = node_labels,
+        node_indices = node_indices,
+        node_distances = node_distances,
+        node_coordinates = node_coordinates,
+        dimension = _wannier90_dimension_hint(node_coordinates),
+    )
 end

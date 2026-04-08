@@ -26,3 +26,4 @@ end
 include("test_refactor.jl")
 include("test_plot_dispatch.jl")
 include("test_quantum_espresso.jl")
+include("test_wannier90_bands.jl")

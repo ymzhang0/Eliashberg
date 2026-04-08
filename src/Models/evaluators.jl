@@ -68,19 +68,13 @@ function ε(k::SVector{D,Float64}, model::MultiOrbitalTightBinding{D}) where {D}
     for (atom_i, atom_j, cell_offset_R, hopping) in model.hoppings
         delta_r = lattice * SVector{D,Float64}(cell_offset_R)
         phase = exp(im * dot(k, delta_r))
-        contribution = hopping * phase
-
-        if atom_i == atom_j && iszero(cell_offset_R)
-            hamiltonian[atom_i, atom_i] += real(contribution)
-        elseif atom_i == atom_j
-            hamiltonian[atom_i, atom_i] += contribution + conj(contribution)
-        else
-            hamiltonian[atom_i, atom_j] += contribution
-            hamiltonian[atom_j, atom_i] += conj(contribution)
-        end
+        hamiltonian[atom_i, atom_j] += hopping * phase
     end
 
-    return Hermitian(hamiltonian)
+    # Wannier90 `hr/tb.dat` stores the full H(R) blocks, so the Bloch Hamiltonian
+    # is the direct Fourier sum. We symmetrize once at the end to suppress small
+    # numerical violations of Hermiticity from I/O roundoff.
+    return Hermitian((hamiltonian + hamiltonian') / 2)
 end
 
 function ε(k::SVector{2,Float64}, model::KagomeLattice)

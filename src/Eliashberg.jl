@@ -54,6 +54,9 @@ include("Geometry/reciprocal_lattice.jl")
 # Response data objects
 include("Responses/data_types.jl")
 
+# Interface data objects
+include("Interfaces/Wannier90/data_types.jl")
+
 # Models methods
 include("Models/evaluators.jl")
 
@@ -100,6 +103,9 @@ export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, Combi
 export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, MediatedInteraction
 export ε, ω, V
 export parse_wannier90_hr, parse_wannier90_tb, cell_from_wannier90_tb, periodic_cell_from_wannier90_tb, build_model_from_wannier90
+export parse_wannier90_band_dat, parse_wannier90_kpoints, parse_wannier90_labelinfo
+export kpath_from_wannier90_bands, kpath_from_wannier90_kpoints, band_data_from_wannier90_bands, compare_wannier90_tb_to_bands
+export Wannier90BandComparison
 
 # Responses
 export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave, CompositeField
@@ -120,7 +126,7 @@ export compute_landscape_line_data, compute_landscape_surface_data, compute_land
 export compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data, compute_coexistence_landscape
 
 # Visualization
-export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plot_fermi_surface, plot_renormalized_bands
+export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plot_wannier90_band_structure, plot_wannier90_tb_band_comparison, plot_fermi_surface, plot_renormalized_bands
 export plot_landscape, plot_spectral_function, plot_phase_transition, plot_zeeman_pairing_landscape, plot_collective_modes
 export visualize_dispersion, dimensionality, visualize_landscape, visualize_spectral_function, visualize_phase_transition, visualize_renormalized_bands, visualize_zeeman_pairing_landscape, visualize_collective_modes
 export visualize_lattice, visualize_reciprocal_space
