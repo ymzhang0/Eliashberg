@@ -44,6 +44,20 @@ function grid_summary(grid::AbstractKGrid{D}) where {D}
     )
 end
 
+function cell_summary(cell_like)
+    vectors = primitive_vectors(cell_like)
+    summary = (
+        dim=size(vectors, 1),
+        lattice_norms=[norm(vectors[:, axis]) for axis in axes(vectors, 2)],
+    )
+
+    if applicable(periodicity, cell_like)
+        summary = (; summary..., periodicity=periodicity(cell_like))
+    end
+
+    return summary
+end
+
 function samples_summary(samples::AbstractVector{<:GridSample})
     return (
         n_samples=length(samples),
@@ -173,6 +187,18 @@ function band_data_summary(data::BandStructureData)
         n_kpoints=size(data.bands, 1),
         n_bands=size(data.bands, 2),
     )
+end
+
+function comparison_summary(comparison)
+    if hasproperty(comparison, :shift) && hasproperty(comparison, :rmse) && hasproperty(comparison, :max_abs_error)
+        return (
+            shift=comparison.shift,
+            rmse=comparison.rmse,
+            max_abs_error=comparison.max_abs_error,
+        )
+    end
+
+    return (type=string(typeof(comparison)),)
 end
 
 function spectrum_summary(spectrum)

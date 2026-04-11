@@ -274,28 +274,34 @@ a `NamedTuple` with the k-point coordinates and band energies. The returned
 `bands` matrix has shape `(num_kpoints, num_bands)`.
 """
 function parse_quantum_espresso_bands(filename::String)
-    open(filename, "r") do io
-        eof(io) && error("Quantum ESPRESSO bands file $filename is empty.")
+    return with_stage_log(
+        "Parse Quantum ESPRESSO bands";
+        context=(filename=filename,),
+        summarize_result=result -> (num_kpoints=result.num_kpoints, num_bands=result.num_bands),
+    ) do
+        open(filename, "r") do io
+            eof(io) && error("Quantum ESPRESSO bands file $filename is empty.")
 
-        num_bands, num_kpoints = _parse_qe_bands_header(readline(io), filename)
-        kpoints = Vector{SVector{3, Float64}}(undef, num_kpoints)
-        bands = Matrix{Float64}(undef, num_kpoints, num_bands)
+            num_bands, num_kpoints = _parse_qe_bands_header(readline(io), filename)
+            kpoints = Vector{SVector{3, Float64}}(undef, num_kpoints)
+            bands = Matrix{Float64}(undef, num_kpoints, num_bands)
 
-        for ik in 1:num_kpoints
-            kpoints[ik] = _parse_qe_kpoint(_read_next_nonempty_line(io, filename), filename)
-            bands[ik, :] = _parse_qe_band_block(io, filename, num_bands)
+            for ik in 1:num_kpoints
+                kpoints[ik] = _parse_qe_kpoint(_read_next_nonempty_line(io, filename), filename)
+                bands[ik, :] = _parse_qe_band_block(io, filename, num_bands)
+            end
+
+            while !eof(io)
+                isempty(strip(readline(io))) || error("Found unexpected trailing content in $filename after reading $num_kpoints k-points.")
+            end
+
+            return (
+                kpoints = kpoints,
+                bands = bands,
+                num_kpoints = num_kpoints,
+                num_bands = num_bands,
+            )
         end
-
-        while !eof(io)
-            isempty(strip(readline(io))) || error("Found unexpected trailing content in $filename after reading $num_kpoints k-points.")
-        end
-
-        return (
-            kpoints = kpoints,
-            bands = bands,
-            num_kpoints = num_kpoints,
-            num_bands = num_bands,
-        )
     end
 end
 
@@ -309,19 +315,25 @@ QE-style `ibrav` definitions. By default the returned cell is an
 `periodicity=(true, true, false)` for slab systems, for example.
 """
 function parse_quantum_espresso_cell(filename::String; periodicity=nothing)
-    lines = readlines(filename)
-    isempty(lines) && error("Quantum ESPRESSO cell file $filename is empty.")
-    text = join(lines, '\n')
-    atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
-        periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
+    return with_stage_log(
+        "Parse Quantum ESPRESSO cell";
+        context=(filename=filename, periodicity=periodicity),
+        summarize_result=cell_summary,
+    ) do
+        lines = readlines(filename)
+        isempty(lines) && error("Quantum ESPRESSO cell file $filename is empty.")
+        text = join(lines, '\n')
+        atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
+            periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
 
-    cell = _qe_parse_cell_parameters(lines, text, filename)
-    cell === nothing || return PeriodicCell(cell; periodicity=atomsbase_periodicity)
+        cell = _qe_parse_cell_parameters(lines, text, filename)
+        cell === nothing || return PeriodicCell(cell; periodicity=atomsbase_periodicity)
 
-    cell = _qe_parse_output_crystal_axes(lines, text, filename)
-    cell === nothing || return PeriodicCell(cell; periodicity=atomsbase_periodicity)
+        cell = _qe_parse_output_crystal_axes(lines, text, filename)
+        cell === nothing || return PeriodicCell(cell; periodicity=atomsbase_periodicity)
 
-    cell = _qe_parse_ibrav_cell(text, filename)
-    cell === nothing || error("Could not determine a Quantum ESPRESSO cell from $filename.")
-    return PeriodicCell(cell; periodicity=atomsbase_periodicity)
+        cell = _qe_parse_ibrav_cell(text, filename)
+        cell === nothing || error("Could not determine a Quantum ESPRESSO cell from $filename.")
+        return PeriodicCell(cell; periodicity=atomsbase_periodicity)
+    end
 end

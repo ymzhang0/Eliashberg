@@ -69,13 +69,19 @@ function Base.getproperty(model::MultiOrbitalTightBinding, name::Symbol)
 end
 
 function MultiOrbitalTightBinding(cell::AbstractMatrix{<:Number}, num_orbitals, hoppings, EF)
-    primitive_cell = primitive_vectors(cell)
-    D = size(primitive_cell, 1)
-    typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
-        (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
-        for (atom_i, atom_j, cell_offset_R, t) in hoppings
-    ]
-    return MultiOrbitalTightBinding{D}(primitive_cell, ntuple(_ -> true, D), Int(num_orbitals), typed_hoppings, Float64(EF))
+    return with_stage_log(
+        "Construct MultiOrbitalTightBinding";
+        context=(cell=cell_summary(cell), num_orbitals=Int(num_orbitals), EF=Float64(EF)),
+        summarize_result=model_summary,
+    ) do
+        primitive_cell = primitive_vectors(cell)
+        D = size(primitive_cell, 1)
+        typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
+            (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
+            for (atom_i, atom_j, cell_offset_R, t) in hoppings
+        ]
+        return MultiOrbitalTightBinding{D}(primitive_cell, ntuple(_ -> true, D), Int(num_orbitals), typed_hoppings, Float64(EF))
+    end
 end
 
 """
@@ -98,21 +104,33 @@ function MultiOrbitalTightBinding(system::AbstractSystem{D}, hoppings, EF) where
 end
 
 function MultiOrbitalTightBinding(cell::PeriodicCell{D}, num_orbitals, hoppings, EF) where {D}
-    primitive_cell = primitive_vectors(cell)
-    typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
-        (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
-        for (atom_i, atom_j, cell_offset_R, t) in hoppings
-    ]
-    return MultiOrbitalTightBinding{D}(primitive_cell, periodicity(cell), Int(num_orbitals), typed_hoppings, Float64(EF))
+    return with_stage_log(
+        "Construct MultiOrbitalTightBinding";
+        context=(cell=cell_summary(cell), num_orbitals=Int(num_orbitals), EF=Float64(EF)),
+        summarize_result=model_summary,
+    ) do
+        primitive_cell = primitive_vectors(cell)
+        typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
+            (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
+            for (atom_i, atom_j, cell_offset_R, t) in hoppings
+        ]
+        return MultiOrbitalTightBinding{D}(primitive_cell, periodicity(cell), Int(num_orbitals), typed_hoppings, Float64(EF))
+    end
 end
 
 function MultiOrbitalTightBinding(system::AbstractSystem{D}, num_orbitals, hoppings, EF) where {D}
-    primitive_cell = primitive_vectors(system)
-    typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
-        (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
-        for (atom_i, atom_j, cell_offset_R, t) in hoppings
-    ]
-    return MultiOrbitalTightBinding{D}(primitive_cell, periodicity(system), Int(num_orbitals), typed_hoppings, Float64(EF))
+    return with_stage_log(
+        "Construct MultiOrbitalTightBinding";
+        context=(cell=cell_summary(system), num_orbitals=Int(num_orbitals), EF=Float64(EF)),
+        summarize_result=model_summary,
+    ) do
+        primitive_cell = primitive_vectors(system)
+        typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
+            (Int(atom_i), Int(atom_j), SVector{D,Int}(cell_offset_R), ComplexF64(t))
+            for (atom_i, atom_j, cell_offset_R, t) in hoppings
+        ]
+        return MultiOrbitalTightBinding{D}(primitive_cell, periodicity(system), Int(num_orbitals), typed_hoppings, Float64(EF))
+    end
 end
 
 """
@@ -247,13 +265,19 @@ function _tight_binding_cubic(cell_like, t::Float64, EF::Float64)
 end
 
 function TightBinding(lattice::AbstractMatrix{<:Number}, hoppings, EF)
-    primitive_lattice = primitive_vectors(lattice)
-    D = size(primitive_lattice, 1)
-    typed_hoppings = Tuple{SVector{D,Int},Float64}[
-        (SVector{D,Int}(R_idx), Float64(t_hop))
-        for (R_idx, t_hop) in hoppings
-    ]
-    return TightBinding{D}(primitive_lattice, typed_hoppings, Float64(EF))
+    return with_stage_log(
+        "Construct TightBinding";
+        context=(cell=cell_summary(lattice), EF=Float64(EF), n_hoppings=length(hoppings)),
+        summarize_result=model_summary,
+    ) do
+        primitive_lattice = primitive_vectors(lattice)
+        D = size(primitive_lattice, 1)
+        typed_hoppings = Tuple{SVector{D,Int},Float64}[
+            (SVector{D,Int}(R_idx), Float64(t_hop))
+            for (R_idx, t_hop) in hoppings
+        ]
+        return TightBinding{D}(primitive_lattice, typed_hoppings, Float64(EF))
+    end
 end
 
 function TightBinding(cell::PeriodicCell{D}, hoppings, EF) where {D}

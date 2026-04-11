@@ -35,7 +35,13 @@ Build an `AtomsBase.PeriodicCell` directly from the lattice vectors stored in a
 `wannier90_tb.dat` file.
 """
 function cell_from_wannier90_tb(filename::String; periodicity=nothing)
-    return parse_wannier90_tb(filename; periodicity).cell
+    return with_stage_log(
+        "Build cell from Wannier90 TB";
+        context=(filename=filename, periodicity=periodicity),
+        summarize_result=cell_summary,
+    ) do
+        return parse_wannier90_tb(filename; periodicity).cell
+    end
 end
 
 function cell_from_wannier90_tb(tb_data::NamedTuple; periodicity=nothing)
@@ -54,7 +60,13 @@ Build an `AtomsBase.PeriodicCell` directly from the lattice vectors stored in a
 systems, for example.
 """
 function periodic_cell_from_wannier90_tb(filename::String; periodicity=nothing)
-    return parse_wannier90_tb(filename; periodicity).cell
+    return with_stage_log(
+        "Build periodic cell from Wannier90 TB";
+        context=(filename=filename, periodicity=periodicity),
+        summarize_result=cell_summary,
+    ) do
+        return parse_wannier90_tb(filename; periodicity).cell
+    end
 end
 
 function periodic_cell_from_wannier90_tb(tb_data::NamedTuple; periodicity=nothing)
@@ -80,14 +92,20 @@ inputs are `AtomsBase.PeriodicCell`, `AtomsBase.AbstractSystem`, or a primitive
 vector matrix.
 """
 function build_model_from_wannier90(filename::String, cell::AbstractMatrix{<:Number}, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename)
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
-    else
-        error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
+    return with_stage_log(
+        "Build model from Wannier90";
+        context=(filename=filename, cell=cell_summary(cell), EF=EF),
+        summarize_result=model_summary,
+    ) do
+        if endswith(lowercase(basename(filename)), "_tb.dat")
+            parsed = parse_wannier90_tb(filename)
+            return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+        elseif endswith(lowercase(basename(filename)), "_hr.dat")
+            num_wann, hoppings = parse_wannier90_hr(filename)
+            return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
+        else
+            error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
+        end
     end
 end
 
@@ -96,25 +114,37 @@ function build_model_from_wannier90(filename::String, crystal::Crystal, EF::Floa
 end
 
 function build_model_from_wannier90(filename::String, cell::PeriodicCell, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename; periodicity=periodicity(cell))
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
+    return with_stage_log(
+        "Build model from Wannier90";
+        context=(filename=filename, cell=cell_summary(cell), EF=EF),
+        summarize_result=model_summary,
+    ) do
+        if endswith(lowercase(basename(filename)), "_tb.dat")
+            parsed = parse_wannier90_tb(filename; periodicity=periodicity(cell))
+            return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+        elseif endswith(lowercase(basename(filename)), "_hr.dat")
+            num_wann, hoppings = parse_wannier90_hr(filename)
+            return MultiOrbitalTightBinding(cell, num_wann, hoppings, EF)
+        end
+        error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
     end
-    error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
 end
 
 function build_model_from_wannier90(filename::String, system::AbstractSystem, EF::Float64)
-    if endswith(lowercase(basename(filename)), "_tb.dat")
-        parsed = parse_wannier90_tb(filename; periodicity=periodicity(system))
-        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
-    elseif endswith(lowercase(basename(filename)), "_hr.dat")
-        num_wann, hoppings = parse_wannier90_hr(filename)
-        return MultiOrbitalTightBinding(system, num_wann, hoppings, EF)
+    return with_stage_log(
+        "Build model from Wannier90";
+        context=(filename=filename, cell=cell_summary(system), EF=EF),
+        summarize_result=model_summary,
+    ) do
+        if endswith(lowercase(basename(filename)), "_tb.dat")
+            parsed = parse_wannier90_tb(filename; periodicity=periodicity(system))
+            return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+        elseif endswith(lowercase(basename(filename)), "_hr.dat")
+            num_wann, hoppings = parse_wannier90_hr(filename)
+            return MultiOrbitalTightBinding(system, num_wann, hoppings, EF)
+        end
+        error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
     end
-    error("Unrecognized Wannier90 file type for $filename. Expected seedname_hr.dat or seedname_tb.dat suffix.")
 end
 
 """
@@ -124,9 +154,15 @@ Construct a `MultiOrbitalTightBinding` model directly from a `wannier90_tb.dat`
 file using the standalone cell stored in the TB data.
 """
 function build_model_from_wannier90(filename::String, EF::Float64, periodicity=nothing)
-    endswith(lowercase(basename(filename)), "_tb.dat") || error("A standalone cell can only be reconstructed from a Wannier90 TB file.")
-    parsed = parse_wannier90_tb(filename; periodicity)
-    return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+    return with_stage_log(
+        "Build model from Wannier90";
+        context=(filename=filename, periodicity=periodicity, EF=EF),
+        summarize_result=model_summary,
+    ) do
+        endswith(lowercase(basename(filename)), "_tb.dat") || error("A standalone cell can only be reconstructed from a Wannier90 TB file.")
+        parsed = parse_wannier90_tb(filename; periodicity)
+        return MultiOrbitalTightBinding(parsed.cell, parsed.num_wann, parsed.hoppings, EF)
+    end
 end
 
 """
@@ -147,13 +183,19 @@ function kpath_from_wannier90_kpoints(
     labelinfo::Union{Nothing, NamedTuple}=nothing,
     coordinates::Symbol=:fractional,
 )
-    node_labels = labelinfo === nothing ? nothing : _wannier90_node_labels(labelinfo, length(kpoints))
-    return kpath_from_quantum_espresso_bands(
-        kpoints;
-        cell=cell,
-        coordinates=coordinates,
-        node_labels=node_labels,
-    )
+    return with_stage_log(
+        "Build KPath from Wannier90 k-points";
+        context=(n_kpoints=length(kpoints), cell=cell_summary(cell), coordinates=coordinates, has_labelinfo=!isnothing(labelinfo)),
+        summarize_result=kpath_summary,
+    ) do
+        node_labels = labelinfo === nothing ? nothing : _wannier90_node_labels(labelinfo, length(kpoints))
+        return kpath_from_quantum_espresso_bands(
+            kpoints;
+            cell=cell,
+            coordinates=coordinates,
+            node_labels=node_labels,
+        )
+    end
 end
 
 function kpath_from_wannier90_kpoints(
@@ -185,29 +227,35 @@ function kpath_from_wannier90_bands(
     distances::AbstractVector{<:Real};
     labelinfo::Union{Nothing, NamedTuple}=nothing,
 )
-    isempty(distances) && throw(ArgumentError("`distances` must contain at least one Wannier90 path sample."))
+    return with_stage_log(
+        "Build KPath from Wannier90 band distances";
+        context=(n_distances=length(distances), has_labelinfo=!isnothing(labelinfo)),
+        summarize_result=kpath_summary,
+    ) do
+        isempty(distances) && throw(ArgumentError("`distances` must contain at least one Wannier90 path sample."))
 
-    distance_values = collect(Float64.(distances))
-    any(diff(distance_values) .< -1e-10) && throw(ArgumentError("Wannier90 path distances must be nondecreasing."))
+        distance_values = collect(Float64.(distances))
+        any(diff(distance_values) .< -1e-10) && throw(ArgumentError("Wannier90 path distances must be nondecreasing."))
 
-    dimension = labelinfo === nothing ? 1 : Int(labelinfo.dimension)
-    points = _wannier90_synthetic_path_points(distance_values, dimension)
-    basis = [SVector{dimension, Float64}(ntuple(i -> i == axis ? 1.0 : 0.0, dimension)) for axis in 1:dimension]
-    labels = Dict{Int, Symbol}()
+        dimension = labelinfo === nothing ? 1 : Int(labelinfo.dimension)
+        points = _wannier90_synthetic_path_points(distance_values, dimension)
+        basis = [SVector{dimension, Float64}(ntuple(i -> i == axis ? 1.0 : 0.0, dimension)) for axis in 1:dimension]
+        labels = Dict{Int, Symbol}()
 
-    if labelinfo !== nothing
-        length(labelinfo.node_labels) == length(labelinfo.node_indices) == length(labelinfo.node_distances) ||
-            throw(DimensionMismatch("Wannier90 labelinfo metadata lengths must agree."))
+        if labelinfo !== nothing
+            length(labelinfo.node_labels) == length(labelinfo.node_indices) == length(labelinfo.node_distances) ||
+                throw(DimensionMismatch("Wannier90 labelinfo metadata lengths must agree."))
 
-        for (idx, label, distance) in zip(labelinfo.node_indices, labelinfo.node_labels, labelinfo.node_distances)
-            1 <= idx <= length(distance_values) || throw(BoundsError(distance_values, idx))
-            isapprox(distance_values[idx], distance; atol=1e-6, rtol=1e-6) ||
-                error("Wannier90 label distance mismatch at index $idx: file gives $distance but the band path contains $(distance_values[idx]).")
-            labels[idx] = Symbol(label)
+            for (idx, label, distance) in zip(labelinfo.node_indices, labelinfo.node_labels, labelinfo.node_distances)
+                1 <= idx <= length(distance_values) || throw(BoundsError(distance_values, idx))
+                isapprox(distance_values[idx], distance; atol=1e-6, rtol=1e-6) ||
+                    error("Wannier90 label distance mismatch at index $idx: file gives $distance but the band path contains $(distance_values[idx]).")
+                labels[idx] = Symbol(label)
+            end
         end
-    end
 
-    return KPath{dimension}([points], [labels], basis, Ref(Brillouin.CARTESIAN))
+        return KPath{dimension}([points], [labels], basis, Ref(Brillouin.CARTESIAN))
+    end
 end
 
 """
@@ -221,11 +269,17 @@ function band_data_from_wannier90_bands(
     bands_filename::String;
     labelinfo_filename::Union{Nothing, AbstractString}=nothing,
 )
-    parsed = parse_wannier90_band_dat(bands_filename)
-    resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
-    labelinfo = resolved_labelinfo === nothing ? nothing : parse_wannier90_labelinfo(resolved_labelinfo)
-    kpath = kpath_from_wannier90_bands(parsed.distances; labelinfo)
-    return BandStructureData(kpath, parsed.bands, parsed.num_bands)
+    return with_stage_log(
+        "Build band data from Wannier90 bands";
+        context=(bands_filename=bands_filename, labelinfo_filename=labelinfo_filename),
+        summarize_result=band_data_summary,
+    ) do
+        parsed = parse_wannier90_band_dat(bands_filename)
+        resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
+        labelinfo = resolved_labelinfo === nothing ? nothing : parse_wannier90_labelinfo(resolved_labelinfo)
+        kpath = kpath_from_wannier90_bands(parsed.distances; labelinfo)
+        return BandStructureData(kpath, parsed.bands, parsed.num_bands)
+    end
 end
 
 """
@@ -249,46 +303,52 @@ function compare_wannier90_tb_to_bands(
     labelinfo_filename::Union{Nothing, AbstractString}=nothing,
     energy_shift::Union{Nothing, Real}=nothing,
 )
-    resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
-    resolved_kpoints = isnothing(kpoints_filename) ? _infer_wannier90_kpoints_filename(bands_filename) : String(kpoints_filename)
-    resolved_kpoints === nothing &&
-        error("Could not infer a Wannier90 `*.kpt` file from $bands_filename. Pass `kpoints_filename=...` explicitly.")
+    return with_stage_log(
+        "Compare Wannier90 TB to bands";
+        context=(model=model_summary(model), bands_filename=bands_filename, kpoints_filename=kpoints_filename, labelinfo_filename=labelinfo_filename, energy_shift=energy_shift),
+        summarize_result=comparison_summary,
+    ) do
+        resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
+        resolved_kpoints = isnothing(kpoints_filename) ? _infer_wannier90_kpoints_filename(bands_filename) : String(kpoints_filename)
+        resolved_kpoints === nothing &&
+            error("Could not infer a Wannier90 `*.kpt` file from $bands_filename. Pass `kpoints_filename=...` explicitly.")
 
-    labelinfo = resolved_labelinfo === nothing ? nothing : parse_wannier90_labelinfo(resolved_labelinfo)
-    parsed_kpoints = parse_wannier90_kpoints(resolved_kpoints)
-    reference = band_data_from_wannier90_bands(bands_filename; labelinfo_filename=resolved_labelinfo)
-    model_kpath = kpath_from_wannier90_kpoints(
-        parsed_kpoints.kpoints;
-        cell=model.cell,
-        labelinfo=labelinfo,
-        coordinates=:fractional,
-    )
-    model_data = compute_band_data(model, model_kpath)
+        labelinfo = resolved_labelinfo === nothing ? nothing : parse_wannier90_labelinfo(resolved_labelinfo)
+        parsed_kpoints = parse_wannier90_kpoints(resolved_kpoints)
+        reference = band_data_from_wannier90_bands(bands_filename; labelinfo_filename=resolved_labelinfo)
+        model_kpath = kpath_from_wannier90_kpoints(
+            parsed_kpoints.kpoints;
+            cell=model.cell,
+            labelinfo=labelinfo,
+            coordinates=:fractional,
+        )
+        model_data = compute_band_data(model, model_kpath)
 
-    size(reference.bands) == size(model_data.bands) ||
-        throw(DimensionMismatch("Wannier90 reference bands and model bands must have the same shape for comparison."))
+        size(reference.bands) == size(model_data.bands) ||
+            throw(DimensionMismatch("Wannier90 reference bands and model bands must have the same shape for comparison."))
 
-    remapped_model = BandStructureData(reference.kpath, copy(model_data.bands), model_data.num_bands)
-    shift = if isnothing(energy_shift)
-        total_difference = sum(reference.bands .- remapped_model.bands)
-        total_difference / length(reference.bands)
-    else
-        Float64(energy_shift)
+        remapped_model = BandStructureData(reference.kpath, copy(model_data.bands), model_data.num_bands)
+        shift = if isnothing(energy_shift)
+            total_difference = sum(reference.bands .- remapped_model.bands)
+            total_difference / length(reference.bands)
+        else
+            Float64(energy_shift)
+        end
+        shifted_bands = remapped_model.bands .+ shift
+        difference = reference.bands .- shifted_bands
+        shifted_model = BandStructureData(reference.kpath, shifted_bands, remapped_model.num_bands)
+
+        return Wannier90BandComparison(
+            reference,
+            remapped_model,
+            shifted_model,
+            parsed_kpoints.kpoints,
+            shift,
+            sqrt(sum(difference .^ 2) / length(difference)),
+            maximum(abs.(difference)),
+            difference,
+        )
     end
-    shifted_bands = remapped_model.bands .+ shift
-    difference = reference.bands .- shifted_bands
-    shifted_model = BandStructureData(reference.kpath, shifted_bands, remapped_model.num_bands)
-
-    return Wannier90BandComparison(
-        reference,
-        remapped_model,
-        shifted_model,
-        parsed_kpoints.kpoints,
-        shift,
-        sqrt(sum(difference .^ 2) / length(difference)),
-        maximum(abs.(difference)),
-        difference,
-    )
 end
 
 function compare_wannier90_tb_to_bands(
