@@ -14,6 +14,10 @@ using QuadGK
 using Optim
 using Distributed
 using SparseArrays
+using Logging
+using TimerOutputs
+
+const TO = TimerOutput()
 
 # 1. Fundamental Constants and Linear Algebra (Base Tier)
 include("Constants.jl")
@@ -80,6 +84,9 @@ include("Visualization/geometry.jl")
 include("Visualization/bands.jl")
 include("Visualization/responses.jl")
 
+# 5.5 Logging helpers
+include("LoggingUtils.jl")
+
 # 6. Backward Compatibility and Aliases
 const LindhardSusceptibility = GeneralizedSusceptibility
 
@@ -117,7 +124,7 @@ export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLine
 export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
 
 # Solvers
-export ApproximationLevel, ExactTrLn, RPA
+export ApproximationLevel, ExactTrLn, RPA, TO
 export Engine, GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLayout, AssemblySpectrum, DenseEigenSolver, SparseEigenSolverHook, bootstrap_engine_workers!, grid_samples, assemble_grid_vector, assemble_grid_matrix, assemble_sparse_grid_matrix, assemble_block_grid_matrix, assemble_sparse_block_grid_matrix, assemble_block_diagonal_matrix, assemble_sparse_block_diagonal_matrix, solve_assembled_eigensystem, integrate_grid, distributed_map_grid
 export SampledHamiltonianAssembly, assemble_sampled_hamiltonian, solve_sampled_hamiltonian
 export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
