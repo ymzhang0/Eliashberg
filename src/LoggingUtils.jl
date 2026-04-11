@@ -2,6 +2,8 @@ const _LOG_STAGE_GROUP = :eliashberg_stage
 
 function _stage_log(level::LogLevel, message::AbstractString; kwargs...)
     logger = current_logger()
+    Logging.min_enabled_level(logger) <= level || return nothing
+    Logging.shouldlog(logger, level, @__MODULE__, _LOG_STAGE_GROUP, nothing) || return nothing
     Logging.handle_message(
         logger,
         level,
@@ -71,6 +73,31 @@ function axis_summary(axis)
     return (
         type=string(typeof(axis)),
         length=length(axis),
+    )
+end
+
+function layout_summary(layout::UniformBlockLayout)
+    return (
+        type="UniformBlockLayout",
+        row_block_size=layout.row_block_size,
+        col_block_size=layout.col_block_size,
+    )
+end
+
+function layout_summary(layout::BlockAxisLayout)
+    return (
+        n_blocks=length(layout.block_sizes),
+        total_size=layout.total_size,
+        min_block=minimum(layout.block_sizes),
+        max_block=maximum(layout.block_sizes),
+    )
+end
+
+function layout_summary(layout::VariableBlockLayout)
+    return (
+        type="VariableBlockLayout",
+        row_axis=layout_summary(layout.row_axis),
+        col_axis=layout_summary(layout.col_axis),
     )
 end
 

@@ -1,7 +1,17 @@
 module Engine
 
 using Distributed
-using ..Eliashberg: AbstractKGrid
+using Logging
+using TimerOutputs
+using ..Eliashberg: AbstractKGrid, TO
+
+_eliashberg_parent() = parentmodule(@__MODULE__)
+_with_stage_log(args...; kwargs...) = getproperty(_eliashberg_parent(), :with_stage_log)(args...; kwargs...)
+_grid_summary(args...) = getproperty(_eliashberg_parent(), :grid_summary)(args...)
+_axis_summary(args...) = getproperty(_eliashberg_parent(), :axis_summary)(args...)
+_layout_summary(args...) = getproperty(_eliashberg_parent(), :layout_summary)(args...)
+_matrix_summary(args...) = getproperty(_eliashberg_parent(), :matrix_summary)(args...)
+_spectrum_summary(args...) = getproperty(_eliashberg_parent(), :spectrum_summary)(args...)
 
 include("reduce.jl")
 include("map.jl")

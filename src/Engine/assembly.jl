@@ -92,7 +92,13 @@ Assemble a dense vector by mapping a local kernel over a single discretized
 sample axis.
 """
 function assemble_grid_vector(f::F, axis; kwargs...) where {F}
-    return distributed_map_grid(f, axis; kwargs...)
+    return _with_stage_log(
+        "Assemble grid vector";
+        context=(kernel=string(typeof(f)), axis=_axis_summary(axis)),
+        summarize_result=result -> (length=length(result), eltype=string(eltype(result))),
+    ) do
+        @timeit TO "Vector Assembly" return distributed_map_grid(f, axis; kwargs...)
+    end
 end
 
 """
@@ -102,7 +108,13 @@ Assemble a dense matrix by mapping a local kernel over the Cartesian product of
 two discretized sample axes.
 """
 function assemble_grid_matrix(f::F, row_axis, col_axis; kwargs...) where {F}
-    return distributed_map_grid(f, row_axis, col_axis; kwargs...)
+    return _with_stage_log(
+        "Assemble grid matrix";
+        context=(kernel=string(typeof(f)), row_axis=_axis_summary(row_axis), col_axis=_axis_summary(col_axis)),
+        summarize_result=_matrix_summary,
+    ) do
+        @timeit TO "Matrix Assembly" return distributed_map_grid(f, row_axis, col_axis; kwargs...)
+    end
 end
 
 """
@@ -112,13 +124,25 @@ Assemble a dense block-diagonal matrix by mapping a block-valued local kernel
 over a single sample axis and packing the returned blocks along the diagonal.
 """
 function assemble_block_diagonal_matrix(f::F, axis, layout::UniformBlockLayout; kwargs...) where {F}
-    blocks = assemble_grid_vector(f, axis; kwargs...)
-    return _dense_block_diagonal_matrix(blocks, layout)
+    return _with_stage_log(
+        "Assemble block diagonal matrix";
+        context=(kernel=string(typeof(f)), axis=_axis_summary(axis), layout=_layout_summary(layout), storage=:dense),
+        summarize_result=_matrix_summary,
+    ) do
+        blocks = assemble_grid_vector(f, axis; kwargs...)
+        return _dense_block_diagonal_matrix(blocks, layout)
+    end
 end
 
 function assemble_block_diagonal_matrix(f::F, axis, layout::VariableBlockLayout; kwargs...) where {F}
-    blocks = assemble_grid_vector(f, axis; kwargs...)
-    return _dense_block_diagonal_matrix(blocks, layout)
+    return _with_stage_log(
+        "Assemble block diagonal matrix";
+        context=(kernel=string(typeof(f)), axis=_axis_summary(axis), layout=_layout_summary(layout), storage=:dense),
+        summarize_result=_matrix_summary,
+    ) do
+        blocks = assemble_grid_vector(f, axis; kwargs...)
+        return _dense_block_diagonal_matrix(blocks, layout)
+    end
 end
 
 """
@@ -135,8 +159,14 @@ function assemble_sparse_block_diagonal_matrix(
     atol::Real=0.0,
     kwargs...
 ) where {F}
-    blocks = assemble_grid_vector(f, axis; kwargs...)
-    return _sparse_block_diagonal_matrix(blocks, layout, atol)
+    return _with_stage_log(
+        "Assemble sparse block diagonal matrix";
+        context=(kernel=string(typeof(f)), axis=_axis_summary(axis), layout=_layout_summary(layout), atol=Float64(atol), storage=:sparse),
+        summarize_result=_matrix_summary,
+    ) do
+        blocks = assemble_grid_vector(f, axis; kwargs...)
+        return _sparse_block_diagonal_matrix(blocks, layout, atol)
+    end
 end
 
 function assemble_sparse_block_diagonal_matrix(
@@ -146,8 +176,14 @@ function assemble_sparse_block_diagonal_matrix(
     atol::Real=0.0,
     kwargs...
 ) where {F}
-    blocks = assemble_grid_vector(f, axis; kwargs...)
-    return _sparse_block_diagonal_matrix(blocks, layout, atol)
+    return _with_stage_log(
+        "Assemble sparse block diagonal matrix";
+        context=(kernel=string(typeof(f)), axis=_axis_summary(axis), layout=_layout_summary(layout), atol=Float64(atol), storage=:sparse),
+        summarize_result=_matrix_summary,
+    ) do
+        blocks = assemble_grid_vector(f, axis; kwargs...)
+        return _sparse_block_diagonal_matrix(blocks, layout, atol)
+    end
 end
 
 """
@@ -164,14 +200,22 @@ function assemble_sparse_grid_matrix(
     atol::Real=0.0,
     kwargs...
 ) where {F}
-    row_values = collect(row_axis)
-    col_values = collect(col_axis)
-    entries = _map_parameter_task(
-        SparseScalarAssemblyTask(f, row_values, col_values, atol),
-        (length(row_values), length(col_values));
-        kwargs...
-    )
-    return _sparse_matrix_from_entries(entries, length(row_values), length(col_values))
+    return _with_stage_log(
+        "Assemble sparse grid matrix";
+        context=(kernel=string(typeof(f)), row_axis=_axis_summary(row_axis), col_axis=_axis_summary(col_axis), atol=Float64(atol)),
+        summarize_result=_matrix_summary,
+    ) do
+        @timeit TO "Sparse Matrix Assembly" begin
+            row_values = collect(row_axis)
+            col_values = collect(col_axis)
+            entries = _map_parameter_task(
+                SparseScalarAssemblyTask(f, row_values, col_values, atol),
+                (length(row_values), length(col_values));
+                kwargs...
+            )
+            return _sparse_matrix_from_entries(entries, length(row_values), length(col_values))
+        end
+    end
 end
 
 """
@@ -188,8 +232,16 @@ function assemble_block_grid_matrix(
     layout::UniformBlockLayout;
     kwargs...
 ) where {F}
-    blocks = distributed_map_grid(f, row_axis, col_axis; kwargs...)
-    return _dense_block_matrix(blocks, layout)
+    return _with_stage_log(
+        "Assemble block grid matrix";
+        context=(kernel=string(typeof(f)), row_axis=_axis_summary(row_axis), col_axis=_axis_summary(col_axis), layout=_layout_summary(layout), storage=:dense),
+        summarize_result=_matrix_summary,
+    ) do
+        @timeit TO "Block Matrix Assembly" begin
+            blocks = distributed_map_grid(f, row_axis, col_axis; kwargs...)
+            return _dense_block_matrix(blocks, layout)
+        end
+    end
 end
 
 function assemble_block_grid_matrix(
@@ -199,8 +251,14 @@ function assemble_block_grid_matrix(
     layout::VariableBlockLayout;
     kwargs...
 ) where {F}
-    blocks = distributed_map_grid(f, row_axis, col_axis; kwargs...)
-    return _dense_block_matrix(blocks, layout)
+    return _with_stage_log(
+        "Assemble block grid matrix";
+        context=(kernel=string(typeof(f)), row_axis=_axis_summary(row_axis), col_axis=_axis_summary(col_axis), layout=_layout_summary(layout), storage=:dense),
+        summarize_result=_matrix_summary,
+    ) do
+        blocks = distributed_map_grid(f, row_axis, col_axis; kwargs...)
+        return _dense_block_matrix(blocks, layout)
+    end
 end
 
 """
@@ -218,14 +276,22 @@ function assemble_sparse_block_grid_matrix(
     atol::Real=0.0,
     kwargs...
 ) where {F}
-    row_values = collect(row_axis)
-    col_values = collect(col_axis)
-    entries = _map_parameter_task(
-        SparseBlockAssemblyTask(f, row_values, col_values, layout, atol),
-        (length(row_values), length(col_values));
-        kwargs...
-    )
-    return _sparse_block_matrix_from_entries(entries, length(row_values), length(col_values), layout, atol)
+    return _with_stage_log(
+        "Assemble sparse block grid matrix";
+        context=(kernel=string(typeof(f)), row_axis=_axis_summary(row_axis), col_axis=_axis_summary(col_axis), layout=_layout_summary(layout), atol=Float64(atol), storage=:sparse),
+        summarize_result=_matrix_summary,
+    ) do
+        @timeit TO "Sparse Block Matrix Assembly" begin
+            row_values = collect(row_axis)
+            col_values = collect(col_axis)
+            entries = _map_parameter_task(
+                SparseBlockAssemblyTask(f, row_values, col_values, layout, atol),
+                (length(row_values), length(col_values));
+                kwargs...
+            )
+            return _sparse_block_matrix_from_entries(entries, length(row_values), length(col_values), layout, atol)
+        end
+    end
 end
 
 function assemble_sparse_block_grid_matrix(
@@ -236,14 +302,20 @@ function assemble_sparse_block_grid_matrix(
     atol::Real=0.0,
     kwargs...
 ) where {F}
-    row_values = collect(row_axis)
-    col_values = collect(col_axis)
-    entries = _map_parameter_task(
-        SparseBlockAssemblyTask(f, row_values, col_values, layout, atol),
-        (length(row_values), length(col_values));
-        kwargs...
-    )
-    return _sparse_block_matrix_from_entries(entries, length(row_values), length(col_values), layout, atol)
+    return _with_stage_log(
+        "Assemble sparse block grid matrix";
+        context=(kernel=string(typeof(f)), row_axis=_axis_summary(row_axis), col_axis=_axis_summary(col_axis), layout=_layout_summary(layout), atol=Float64(atol), storage=:sparse),
+        summarize_result=_matrix_summary,
+    ) do
+        row_values = collect(row_axis)
+        col_values = collect(col_axis)
+        entries = _map_parameter_task(
+            SparseBlockAssemblyTask(f, row_values, col_values, layout, atol),
+            (length(row_values), length(col_values));
+            kwargs...
+        )
+        return _sparse_block_matrix_from_entries(entries, length(row_values), length(col_values), layout, atol)
+    end
 end
 
 struct SparseScalarAssemblyEntry{T}

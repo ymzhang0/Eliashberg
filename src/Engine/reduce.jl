@@ -7,24 +7,31 @@ multithreaded reduction where each spawned task owns an independent partial
 sum before the final serial combine step.
 """
 function integrate_grid(f::F, grid::AbstractKGrid) where {F}
-    n_items = length(grid)
-    n_items == 0 && throw(ArgumentError("integrate_grid requires a non-empty grid."))
+    return _with_stage_log(
+        "Integrate grid";
+        level=Logging.Debug,
+        context=(kernel=string(typeof(f)), grid=_grid_summary(grid), n_chunks=min(length(grid), max(1, Threads.nthreads()))),
+        summarize_result=result -> (result_type=string(typeof(result)),),
+    ) do
+        n_items = length(grid)
+        n_items == 0 && throw(ArgumentError("integrate_grid requires a non-empty grid."))
 
-    schedule = ChunkedGridReduction(f, grid, min(n_items, max(1, Threads.nthreads())))
-    tasks = Vector{Task}(undef, length(schedule.ranges))
+        schedule = ChunkedGridReduction(f, grid, min(n_items, max(1, Threads.nthreads())))
+        tasks = Vector{Task}(undef, length(schedule.ranges))
 
-    for idx in eachindex(schedule.ranges)
-        chunk = schedule.ranges[idx]
-        chunk_task = GridChunkTask(schedule.reducer, first(chunk), last(chunk))
-        tasks[idx] = Threads.@spawn chunk_task()
+        for idx in eachindex(schedule.ranges)
+            chunk = schedule.ranges[idx]
+            chunk_task = GridChunkTask(schedule.reducer, first(chunk), last(chunk))
+            tasks[idx] = Threads.@spawn chunk_task()
+        end
+
+        total = fetch(tasks[1])
+        for idx in 2:length(tasks)
+            total += fetch(tasks[idx])
+        end
+
+        return total
     end
-
-    total = fetch(tasks[1])
-    for idx in 2:length(tasks)
-        total += fetch(tasks[idx])
-    end
-
-    return total
 end
 
 struct WeightedGridReducer{F,G<:AbstractKGrid}

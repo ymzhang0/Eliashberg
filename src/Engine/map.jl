@@ -11,16 +11,22 @@ function bootstrap_engine_workers!(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 )
-    target = max(0, Int(n_workers))
-    current = Distributed.nworkers()
+    return _with_stage_log(
+        "Bootstrap engine workers";
+        context=(target_workers=max(0, Int(n_workers)), current_workers=Distributed.nworkers(), project=project, restrict=restrict),
+        summarize_result=result -> (n_workers=length(result), worker_ids=collect(result)),
+    ) do
+        target = max(0, Int(n_workers))
+        current = Distributed.nworkers()
 
-    if current < target
-        _add_engine_workers!(target - current, project, restrict)
+        if current < target
+            _add_engine_workers!(target - current, project, restrict)
+        end
+
+        worker_ids = Distributed.workers()
+        _load_engine_runtime!(worker_ids, project)
+        return worker_ids
     end
-
-    worker_ids = Distributed.workers()
-    _load_engine_runtime!(worker_ids, project)
-    return worker_ids
 end
 
 """
@@ -44,21 +50,37 @@ function distributed_map_grid(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {F}
-    length(grids) == 0 && throw(ArgumentError("distributed_map_grid requires at least one parameter axis."))
+    return _with_stage_log(
+        "Distributed map";
+        context=(
+            kernel=string(typeof(f)),
+            n_axes=length(grids),
+            axes=[_axis_summary(_parameter_axis(grid)) for grid in grids],
+            bootstrap_workers=bootstrap_workers,
+            requested_workers=Int(n_workers),
+            project=project,
+            restrict=restrict,
+        ),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+    ) do
+        @timeit TO "Distributed Map" begin
+            length(grids) == 0 && throw(ArgumentError("distributed_map_grid requires at least one parameter axis."))
 
-    axes_tuple = map(_parameter_axis, grids)
-    dims = map(length, axes_tuple)
-    map_task = ParameterMapTask(f, axes_tuple)
-    values = _map_parameter_task(
-        map_task,
-        Tuple(dims);
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
+            axes_tuple = map(_parameter_axis, grids)
+            dims = map(length, axes_tuple)
+            map_task = ParameterMapTask(f, axes_tuple)
+            values = _map_parameter_task(
+                map_task,
+                Tuple(dims);
+                bootstrap_workers=bootstrap_workers,
+                n_workers=n_workers,
+                project=project,
+                restrict=restrict
+            )
 
-    return reshape(values, dims...)
+            return reshape(values, dims...)
+        end
+    end
 end
 
 struct ParameterMapTask{F,A}
@@ -82,14 +104,20 @@ function _map_parameter_task(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 )
-    bootstrap_workers && bootstrap_engine_workers!(n_workers; project=project, restrict=restrict)
-    index_space = collect(CartesianIndices(dims))
+    return _with_stage_log(
+        "Map parameter task";
+        context=(dims=dims, bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers), current_workers=Distributed.nworkers()),
+        summarize_result=result -> (n_results=length(result), execution_mode=Distributed.nworkers() > 1 ? :distributed : :serial),
+    ) do
+        bootstrap_workers && bootstrap_engine_workers!(n_workers; project=project, restrict=restrict)
+        index_space = collect(CartesianIndices(dims))
 
-    if Distributed.nworkers() > 1
-        return Distributed.pmap(map_task, index_space)
+        if Distributed.nworkers() > 1
+            return Distributed.pmap(map_task, index_space)
+        end
+
+        return map(map_task, index_space)
     end
-
-    return map(map_task, index_space)
 end
 
 function _add_engine_workers!(n_new::Int, project::Union{Nothing,AbstractString}, restrict::Bool)

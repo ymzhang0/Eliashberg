@@ -54,11 +54,24 @@ require an explicit `SparseEigenSolverHook` unless the caller opts into dense
 fallback by passing `solver=DenseEigenSolver()`.
 """
 function solve_assembled_eigensystem(matrix::AbstractMatrix; solver=DenseEigenSolver(), kwargs...)
-    return _solve_assembled_eigensystem(solver, matrix; kwargs...)
+    return _with_stage_log(
+        "Solve assembled eigensystem";
+        context=(matrix=_matrix_summary(matrix), solver=string(typeof(solver))),
+        summarize_result=_spectrum_summary,
+    ) do
+        @timeit TO "Eigensystem Solve" return _solve_assembled_eigensystem(solver, matrix; kwargs...)
+    end
 end
 
 function solve_assembled_eigensystem(matrix::SparseMatrixCSC; solver=SparseEigenSolverHook(), kwargs...)
-    return _solve_assembled_eigensystem(solver, matrix; kwargs...)
+    solver isa DenseEigenSolver && @warn "Dense eigensolver requested for sparse assembled matrix; materializing a dense copy." matrix=_matrix_summary(matrix)
+    return _with_stage_log(
+        "Solve assembled eigensystem";
+        context=(matrix=_matrix_summary(matrix), solver=string(typeof(solver))),
+        summarize_result=_spectrum_summary,
+    ) do
+        @timeit TO "Eigensystem Solve" return _solve_assembled_eigensystem(solver, matrix; kwargs...)
+    end
 end
 
 function _solve_assembled_eigensystem(::DenseEigenSolver, matrix::AbstractMatrix; kwargs...)
