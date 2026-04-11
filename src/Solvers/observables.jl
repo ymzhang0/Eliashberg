@@ -1,5 +1,36 @@
 # observables.jl
 
+const _GROUND_STATE_DEBUG_EVERY = 5
+
+function _optimization_progress_callback(stage::AbstractString; every::Integer=_GROUND_STATE_DEBUG_EVERY)
+    callback_iteration = Ref(-1)
+
+    return state -> begin
+        callback_iteration[] += 1
+        iteration = callback_iteration[]
+
+        if iteration == 0 || iteration % every == 0
+            context = (iteration=iteration,)
+
+            if hasproperty(state, :f_x)
+                context = (; context..., objective=getproperty(state, :f_x))
+            end
+
+            if hasproperty(state, :x)
+                context = (; context..., x=Float64.(collect(getproperty(state, :x))))
+            end
+
+            if hasproperty(state, :g_x)
+                context = (; context..., grad_norm=norm(getproperty(state, :g_x)))
+            end
+
+            _stage_log(Logging.Debug, "$(stage) iteration"; stage, status=:progress, context)
+        end
+
+        return false
+    end
+end
+
 """
     solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=0.1, T=1e-3)
 
@@ -30,7 +61,8 @@ function solve_ground_state(
             phi_array[1], field, model, interaction, kgrid, approx; T=T
         )
 
-        optimization_result[] = optimize(objective, [phi_guess], BFGS())
+        options = Optim.Options(callback=_optimization_progress_callback("Solve ground state"))
+        optimization_result[] = optimize(objective, [phi_guess], BFGS(), options)
         !Optim.converged(optimization_result[]) && @warn "Ground-state optimization did not report convergence." field=field_summary(field) approx=approx_summary(approx) phi_guess=phi_guess iterations=Optim.iterations(optimization_result[]) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
         !isfinite_value(Optim.minimum(optimization_result[])) && @warn "Ground-state optimization produced a non-finite objective value." field=field_summary(field) approx=approx_summary(approx) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
         return Optim.minimizer(optimization_result[])[1]
@@ -68,7 +100,8 @@ function solve_ground_state(
         initial_guess = _composite_phi_guess(field, phi_guess)
         objective(phis) = evaluate_action(phis, field, model, interaction, kgrid, approx; T=T)
 
-        optimization_result[] = optimize(objective, initial_guess, LBFGS())
+        options = Optim.Options(callback=_optimization_progress_callback("Solve ground state"))
+        optimization_result[] = optimize(objective, initial_guess, LBFGS(), options)
         !Optim.converged(optimization_result[]) && @warn "Composite ground-state optimization did not report convergence." field=field_summary(field) approx=approx_summary(approx) phi_guess=phi_guess iterations=Optim.iterations(optimization_result[]) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
         !isfinite_value(Optim.minimum(optimization_result[])) && @warn "Composite ground-state optimization produced a non-finite objective value." field=field_summary(field) approx=approx_summary(approx) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
         return Float64.(Optim.minimizer(optimization_result[]))
