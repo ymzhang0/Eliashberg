@@ -79,13 +79,23 @@ function evaluate_action(
     ::ExactTrLn;
     T::Float64=1e-3
 )
-    term1 = _quadratic_action_term(phi, field, interaction, kgrid)
+    quadratic_term = Ref{Float64}(0.0)
+    tr_ln_term = Ref{Float64}(0.0)
 
-    mf_disp = MeanFieldDispersion(model, field, phi)
-    tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
-    tr_ln_sum = Engine.integrate_grid(tr_ln_kernel, kgrid)
+    return with_stage_log(
+        "Evaluate effective action";
+        level=Logging.Debug,
+        context=(phi=Float64(phi), field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx="ExactTrLn", T=T),
+        summarize_result=result -> (quadratic_term=quadratic_term[], tr_ln_term=tr_ln_term[], total_action=Float64(result)),
+    ) do
+        quadratic_term[] = _quadratic_action_term(phi, field, interaction, kgrid)
 
-    return term1 + tr_ln_sum
+        mf_disp = MeanFieldDispersion(model, field, phi)
+        tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
+        tr_ln_term[] = Engine.integrate_grid(tr_ln_kernel, kgrid)
+
+        return quadratic_term[] + tr_ln_term[]
+    end
 end
 
 # RPA action evaluation for a single scalar order parameter
@@ -98,14 +108,26 @@ function evaluate_action(
     ::RPA;
     T::Float64=1e-3
 )
-    normal_model = normal_state_basis(model, field)
-    chi0 = GeneralizedSusceptibility(normal_model, kgrid, field, T)
+    inverse_vertex_term = Ref{Float64}(0.0)
+    susceptibility_term = Ref{Float64}(0.0)
 
-    q_vec = _field_wavevector(field, kgrid)
-    V_total = V(q_vec, interaction)
-    chi_val = chi0(q_vec)
+    return with_stage_log(
+        "Evaluate effective action";
+        level=Logging.Debug,
+        context=(phi=Float64(phi), field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx="RPA", T=T),
+        summarize_result=result -> (inverse_vertex_term=inverse_vertex_term[], susceptibility_term=susceptibility_term[], total_action=Float64(result)),
+    ) do
+        normal_model = normal_state_basis(model, field)
+        chi0 = GeneralizedSusceptibility(normal_model, kgrid, field, T)
 
-    return (1.0 / abs(V_total) - real(chi_val)) * phi^2
+        q_vec = _field_wavevector(field, kgrid)
+        V_total = V(q_vec, interaction)
+        chi_val = chi0(q_vec)
+        inverse_vertex_term[] = 1.0 / abs(V_total)
+        susceptibility_term[] = real(chi_val)
+
+        return (inverse_vertex_term[] - susceptibility_term[]) * phi^2
+    end
 end
 
 function evaluate_action(
@@ -117,15 +139,25 @@ function evaluate_action(
     ::ExactTrLn;
     T::Float64=1e-3
 )
-    length(field) == length(phis) || throw(DimensionMismatch("Number of fields must match number of phis."))
-    length(field) == length(interaction) || throw(DimensionMismatch("Number of fields must match number of interactions."))
+    quadratic_term = Ref{Float64}(0.0)
+    tr_ln_term = Ref{Float64}(0.0)
 
-    term1 = _quadratic_action_term(field.fields, phis, interaction.interactions, kgrid, 1)
-    mf_disp = MeanFieldDispersion(model, field, phis)
-    tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
-    tr_ln_sum = Engine.integrate_grid(tr_ln_kernel, kgrid)
+    return with_stage_log(
+        "Evaluate effective action";
+        level=Logging.Debug,
+        context=(phis=Float64.(phis), field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx="ExactTrLn", T=T),
+        summarize_result=result -> (quadratic_term=quadratic_term[], tr_ln_term=tr_ln_term[], total_action=Float64(result)),
+    ) do
+        length(field) == length(phis) || throw(DimensionMismatch("Number of fields must match number of phis."))
+        length(field) == length(interaction) || throw(DimensionMismatch("Number of fields must match number of interactions."))
 
-    return term1 + tr_ln_sum
+        quadratic_term[] = _quadratic_action_term(field.fields, phis, interaction.interactions, kgrid, 1)
+        mf_disp = MeanFieldDispersion(model, field, phis)
+        tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
+        tr_ln_term[] = Engine.integrate_grid(tr_ln_kernel, kgrid)
+
+        return quadratic_term[] + tr_ln_term[]
+    end
 end
 
 function evaluate_action(

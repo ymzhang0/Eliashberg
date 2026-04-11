@@ -14,15 +14,25 @@ function solve_ground_state(
     phi_guess=0.1,
     T=1e-3
 )
-    # Build the scalar objective as a one-parameter closure.
-    objective(phi_array) = evaluate_action(
-        phi_array[1], field, model, interaction, kgrid, approx; T=T
-    )
+    optimization_result = Ref{Any}(nothing)
 
-    # Delegate the minimization to Optim.jl.
-    res = optimize(objective, [phi_guess], BFGS())
+    return with_stage_log(
+        "Solve ground state";
+        context=(field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx=approx_summary(approx), phi_guess=phi_guess, T=Float64(T)),
+        summarize_result=phi -> (
+            phi=Float64(phi),
+            converged=Optim.converged(optimization_result[]),
+            iterations=Optim.iterations(optimization_result[]),
+            minimum=Optim.minimum(optimization_result[]),
+        ),
+    ) do
+        objective(phi_array) = evaluate_action(
+            phi_array[1], field, model, interaction, kgrid, approx; T=T
+        )
 
-    return Optim.minimizer(res)[1]
+        optimization_result[] = optimize(objective, [phi_guess], BFGS())
+        return Optim.minimizer(optimization_result[])[1]
+    end
 end
 
 _composite_phi_guess(field::CompositeField, phi_guess::Real) = fill(Float64(phi_guess), length(field))
@@ -41,10 +51,22 @@ function solve_ground_state(
     phi_guess=0.1,
     T=1e-3
 )
-    initial_guess = _composite_phi_guess(field, phi_guess)
-    objective(phis) = evaluate_action(phis, field, model, interaction, kgrid, approx; T=T)
+    optimization_result = Ref{Any}(nothing)
 
-    res = optimize(objective, initial_guess, LBFGS())
+    return with_stage_log(
+        "Solve ground state";
+        context=(field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx=approx_summary(approx), phi_guess=phi_guess, T=Float64(T)),
+        summarize_result=phis -> (
+            phis=Float64.(phis),
+            converged=Optim.converged(optimization_result[]),
+            iterations=Optim.iterations(optimization_result[]),
+            minimum=Optim.minimum(optimization_result[]),
+        ),
+    ) do
+        initial_guess = _composite_phi_guess(field, phi_guess)
+        objective(phis) = evaluate_action(phis, field, model, interaction, kgrid, approx; T=T)
 
-    return Float64.(Optim.minimizer(res))
+        optimization_result[] = optimize(objective, initial_guess, LBFGS())
+        return Float64.(Optim.minimizer(optimization_result[]))
+    end
 end

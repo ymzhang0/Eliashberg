@@ -46,32 +46,52 @@ function solve_bcs(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    samples = Engine.grid_samples(kgrid)
-    kinetic_vector = Engine.assemble_grid_vector(
-        BCSKineticAssemblyTask(dispersion_model),
-        samples;
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
-    pairing_matrix = _assemble_bcs_pairing_matrix(
-        matrix_format,
-        samples,
-        interaction_model,
-        dispersion_model;
-        sparse_atol=sparse_atol,
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
+    return with_stage_log(
+        "Solve BCS";
+        context=(
+            grid=grid_summary(kgrid),
+            model=model_summary(dispersion_model),
+            interaction=interaction_summary(interaction_model),
+            matrix_format=matrix_format,
+            sparse_atol=Float64(sparse_atol),
+            bootstrap_workers=bootstrap_workers,
+            requested_workers=Int(n_workers),
+        ),
+        summarize_result=result -> (
+            n_eigenvalues=length(result[1]),
+            min_value=isempty(result[1]) ? nothing : minimum(result[1]),
+            max_value=isempty(result[1]) ? nothing : maximum(result[1]),
+        ),
+    ) do
+        @timeit TO "BCS Solver" begin
+            samples = Engine.grid_samples(kgrid)
+            kinetic_vector = Engine.assemble_grid_vector(
+                BCSKineticAssemblyTask(dispersion_model),
+                samples;
+                bootstrap_workers=bootstrap_workers,
+                n_workers=n_workers,
+                project=project,
+                restrict=restrict
+            )
+            pairing_matrix = @timeit TO "Pairing Matrix Assembly" _assemble_bcs_pairing_matrix(
+                matrix_format,
+                samples,
+                interaction_model,
+                dispersion_model;
+                sparse_atol=sparse_atol,
+                bootstrap_workers=bootstrap_workers,
+                n_workers=n_workers,
+                project=project,
+                restrict=restrict
+            )
 
-    H = _materialize_bcs_matrix(pairing_matrix)
-    H[diagind(H)] .+= kinetic_vector
+            H = _materialize_bcs_matrix(pairing_matrix)
+            H[diagind(H)] .+= kinetic_vector
 
-    spectrum = Engine.solve_assembled_eigensystem(H; solver=_resolve_bcs_eigensolver(H, eigensolver))
-    return spectrum.values, spectrum.vectors
+            spectrum = Engine.solve_assembled_eigensystem(H; solver=_resolve_bcs_eigensolver(H, eigensolver))
+            return spectrum.values, spectrum.vectors
+        end
+    end
 end
 
 function _assemble_bcs_pairing_matrix(
