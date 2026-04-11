@@ -37,6 +37,11 @@ end
 
 _safe_weight_sum(weights) = isempty(weights) ? 0.0 : sum(weights)
 
+isfinite_value(x::Real) = isfinite(x)
+isfinite_value(x::Complex) = isfinite(real(x)) && isfinite(imag(x))
+isfinite_value(values::AbstractArray) = all(isfinite_value, values)
+count_nonfinite(values) = count(value -> !isfinite_value(value), values)
+
 function grid_summary(grid::AbstractKGrid{D}) where {D}
     return (
         type=string(typeof(grid)),

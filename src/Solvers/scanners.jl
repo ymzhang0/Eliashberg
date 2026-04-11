@@ -48,7 +48,11 @@ function (task::RPASpectralFunctionTask{D})(q::SVector{D,Float64}, omega::Real) 
     vq = V(q, task.interaction)
     
     # 3. RPA Dyson 方程：当 1 - V*Re(χ₀) 接近 0 时，虚部会产生极锐的等离激元共振峰
-    chi_rpa = chi0 / (1.0 - vq * chi0)
+    denominator = 1.0 - vq * chi0
+    !isfinite_value(denominator) && @warn "RPA denominator became non-finite during spectral scan." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
+    abs(denominator) <= 100 * eps(Float64) && @warn "RPA denominator is numerically singular during spectral scan." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
+    chi_rpa = chi0 / denominator
+    !isfinite_value(chi_rpa) && @warn "RPA susceptibility became non-finite during spectral scan." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator chi_rpa=chi_rpa
     
     return imag(chi_rpa)
 end

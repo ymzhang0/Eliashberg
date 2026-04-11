@@ -73,6 +73,7 @@ function solve_bcs(
                 project=project,
                 restrict=restrict
             )
+            !isfinite_value(kinetic_vector) && @warn "BCS kinetic vector contains non-finite entries." nonfinite_entries=count_nonfinite(kinetic_vector) grid=grid_summary(kgrid) model=model_summary(dispersion_model)
             pairing_matrix = @timeit TO "Pairing Matrix Assembly" _assemble_bcs_pairing_matrix(
                 matrix_format,
                 samples,
@@ -87,8 +88,10 @@ function solve_bcs(
 
             H = _materialize_bcs_matrix(pairing_matrix)
             H[diagind(H)] .+= kinetic_vector
+            !isfinite_value(H) && @warn "BCS matrix contains non-finite entries before eigensolve." nonfinite_entries=count_nonfinite(H) matrix=matrix_summary(H)
 
             spectrum = Engine.solve_assembled_eigensystem(H; solver=_resolve_bcs_eigensolver(H, eigensolver))
+            !isfinite_value(spectrum.values) && @warn "BCS eigenspectrum contains non-finite eigenvalues." nonfinite_values=count_nonfinite(spectrum.values) matrix_format=matrix_format grid=grid_summary(kgrid)
             return spectrum.values, spectrum.vectors
         end
     end
@@ -181,6 +184,7 @@ _materialize_bcs_matrix(matrix::AbstractMatrix) = matrix
 _materialize_bcs_matrix(matrix::SparseMatrixCSC) = copy(matrix)
 
 function _resolve_bcs_eigensolver(::SparseMatrixCSC, eigensolver)
+    isnothing(eigensolver) && @warn "Sparse BCS matrix is using dense eigensolver fallback. Provide `eigensolver=Engine.SparseEigenSolverHook(...)` for large problems."
     return isnothing(eigensolver) ? Engine.DenseEigenSolver() : eigensolver
 end
 

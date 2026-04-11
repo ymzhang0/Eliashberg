@@ -35,7 +35,11 @@ function _quadratic_action_term(
     kgrid::AbstractKGrid
 )
     q_vec = _field_wavevector(field, kgrid)
-    return Float64(phi)^2 / abs(V(q_vec, interaction))
+    interaction_strength = abs(V(q_vec, interaction))
+    if !isfinite_value(interaction_strength) || interaction_strength <= sqrt(eps(Float64))
+        @warn "Quadratic action term is ill-conditioned because |V(q)| is too small or non-finite." field=field_summary(field) interaction=interaction_summary(interaction) q=q_vec abs_V=interaction_strength
+    end
+    return Float64(phi)^2 / interaction_strength
 end
 
 _quadratic_action_term(::Tuple{}, ::AbstractVector{<:Real}, ::Interaction, ::AbstractKGrid, ::Int) = 0.0
@@ -93,8 +97,11 @@ function evaluate_action(
         mf_disp = MeanFieldDispersion(model, field, phi)
         tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
         tr_ln_term[] = Engine.integrate_grid(tr_ln_kernel, kgrid)
+        (!isfinite_value(quadratic_term[]) || !isfinite_value(tr_ln_term[])) && @warn "Effective-action components contain non-finite values." field=field_summary(field) approx="ExactTrLn" quadratic_term=quadratic_term[] tr_ln_term=tr_ln_term[] T=T
 
-        return quadratic_term[] + tr_ln_term[]
+        total_action = quadratic_term[] + tr_ln_term[]
+        !isfinite_value(total_action) && @warn "Effective action evaluated to a non-finite value." field=field_summary(field) approx="ExactTrLn" phi=Float64(phi) total_action=total_action T=T
+        return total_action
     end
 end
 
@@ -122,11 +129,18 @@ function evaluate_action(
 
         q_vec = _field_wavevector(field, kgrid)
         V_total = V(q_vec, interaction)
+        interaction_strength = abs(V_total)
         chi_val = chi0(q_vec)
-        inverse_vertex_term[] = 1.0 / abs(V_total)
+        if !isfinite_value(interaction_strength) || interaction_strength <= sqrt(eps(Float64))
+            @warn "RPA action inverse vertex is ill-conditioned because |V(q)| is too small or non-finite." field=field_summary(field) interaction=interaction_summary(interaction) q=q_vec abs_V=interaction_strength
+        end
+        !isfinite_value(chi_val) && @warn "RPA susceptibility is non-finite during effective-action evaluation." field=field_summary(field) q=q_vec chi0=chi_val T=T
+        inverse_vertex_term[] = 1.0 / interaction_strength
         susceptibility_term[] = real(chi_val)
 
-        return (inverse_vertex_term[] - susceptibility_term[]) * phi^2
+        total_action = (inverse_vertex_term[] - susceptibility_term[]) * phi^2
+        !isfinite_value(total_action) && @warn "RPA effective action evaluated to a non-finite value." field=field_summary(field) phi=Float64(phi) q=q_vec total_action=total_action T=T
+        return total_action
     end
 end
 
@@ -155,8 +169,11 @@ function evaluate_action(
         mf_disp = MeanFieldDispersion(model, field, phis)
         tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
         tr_ln_term[] = Engine.integrate_grid(tr_ln_kernel, kgrid)
+        (!isfinite_value(quadratic_term[]) || !isfinite_value(tr_ln_term[])) && @warn "Composite effective-action components contain non-finite values." field=field_summary(field) approx="ExactTrLn" quadratic_term=quadratic_term[] tr_ln_term=tr_ln_term[] T=T
 
-        return quadratic_term[] + tr_ln_term[]
+        total_action = quadratic_term[] + tr_ln_term[]
+        !isfinite_value(total_action) && @warn "Composite effective action evaluated to a non-finite value." field=field_summary(field) phis=Float64.(phis) total_action=total_action T=T
+        return total_action
     end
 end
 

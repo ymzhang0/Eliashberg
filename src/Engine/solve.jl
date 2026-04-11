@@ -75,7 +75,9 @@ function solve_assembled_eigensystem(matrix::SparseMatrixCSC; solver=SparseEigen
 end
 
 function _solve_assembled_eigensystem(::DenseEigenSolver, matrix::AbstractMatrix; kwargs...)
+    !_isfinite_value(matrix) && @warn "Assembled matrix contains non-finite entries before dense eigensolve." matrix=_matrix_summary(matrix) nonfinite_entries=_count_nonfinite(matrix)
     eig = eigen(Matrix(matrix))
+    !_isfinite_value(eig.values) && @warn "Dense eigensolver returned non-finite eigenvalues." nonfinite_values=_count_nonfinite(eig.values) matrix=_matrix_summary(matrix)
     return AssemblySpectrum(eig.values, eig.vectors)
 end
 

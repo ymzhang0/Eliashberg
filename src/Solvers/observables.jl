@@ -31,6 +31,8 @@ function solve_ground_state(
         )
 
         optimization_result[] = optimize(objective, [phi_guess], BFGS())
+        !Optim.converged(optimization_result[]) && @warn "Ground-state optimization did not report convergence." field=field_summary(field) approx=approx_summary(approx) phi_guess=phi_guess iterations=Optim.iterations(optimization_result[]) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
+        !isfinite_value(Optim.minimum(optimization_result[])) && @warn "Ground-state optimization produced a non-finite objective value." field=field_summary(field) approx=approx_summary(approx) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
         return Optim.minimizer(optimization_result[])[1]
     end
 end
@@ -67,6 +69,8 @@ function solve_ground_state(
         objective(phis) = evaluate_action(phis, field, model, interaction, kgrid, approx; T=T)
 
         optimization_result[] = optimize(objective, initial_guess, LBFGS())
+        !Optim.converged(optimization_result[]) && @warn "Composite ground-state optimization did not report convergence." field=field_summary(field) approx=approx_summary(approx) phi_guess=phi_guess iterations=Optim.iterations(optimization_result[]) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
+        !isfinite_value(Optim.minimum(optimization_result[])) && @warn "Composite ground-state optimization produced a non-finite objective value." field=field_summary(field) approx=approx_summary(approx) minimum=Optim.minimum(optimization_result[]) T=Float64(T)
         return Float64.(Optim.minimizer(optimization_result[]))
     end
 end
