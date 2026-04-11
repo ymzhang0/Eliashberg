@@ -6,17 +6,23 @@
 Plot one or more band curves over a one-dimensional coordinate axis.
 """
 function plot_dispersion_curves(k_coords::AbstractVector{<:Real}, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
-    size(band_matrix, 1) == length(k_coords) || throw(DimensionMismatch("Band matrix row count must match the coordinate axis length."))
+    return with_stage_log(
+        "Plot dispersion curves";
+        context=(n_coords=length(k_coords), n_bands=size(band_matrix, 2), E_Fermi=Float64(E_Fermi)),
+        summarize_result=result -> (figure_type=string(typeof(result)),),
+    ) do
+        size(band_matrix, 1) == length(k_coords) || throw(DimensionMismatch("Band matrix row count must match the coordinate axis length."))
 
-    fig = Figure()
-    ax = Axis(fig[1, 1]; xlabel="k", ylabel="E(k)", title="1D Dispersion", axis...)
+        fig = Figure()
+        ax = Axis(fig[1, 1]; xlabel="k", ylabel="E(k)", title="1D Dispersion", axis...)
 
-    for band_idx in axes(band_matrix, 2)
-        lines!(ax, k_coords, band_matrix[:, band_idx]; label="Band $band_idx", kwargs...)
+        for band_idx in axes(band_matrix, 2)
+            lines!(ax, k_coords, band_matrix[:, band_idx]; label="Band $band_idx", kwargs...)
+        end
+
+        hlines!(ax, [E_Fermi], color=:black, linestyle=:dash, label="Fermi Level")
+        return fig
     end
-
-    hlines!(ax, [E_Fermi], color=:black, linestyle=:dash, label="Fermi Level")
-    return fig
 end
 
 """
@@ -25,15 +31,21 @@ end
 Plot a two-dimensional scalar field together with an iso-energy contour.
 """
 function plot_dispersion_surface(kxs::AbstractVector{<:Real}, kys::AbstractVector{<:Real}, energy_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
-    size(energy_matrix) == (length(kxs), length(kys)) || throw(DimensionMismatch("Energy matrix shape must match the provided axes."))
+    return with_stage_log(
+        "Plot dispersion surface";
+        context=(nx=length(kxs), ny=length(kys), E_Fermi=Float64(E_Fermi)),
+        summarize_result=result -> (figure_type=string(typeof(result)),),
+    ) do
+        size(energy_matrix) == (length(kxs), length(kys)) || throw(DimensionMismatch("Energy matrix shape must match the provided axes."))
 
-    fig = Figure()
-    ax = Axis(fig[1, 1]; xlabel=L"k_x", ylabel=L"k_y", title="2D Dispersion", axis...)
-    hm = heatmap!(ax, kxs, kys, energy_matrix; colormap=:viridis, kwargs...)
-    Colorbar(fig[1, 2], hm, label="Energy")
-    contour!(ax, kxs, kys, energy_matrix; levels=[E_Fermi], color=:red, linewidth=2, labels=true)
-    lines!(ax, [-π, π, π, -π, -π], [-π, -π, π, π, -π], color=:white, linestyle=:dash)
-    return fig
+        fig = Figure()
+        ax = Axis(fig[1, 1]; xlabel=L"k_x", ylabel=L"k_y", title="2D Dispersion", axis...)
+        hm = heatmap!(ax, kxs, kys, energy_matrix; colormap=:viridis, kwargs...)
+        Colorbar(fig[1, 2], hm, label="Energy")
+        contour!(ax, kxs, kys, energy_matrix; levels=[E_Fermi], color=:red, linewidth=2, labels=true)
+        lines!(ax, [-π, π, π, -π, -π], [-π, -π, π, π, -π], color=:white, linestyle=:dash)
+        return fig
+    end
 end
 
 plot_dispersion_surface(data::DispersionSurfaceData; kwargs...) =
@@ -119,36 +131,42 @@ function _band_path_axes!(
 end
 
 function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, band_color=:royalblue, axis=(;), kwargs...)
-    points = path_points(kpath)
-    size(band_matrix, 1) == length(points) || throw(DimensionMismatch("Band matrix row count must match the number of path samples."))
-    distances = path_distances(kpath)
-    node_indices, tick_labels = path_node_metadata(kpath)
-    branch_ranges = path_branch_ranges(kpath)
+    return with_stage_log(
+        "Plot band structure";
+        context=(kpath=kpath_summary(kpath), n_bands=size(band_matrix, 2), E_Fermi=Float64(E_Fermi)),
+        summarize_result=result -> (figure_type=string(typeof(result)),),
+    ) do
+        points = path_points(kpath)
+        size(band_matrix, 1) == length(points) || throw(DimensionMismatch("Band matrix row count must match the number of path samples."))
+        distances = path_distances(kpath)
+        node_indices, tick_labels = path_node_metadata(kpath)
+        branch_ranges = path_branch_ranges(kpath)
 
-    fig = Figure(size=(800, 600))
-    branch_grid = fig[1, 1] = GridLayout()
-    branch_axes = _band_path_axes!(
-        branch_grid,
-        distances,
-        node_indices,
-        tick_labels,
-        branch_ranges;
-        ylabel="Energy E(k)",
-        title="$(length(first(points)))D Band Structure",
-        axis=axis,
-    )
+        fig = Figure(size=(800, 600))
+        branch_grid = fig[1, 1] = GridLayout()
+        branch_axes = _band_path_axes!(
+            branch_grid,
+            distances,
+            node_indices,
+            tick_labels,
+            branch_ranges;
+            ylabel="Energy E(k)",
+            title="$(length(first(points)))D Band Structure",
+            axis=axis,
+        )
 
-    for band_idx in axes(band_matrix, 2)
-        for (ax, range) in zip(branch_axes, branch_ranges)
-            lines!(ax, distances[range], band_matrix[range, band_idx], color=band_color; linewidth=2.5, kwargs...)
+        for band_idx in axes(band_matrix, 2)
+            for (ax, range) in zip(branch_axes, branch_ranges)
+                lines!(ax, distances[range], band_matrix[range, band_idx], color=band_color; linewidth=2.5, kwargs...)
+            end
         end
-    end
 
-    for ax in branch_axes
-        hlines!(ax, [E_Fermi], color=(:black, 0.7), linestyle=:dash, linewidth=1.5)
-    end
+        for ax in branch_axes
+            hlines!(ax, [E_Fermi], color=(:black, 0.7), linestyle=:dash, linewidth=1.5)
+        end
 
-    return fig
+        return fig
+    end
 end
 
 plot_band_structure(data::BandStructureData; kwargs...) =
@@ -166,8 +184,14 @@ function plot_wannier90_band_structure(
     labelinfo_filename::Union{Nothing, AbstractString}=nothing,
     kwargs...
 )
-    data = band_data_from_wannier90_bands(bands_filename; labelinfo_filename)
-    return plot_band_structure(data; kwargs...)
+    return with_stage_log(
+        "Plot Wannier90 band structure";
+        context=(bands_filename=bands_filename, labelinfo_filename=labelinfo_filename),
+        summarize_result=result -> (figure_type=string(typeof(result)),),
+    ) do
+        data = band_data_from_wannier90_bands(bands_filename; labelinfo_filename)
+        return plot_band_structure(data; kwargs...)
+    end
 end
 
 """
@@ -197,48 +221,54 @@ function plot_wannier90_tb_band_comparison(
     legend_position=:rb,
     axis=(;),
 )
-    reference = comparison.reference
-    shifted_model = comparison.shifted_model
-    distances = path_distances(reference.kpath)
-    node_indices, labels = path_node_metadata(reference.kpath)
-    branch_ranges = path_branch_ranges(reference.kpath)
+    return with_stage_log(
+        "Plot Wannier90 TB comparison";
+        context=(comparison=comparison_summary(comparison), n_bands=size(comparison.reference.bands, 2)),
+        summarize_result=result -> (figure_type=string(typeof(result)),),
+    ) do
+        reference = comparison.reference
+        shifted_model = comparison.shifted_model
+        distances = path_distances(reference.kpath)
+        node_indices, labels = path_node_metadata(reference.kpath)
+        branch_ranges = path_branch_ranges(reference.kpath)
 
-    fig = Figure(size=(900, 650))
-    branch_grid = fig[1, 1] = GridLayout()
-    branch_axes = _band_path_axes!(
-        branch_grid,
-        distances,
-        node_indices,
-        labels,
-        branch_ranges;
-        ylabel="Energy (eV)",
-        title="Wannier90 TB vs band.dat",
-        axis=axis,
-    )
+        fig = Figure(size=(900, 650))
+        branch_grid = fig[1, 1] = GridLayout()
+        branch_axes = _band_path_axes!(
+            branch_grid,
+            distances,
+            node_indices,
+            labels,
+            branch_ranges;
+            ylabel="Energy (eV)",
+            title="Wannier90 TB vs band.dat",
+            axis=axis,
+        )
 
-    for band_idx in axes(reference.bands, 2)
-        for (range_idx, (ax, range)) in enumerate(zip(branch_axes, branch_ranges))
-            lines!(
-                ax,
-                distances[range],
-                shifted_model.bands[range, band_idx];
-                color=model_color,
-                linewidth=linewidth,
-                label=(band_idx == 1 && range_idx == 1 ? model_label : nothing),
-            )
-            scatter!(
-                ax,
-                distances[range],
-                reference.bands[range, band_idx];
-                color=reference_color,
-                markersize=markersize,
-                label=(band_idx == 1 && range_idx == 1 ? reference_label : nothing),
-            )
+        for band_idx in axes(reference.bands, 2)
+            for (range_idx, (ax, range)) in enumerate(zip(branch_axes, branch_ranges))
+                lines!(
+                    ax,
+                    distances[range],
+                    shifted_model.bands[range, band_idx];
+                    color=model_color,
+                    linewidth=linewidth,
+                    label=(band_idx == 1 && range_idx == 1 ? model_label : nothing),
+                )
+                scatter!(
+                    ax,
+                    distances[range],
+                    reference.bands[range, band_idx];
+                    color=reference_color,
+                    markersize=markersize,
+                    label=(band_idx == 1 && range_idx == 1 ? reference_label : nothing),
+                )
+            end
         end
-    end
 
-    axislegend(first(branch_axes), position=legend_position, framevisible=false)
-    return fig
+        axislegend(first(branch_axes), position=legend_position, framevisible=false)
+        return fig
+    end
 end
 
 """
@@ -255,20 +285,47 @@ function plot_fermi_surface(
     axis=(;),
     kwargs...
 )
-    size(energy_volume) == (length(kxs), length(kys), length(kzs)) || throw(DimensionMismatch("Volume shape must match the provided axes."))
+    return with_stage_log(
+        "Plot Fermi surface";
+        context=(nx=length(kxs), ny=length(kys), nz=length(kzs), E_Fermi=Float64(E_Fermi)),
+        summarize_result=result -> (figure_type=string(typeof(result)),),
+    ) do
+        size(energy_volume) == (length(kxs), length(kys), length(kzs)) || throw(DimensionMismatch("Volume shape must match the provided axes."))
 
-    fig = Figure(size=(900, 800), fontsize=16)
-    ax = Axis3(fig[1, 1]; xlabel=L"k_x", ylabel=L"k_y", zlabel=L"k_z",
-        title="Interactive 3D Fermi Surface", elevation=π / 6, azimuth=π / 4, axis...)
+        fig = Figure(size=(900, 800), fontsize=16)
+        ax = Axis3(
+            fig[1, 1];
+            xlabel=L"k_x",
+            ylabel=L"k_y",
+            zlabel=L"k_z",
+            title="Interactive 3D Fermi Surface",
+            elevation=π / 6,
+            azimuth=π / 4,
+            axis...,
+        )
 
-    E_min, E_max = minimum(energy_volume), maximum(energy_volume)
-    sg = SliderGrid(fig[2, 1], (label="μ (Fermi level)", range=range(E_min, E_max, length=300), startvalue=Float64(E_Fermi)))
-    mu_slider = sg.sliders[1].value
-    iso_level = lift(mu -> Float32[mu], mu_slider)
+        E_min, E_max = minimum(energy_volume), maximum(energy_volume)
+        sg = SliderGrid(
+            fig[2, 1],
+            (label="μ (Fermi level)", range=range(E_min, E_max, length=300), startvalue=Float64(E_Fermi)),
+        )
+        mu_slider = sg.sliders[1].value
+        iso_level = lift(mu -> Float32[mu], mu_slider)
 
-    contour!(ax, (first(kxs), last(kxs)), (first(kys), last(kys)), (first(kzs), last(kzs)), energy_volume;
-        levels=iso_level, colormap=:viridis, alpha=0.5, transparency=true, kwargs...)
-    return fig
+        contour!(
+            ax,
+            (first(kxs), last(kxs)),
+            (first(kys), last(kys)),
+            (first(kzs), last(kzs)),
+            energy_volume;
+            levels=iso_level,
+            colormap=:viridis,
+            alpha=0.5,
+            transparency=true,
+            kwargs...,
+        )
+        return fig
+    end
 end
 
 plot_fermi_surface(data::FermiSurfaceData; kwargs...) =

@@ -65,30 +65,36 @@ function scan_instability_landscape(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
-    
-    @info "Scanning instability landscape over $(length(qgrid)) q-points..."
-    axes = _parameter_axes(qgrid)
+    return with_stage_log(
+        "Scan instability landscape";
+        context=(model=model_summary(model), field=field_summary(field), kgrid=grid_summary(kgrid), qgrid=grid_summary(qgrid), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+    ) do
+        chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
+        axes = _parameter_axes(qgrid)
 
-    if length(axes) == 1 && eltype(axes[1]) <: SVector{D,Float64}
-        return Engine.distributed_map_grid(
-            StaticFluctuationTask(chi_functor),
-            axes[1];
-            bootstrap_workers=bootstrap_workers,
-            n_workers=n_workers,
-            project=project,
-            restrict=restrict
-        )
+        @timeit TO "Instability Scan" begin
+            if length(axes) == 1 && eltype(axes[1]) <: SVector{D,Float64}
+                return Engine.distributed_map_grid(
+                    StaticFluctuationTask(chi_functor),
+                    axes[1];
+                    bootstrap_workers=bootstrap_workers,
+                    n_workers=n_workers,
+                    project=project,
+                    restrict=restrict
+                )
+            end
+
+            return Engine.distributed_map_grid(
+                StaticCoordinateFluctuationTask{D,typeof(chi_functor)}(chi_functor),
+                axes...;
+                bootstrap_workers=bootstrap_workers,
+                n_workers=n_workers,
+                project=project,
+                restrict=restrict
+            )
+        end
     end
-
-    return Engine.distributed_map_grid(
-        StaticCoordinateFluctuationTask{D,typeof(chi_functor)}(chi_functor),
-        axes...;
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
 end
 
 """
@@ -113,18 +119,23 @@ function scan_rpa_spectral_function_hpc(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    # 🌟 使用明确代表电荷涨落的 DirectChannel
-    chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
-    
-    return Engine.distributed_map_grid(
-        RPASpectralFunctionTask{D, typeof(chi_functor), typeof(interaction)}(chi_functor, interaction),
-        qaxis,
-        omegas;
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
+    return with_stage_log(
+        "Scan RPA spectral function";
+        context=(model=model_summary(model), interaction=interaction_summary(interaction), field=field_summary(field), kgrid=grid_summary(kgrid), qaxis=axis_summary(qaxis), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+    ) do
+        chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
+
+        return Engine.distributed_map_grid(
+            RPASpectralFunctionTask{D, typeof(chi_functor), typeof(interaction)}(chi_functor, interaction),
+            qaxis,
+            omegas;
+            bootstrap_workers=bootstrap_workers,
+            n_workers=n_workers,
+            project=project,
+            restrict=restrict
+        )
+    end
 end
 
 function scan_rpa_spectral_function_hpc(
@@ -140,17 +151,23 @@ function scan_rpa_spectral_function_hpc(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
+    return with_stage_log(
+        "Scan spectral function";
+        context=(model=model_summary(model), field=field_summary(field), kgrid=grid_summary(kgrid), qaxis=axis_summary(qaxis), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+    ) do
+        chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
 
-    return Engine.distributed_map_grid(
-        SpectralFunctionTask(chi_functor),
-        qaxis,
-        omegas;
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
+        return Engine.distributed_map_grid(
+            SpectralFunctionTask(chi_functor),
+            qaxis,
+            omegas;
+            bootstrap_workers=bootstrap_workers,
+            n_workers=n_workers,
+            project=project,
+            restrict=restrict
+        )
+    end
 end
 
 """
@@ -174,21 +191,26 @@ function scan_spectral_function(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    @info "Scanning spectral function over $(length(qpath)) parameter samples and $(length(omegas)) frequency samples..."
-    return scan_rpa_spectral_function_hpc(
-        model,
-        interaction, 
-        field,
-        kgrid,
-        path_points(qpath),
-        omegas;
-        T=T,
-        η=η,
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
+    return with_stage_log(
+        "Scan spectral function along path";
+        context=(model=model_summary(model), interaction=interaction_summary(interaction), field=field_summary(field), kgrid=grid_summary(kgrid), qpath=kpath_summary(qpath), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+    ) do
+        @timeit TO "Spectral Function Scan" return scan_rpa_spectral_function_hpc(
+            model,
+            interaction, 
+            field,
+            kgrid,
+            path_points(qpath),
+            omegas;
+            T=T,
+            η=η,
+            bootstrap_workers=bootstrap_workers,
+            n_workers=n_workers,
+            project=project,
+            restrict=restrict
+        )
+    end
 end
 
 function scan_spectral_function(
@@ -204,20 +226,25 @@ function scan_spectral_function(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 ) where {D}
-    @info "Scanning spectral function over $(length(qpath)) parameter samples and $(length(omegas)) frequency samples..."
-    return scan_rpa_spectral_function_hpc(
-        model,
-        kgrid,
-        path_points(qpath),
-        omegas;
-        field=field,
-        T=T,
-        η=η,
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
+    return with_stage_log(
+        "Scan spectral function along path";
+        context=(model=model_summary(model), field=field_summary(field), kgrid=grid_summary(kgrid), qpath=kpath_summary(qpath), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+    ) do
+        return scan_rpa_spectral_function_hpc(
+            model,
+            kgrid,
+            path_points(qpath),
+            omegas;
+            field=field,
+            T=T,
+            η=η,
+            bootstrap_workers=bootstrap_workers,
+            n_workers=n_workers,
+            project=project,
+            restrict=restrict
+        )
+    end
 end
 
 function _parameter_axes(grid::KGrid{D}) where {D}
