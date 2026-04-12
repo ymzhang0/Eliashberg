@@ -35,6 +35,15 @@ function (task::SpectralFunctionTask)(q::SVector{D,Float64}, omega::Real) where 
     return imag(task.susceptibility(DynamicalFluctuation(q, Float64(omega))))
 end
 
+struct SpectralFunctionRowTask{C,O}
+    susceptibility::C
+    omegas::O
+end
+
+function (task::SpectralFunctionRowTask)(q::SVector{D,Float64}) where {D}
+    return imag.(susceptibility_spectrum(task.susceptibility, q, task.omegas))
+end
+
 struct RPASpectralFunctionTask{D, C, I<:Interaction}
     susceptibility::C
     interaction::I
@@ -59,6 +68,36 @@ function (task::RPASpectralFunctionTask{D})(q::SVector{D,Float64}, omega::Real) 
     !isfinite_value(chi_rpa) && @warn "RPA susceptibility became non-finite during spectral scan." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator chi_rpa=chi_rpa
     
     return imag(chi_rpa)
+end
+
+struct RPASpectralFunctionRowTask{D,C,I<:Interaction,O}
+    susceptibility::C
+    interaction::I
+    omegas::O
+end
+
+function (task::RPASpectralFunctionRowTask{D})(q::SVector{D,Float64}) where {D}
+    chi0_spectrum = susceptibility_spectrum(task.susceptibility, q, task.omegas)
+    vq = V(q, task.interaction)
+    spectral_row = Vector{Float64}(undef, length(task.omegas))
+
+    for idx in eachindex(task.omegas)
+        chi0 = chi0_spectrum[idx]
+        omega = Float64(task.omegas[idx])
+        denominator = 1.0 - vq * chi0
+        !isfinite_value(denominator) && @warn "RPA denominator became non-finite during spectral scan." q=q omega=omega interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
+        if abs(denominator) <= 100 * eps(Float64)
+            @warn "RPA denominator is numerically singular during spectral scan. Returning NaN." q=q omega=omega interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
+            spectral_row[idx] = NaN
+            continue
+        end
+
+        chi_rpa = chi0 / denominator
+        !isfinite_value(chi_rpa) && @warn "RPA susceptibility became non-finite during spectral scan." q=q omega=omega interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator chi_rpa=chi_rpa
+        spectral_row[idx] = imag(chi_rpa)
+    end
+
+    return spectral_row
 end
 
 function scan_instability_landscape(
@@ -133,16 +172,16 @@ function scan_rpa_spectral_function_hpc(
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
-
-        return Engine.distributed_map_grid(
-            RPASpectralFunctionTask{D, typeof(chi_functor), typeof(interaction)}(chi_functor, interaction),
-            qaxis,
-            omegas;
+        row_data = Engine.distributed_map_grid(
+            RPASpectralFunctionRowTask{D, typeof(chi_functor), typeof(interaction), typeof(omegas)}(chi_functor, interaction, omegas),
+            qaxis;
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
             project=project,
             restrict=restrict
         )
+
+        return _stack_spectral_rows(row_data, length(omegas))
     end
 end
 
@@ -165,17 +204,29 @@ function scan_rpa_spectral_function_hpc(
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
-
-        return Engine.distributed_map_grid(
-            SpectralFunctionTask(chi_functor),
-            qaxis,
-            omegas;
+        row_data = Engine.distributed_map_grid(
+            SpectralFunctionRowTask{typeof(chi_functor), typeof(omegas)}(chi_functor, omegas),
+            qaxis;
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
             project=project,
             restrict=restrict
         )
+
+        return _stack_spectral_rows(row_data, length(omegas))
     end
+end
+
+function _stack_spectral_rows(rows::AbstractVector{<:AbstractVector{<:Real}}, n_omegas::Integer)
+    n_q = length(rows)
+    matrix = Matrix{Float64}(undef, n_q, n_omegas)
+
+    for idx in eachindex(rows)
+        length(rows[idx]) == n_omegas || throw(DimensionMismatch("Spectral row length must match the omega axis length."))
+        matrix[idx, :] .= rows[idx]
+    end
+
+    return matrix
 end
 
 """

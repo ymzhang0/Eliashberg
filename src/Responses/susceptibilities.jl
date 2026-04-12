@@ -19,6 +19,12 @@ end
 # Default constructor with small broadening
 GeneralizedSusceptibility(model, grid, field, T) = GeneralizedSusceptibility(model, grid, field, T, 1e-3)
 
+struct SusceptibilitySpectrumTerms
+    deltas::Vector{Float64}
+    numerators::Vector{Float64}
+    degenerate_numerators::Vector{Float64}
+end
+
 """
     (chi::GeneralizedSusceptibility)(fluct::DynamicalFluctuation)
 
@@ -32,6 +38,37 @@ function (chi::GeneralizedSusceptibility)(fluct::DynamicalFluctuation{D}) where 
     end
 
     return Engine.integrate_grid(SusceptibilityReductionKernel(chi, fluct), chi.grid)
+end
+
+function susceptibility_spectrum(
+    chi::GeneralizedSusceptibility{M,G,F},
+    q::SVector{D,Float64},
+    omegas::AbstractVector{<:Real},
+) where {M,G,F,D}
+    if !(chi.grid isa AbstractKGrid{D})
+        throw(DimensionMismatch("Fluctuation momentum dimension ($D) does not match grid dimension"))
+    end
+
+    terms = susceptibility_spectrum_terms(chi, q)
+    spectrum = Vector{ComplexF64}(undef, length(omegas))
+    eta = chi.η
+
+    for (idx, omega) in pairs(omegas)
+        ω = Float64(omega)
+        response = 0.0im
+
+        for term_idx in eachindex(terms.deltas)
+            if abs(ω) < 1e-8 && abs(terms.deltas[term_idx]) < 1e-8
+                response += terms.degenerate_numerators[term_idx]
+            else
+                response += terms.numerators[term_idx] / (terms.deltas[term_idx] - ω - 1im * eta)
+            end
+        end
+
+        spectrum[idx] = response
+    end
+
+    return spectrum
 end
 
 # Support for static evaluation via SVector
@@ -78,6 +115,43 @@ function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D
     end
 
     return response_sum
+end
+
+function susceptibility_spectrum_terms(
+    chi::GeneralizedSusceptibility{M,G,F},
+    q::SVector{D,Float64},
+) where {M,G,F,D}
+    deltas = Float64[]
+    numerators = Float64[]
+    degenerate_numerators = Float64[]
+
+    for (k, weight) in zip(chi.grid.points, chi.grid.weights)
+        eig_k = band_structure(chi.model, k)
+        eig_kq = band_structure(chi.model, k + q)
+        vertex = _susceptibility_vertex(chi.model, chi.field, k)
+        occupations_k = [_fermi_weight(real(energy), chi.T) for energy in eig_k.values]
+        occupations_kq = [_fermi_weight(real(energy), chi.T) for energy in eig_kq.values]
+
+        for m in eachindex(eig_k.values)
+            energy_m = real(eig_k.values[m])
+            occ_m = occupations_k[m]
+            vec_m = eig_k.vectors[:, m]
+
+            for n in eachindex(eig_kq.values)
+                energy_n = real(eig_kq.values[n])
+                occ_n = occupations_kq[n]
+                vec_n = eig_kq.vectors[:, n]
+                coherence = abs2(dot(vec_n, vertex * vec_m))
+                coherence <= 1e-10 && continue
+
+                push!(deltas, energy_n - energy_m)
+                push!(numerators, weight * coherence * (occ_m - occ_n))
+                push!(degenerate_numerators, weight * coherence * (-_fermi_derivative(occ_m, chi.T)))
+            end
+        end
+    end
+
+    return SusceptibilitySpectrumTerms(deltas, numerators, degenerate_numerators)
 end
 
 _susceptibility_vertex(model::ElectronicDispersion, field::AuxiliaryField, k::SVector) = vertex_matrix(model, k, field)

@@ -15,6 +15,10 @@ function integrate_grid(f::F, grid::AbstractKGrid) where {F}
     ) do
         n_items = length(grid)
         n_items == 0 && throw(ArgumentError("integrate_grid requires a non-empty grid."))
+        if Threads.nthreads() == 1
+            reducer = WeightedGridReducer(f, grid)
+            return _chunk_reduce(reducer, 1, n_items)
+        end
 
         schedule = ChunkedGridReduction(f, grid, min(n_items, max(1, Threads.nthreads())))
         tasks = Vector{Task}(undef, length(schedule.ranges))
