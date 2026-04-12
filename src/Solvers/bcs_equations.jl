@@ -73,7 +73,10 @@ function solve_bcs(
                 project=project,
                 restrict=restrict
             )
-            !isfinite_value(kinetic_vector) && @warn "BCS kinetic vector contains non-finite entries." nonfinite_entries=count_nonfinite(kinetic_vector) grid=grid_summary(kgrid) model=model_summary(dispersion_model)
+            if !isfinite_value(kinetic_vector)
+                @error "BCS kinetic vector contains non-finite entries." nonfinite_entries=count_nonfinite(kinetic_vector) grid=grid_summary(kgrid) model=model_summary(dispersion_model)
+                throw(PhysicalParameterError("kinetic_vector", "NaN/Inf", "Evaluated BCS kinetic vector contains non-finite entries. Check if dispersion model or grid produces singularities."))
+            end
             pairing_matrix = @timeit TO "Pairing Matrix Assembly" _assemble_bcs_pairing_matrix(
                 matrix_format,
                 samples,
@@ -88,7 +91,10 @@ function solve_bcs(
 
             H = _materialize_bcs_matrix(pairing_matrix)
             H[diagind(H)] .+= kinetic_vector
-            !isfinite_value(H) && @warn "BCS matrix contains non-finite entries before eigensolve." nonfinite_entries=count_nonfinite(H) matrix=matrix_summary(H)
+            if !isfinite_value(H)
+                @error "BCS matrix contains non-finite entries before eigensolve." nonfinite_entries=count_nonfinite(H) matrix=matrix_summary(H)
+                throw(PhysicalParameterError("BCS Matrix", "NaN/Inf", "Assembled Hamiltonian contains non-finite entries. Check model parameters or sparse_atol."))
+            end
 
             spectrum = Engine.solve_assembled_eigensystem(H; solver=_resolve_bcs_eigensolver(H, eigensolver))
             !isfinite_value(spectrum.values) && @warn "BCS eigenspectrum contains non-finite eigenvalues." nonfinite_values=count_nonfinite(spectrum.values) matrix_format=matrix_format grid=grid_summary(kgrid)
@@ -177,7 +183,7 @@ function _assemble_bcs_pairing_matrix(
         )
     end
 
-    throw(ArgumentError("Unsupported matrix_format `$matrix_format`. Expected `:dense` or `:sparse`."))
+    throw(ConfigurationError("matrix_format", matrix_format, "Unsupported matrix_format. Expected `:dense` or `:sparse`."))
 end
 
 _materialize_bcs_matrix(matrix::AbstractMatrix) = matrix

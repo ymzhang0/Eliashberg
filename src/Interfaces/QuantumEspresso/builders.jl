@@ -28,7 +28,7 @@ function kpath_from_quantum_espresso_bands(
     coordinates::Symbol=:fractional,
     node_labels::Union{Nothing, AbstractVector{<:AbstractString}}=nothing,
 ) where {D}
-    coordinates in (:fractional, :cartesian) || throw(ArgumentError("`coordinates` must be either `:fractional` or `:cartesian`."))
+    coordinates in (:fractional, :cartesian) || throw(ConfigurationError("coordinates", coordinates, "Must be either `:fractional` or `:cartesian`."))
 
     basis = cell === nothing ?
         [SVector{D, Float64}(ntuple(i -> i == j ? 1.0 : 0.0, D)) for j in 1:D] :

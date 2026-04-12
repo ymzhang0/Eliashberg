@@ -6,7 +6,7 @@ function _parse_qe_number(token::AbstractString, filename::AbstractString, conte
     try
         return parse(Float64, replace(strip(token), r"[dD]" => "e"))
     catch err
-        throw(ArgumentError("Could not parse $context in $filename from token `$(strip(token))`: $(sprint(showerror, err))"))
+        throw(ParsingError(filename, "Could not parse $context from token `$(strip(token))`: $(sprint(showerror, err))"))
     end
 end
 
@@ -14,7 +14,7 @@ function _parse_qe_int(token::AbstractString, filename::AbstractString, context:
     try
         return parse(Int, strip(token))
     catch err
-        throw(ArgumentError("Could not parse $context in $filename from token `$(strip(token))`: $(sprint(showerror, err))"))
+        throw(ParsingError(filename, "Could not parse $context from token `$(strip(token))`: $(sprint(showerror, err))"))
     end
 end
 

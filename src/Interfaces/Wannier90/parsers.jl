@@ -182,7 +182,7 @@ _parse_wannier90_number(token::AbstractString, filename::AbstractString, context
     try
         parse(Float64, replace(strip(token), r"[dD]" => "e"))
     catch err
-        throw(ArgumentError("Could not parse $context in $filename from token `$(strip(token))`: $(sprint(showerror, err))"))
+        throw(ParsingError(filename, "Could not parse $context from token `$(strip(token))`: $(sprint(showerror, err))"))
     end
 
 function _normalize_wannier90_label(label::AbstractString)

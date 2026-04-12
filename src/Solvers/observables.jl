@@ -43,12 +43,14 @@ function solve_ground_state(
     kgrid::AbstractKGrid,
     approx::ApproximationLevel;
     phi_guess=0.1,
-    T=1e-3
+    T=1e-3,
+    log_level::LogLevel=Logging.Info
 )
     optimization_result = Ref{Any}(nothing)
 
     return with_stage_log(
         "Solve ground state";
+        level=log_level,
         context=(field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx=approx_summary(approx), phi_guess=phi_guess, T=Float64(T)),
         summarize_result=phi -> (
             phi=Float64(phi),
@@ -83,12 +85,14 @@ function solve_ground_state(
     kgrid::AbstractKGrid,
     approx::ApproximationLevel;
     phi_guess=0.1,
-    T=1e-3
+    T=1e-3,
+    log_level::LogLevel=Logging.Info
 )
     optimization_result = Ref{Any}(nothing)
 
     return with_stage_log(
         "Solve ground state";
+        level=log_level,
         context=(field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx=approx_summary(approx), phi_guess=phi_guess, T=Float64(T)),
         summarize_result=phis -> (
             phis=Float64.(phis),
