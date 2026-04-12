@@ -4,7 +4,9 @@ n_workers = 4
 [geometry]
 type = "CubicLattice"
 a = 1.5
-kgrid_grid = [20, 20, 20]
+
+[kpoints]
+grid = [20, 20, 20]
 
 [model]
 type = "TightBinding"

@@ -26,7 +26,7 @@ qpath_points = [[0.0], [2.0943951]]
 qpath_labels = ["Γ", "X"]
 omega_range = [0.0, 5.0]
 omega_points = 400
-T = 0.01
+T_val = 0.01
 eta = 0.02
 
 [plot]
