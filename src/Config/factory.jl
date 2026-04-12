@@ -51,9 +51,9 @@ function build_kpoints(opt::KpointsOptions, geometry)
     if D == 1
         return generate_1d_kgrid(sz_array[1])
     elseif D == 2
-        return generate_2d_kgrid(sz_array)
+        return generate_2d_kgrid(sz_array[1], sz_array[2])
     else
-        return generate_3d_kgrid(sz_array)
+        return generate_3d_kgrid(sz_array[1], sz_array[2], sz_array[3])
     end
 end
 
@@ -165,6 +165,11 @@ function validate_task_config(task::ComputeZeemanPairingDataOption)
     isnothing(task.q_range) && throw(ArgumentError("Task 'compute_zeeman_pairing_data' requires `q_range` in TOML."))
 end
 
+function validate_task_config(task::ComputeCollectiveModeSpectralDataOption)
+    isnothing(task.qpath_points) && throw(ArgumentError("Task 'compute_collective_mode_spectral_data' requires `qpath_points` in TOML."))
+    isnothing(task.qpath_labels) && throw(ArgumentError("Task 'compute_collective_mode_spectral_data' requires `qpath_labels` in TOML."))
+end
+
 # ---------------------------------------------------------
 # Task Builder
 # ---------------------------------------------------------
@@ -222,6 +227,22 @@ function build_task(task::ComputeZeemanPairingDataOption)
     return (; q_vals, h_val=task.h_val, T_val=task.T_val, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
 end
 
+function build_task(task::ComputeCollectiveModeSpectralDataOption)
+    approx = _parse_approx(task.approx)
+    D = length(task.qpath_points[1])
+    nodes = [_svec(D, pt) for pt in task.qpath_points]
+    qpath = generate_kpath(nodes, task.qpath_labels; n_pts_per_segment=50)
+    return (;
+        qpath,
+        T_val=task.T_val,
+        omega_max_factor=task.omega_max_factor,
+        n_omegas=task.n_omegas,
+        eta=task.eta,
+        phi_guess=task.phi_guess,
+        approx,
+    )
+end
+
 # ---------------------------------------------------------
 # High-level Constructor
 # ---------------------------------------------------------
@@ -232,6 +253,8 @@ Instantiate all physics models, interactions, kpoints, and order parameter field
 from the provided TOML configurations. Returns a NamedTuple with `(system, geometry, kpoints, model, interaction, field, task, plot)`.
 """
 function build_from_config(config::EliashbergConfig)
+    validate_task_config(config.task)
+
     # 1. Geometry & Kpoints
     geometry = build_geometry(config.geometry)
     kpoints = build_kpoints(config.kpoints, geometry)

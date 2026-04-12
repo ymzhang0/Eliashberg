@@ -6,7 +6,7 @@ export KpointsOptions, PlotOptions
 export AbstractModelOption, FreeElectronOption, TightBindingOption, MultiOrbitalTightBindingOption, KagomeLatticeOption, GrapheneOption, SSHModelOption, EinsteinModelOption, DebyeModelOption, PolaritonModelOption, MonoatomicLatticeModelOption
 export AbstractInteractionOption, ConstantInteractionOption, LocalInteractionOption, YukawaInteractionOption, LimitedConstantInteractionOption, BareCoulombInteractionOption, ScreenedCoulombInteractionOption, CompositeInteractionOption
 export AbstractFieldOption, ChargeDensityWaveOption, SpinDensityWaveOption, BCSReducedPairingOption, FFLOPairingOption, PairDensityWaveOption, MomentumDependentPairingOption, DirectChannelOption, ExchangeChannelOption
-export AbstractTaskOption, SolveGroundStateOption, ScanInstabilityLandscapeOption, ScanSpectralFunctionOption, ComputePhaseTransitionDataOption, ComputeRenormalizedBandDataOption, ComputeZeemanPairingDataOption
+export AbstractTaskOption, SolveGroundStateOption, ScanInstabilityLandscapeOption, ScanSpectralFunctionOption, ComputePhaseTransitionDataOption, ComputeRenormalizedBandDataOption, ComputeZeemanPairingDataOption, ComputeCollectiveModeSpectralDataOption
 export EliashbergConfig, load_config
 
 # ---------------------------------------------------------
@@ -274,6 +274,17 @@ end
     warm_start::Bool = true
 end
 
+@option "compute_collective_mode_spectral_data" struct ComputeCollectiveModeSpectralDataOption <: AbstractTaskOption
+    qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
+    qpath_labels::Union{Vector{String},Nothing} = nothing
+    T_val::Float64 = 0.01
+    omega_max_factor::Float64 = 5.0
+    n_omegas::Int = 100
+    eta::Float64 = 0.02
+    phi_guess::Float64 = 0.4
+    approx::String = "ExactTrLn"
+end
+
 # ---------------------------------------------------------
 # Master Configuration Struct
 # ---------------------------------------------------------
@@ -351,6 +362,7 @@ const TASK_OPTION_TYPES = Dict{String,DataType}(
     "compute_phase_transition_data" => ComputePhaseTransitionDataOption,
     "compute_renormalized_band_data" => ComputeRenormalizedBandDataOption,
     "compute_zeeman_pairing_data" => ComputeZeemanPairingDataOption,
+    "compute_collective_mode_spectral_data" => ComputeCollectiveModeSpectralDataOption,
 )
 
 function _parse_polymorphic_option(

@@ -18,6 +18,8 @@ function submit_job(toml_path::String)
     # 1. 解析 TOML
     config = Configurations.from_toml(EliashbergConfig, toml_path)
     params = build_from_config(config)
+    project = something(config.system.project, Base.active_project(), ".")
+    restrict = config.system.restrict
 
     # 2. 自动化分布式集群配置
     n_requested = config.system.n_workers
@@ -25,12 +27,18 @@ function submit_job(toml_path::String)
 
     if config.system.bootstrap_workers && n_requested > n_current
         @info "Bootstrapping cluster workers..." requested = n_requested
-        addprocs(n_requested - n_current; exeflags="--project=.")
+        addprocs(n_requested - n_current; exeflags="--project=$(project)", restrict=restrict)
     end
 
     # 确保所有 worker 都加载了 Eliashberg
     @info "Loading Eliashberg.jl on all $(nworkers()) workers..."
-    @everywhere Main.eval(:(using Eliashberg))
+    for worker_id in workers()
+        remotecall_wait(Core.eval, worker_id, Main, quote
+            import Pkg
+            Pkg.activate($project; io=Base.devnull)
+            using Eliashberg
+        end)
+    end
 
     # 3. 创建时间戳输出目录
     timestamp = Dates.format(now(), "yyyymmdd_HHMMSS")
@@ -49,7 +57,12 @@ function submit_job(toml_path::String)
             result = scan_spectral_function(
                 params.model, params.interaction, params.field, params.kpoints,
                 params.task.qpath, params.task.omegas;
-                T=params.task.T_val, η=params.task.eta
+                T=params.task.T_val,
+                η=params.task.eta,
+                bootstrap_workers=config.system.bootstrap_workers,
+                n_workers=n_requested,
+                project=project,
+                restrict=restrict,
             )
         elseif config.task.type == "compute_phase_transition_data"
             result = compute_phase_transition_data(
