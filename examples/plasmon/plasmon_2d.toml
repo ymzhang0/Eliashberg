@@ -7,7 +7,7 @@ type = "SquareLattice"
 a = 1.5
 
 [kpoints]
-size = [50, 50]
+grid = [50, 50]
 
 [model]
 type = "TightBinding"

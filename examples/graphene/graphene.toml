@@ -5,7 +5,7 @@ type = "HexagonalLattice"
 a = 2.46
 
 [kpoints]
-size = [60, 60]
+grid = [60, 60]
 
 [model]
 type = "Graphene"

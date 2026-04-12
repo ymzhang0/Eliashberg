@@ -5,7 +5,7 @@ type = "ChainLattice"
 a = 1.5
 
 [kpoints]
-size = [2000]
+grid = [2000]
 
 [model]
 type = "TightBinding"

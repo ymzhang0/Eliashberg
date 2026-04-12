@@ -7,12 +7,10 @@ using Dates
 using TOML
 using JLD2        # 用于无损保存 Julia 数据结构
 
-# 加载我们重构好的 Config 模块
-include("../Config/Config.jl")
-using .Config: EliashbergConfig, Configurations, build_from_config
-
-# 只在主进程加载核心物理代码
+# 加载核心物理代码及其中嵌套的 Config 模块
 using Eliashberg
+using Eliashberg.Config: EliashbergConfig, Configurations, build_from_config
+
 
 function submit_job(toml_path::String)
     @info "Parsing cluster job specification..." file = toml_path
@@ -32,7 +30,7 @@ function submit_job(toml_path::String)
 
     # 确保所有 worker 都加载了 Eliashberg
     @info "Loading Eliashberg.jl on all $(nworkers()) workers..."
-    @everywhere using Eliashberg
+    @everywhere Main.eval(:(using Eliashberg))
 
     # 3. 创建时间戳输出目录
     timestamp = Dates.format(now(), "yyyymmdd_HHMMSS")

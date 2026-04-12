@@ -339,7 +339,10 @@ const FIELD_OPTION_TYPES = Dict{String,DataType}(
     "FFLOPairing" => FFLOPairingOption,
     "PairDensityWave" => PairDensityWaveOption,
     "MomentumDependentPairing" => MomentumDependentPairingOption,
+    "DirectChannel" => DirectChannelOption,
+    "ExchangeChannel" => ExchangeChannelOption,
 )
+
 
 const TASK_OPTION_TYPES = Dict{String,DataType}(
     "solve_ground_state" => SolveGroundStateOption,
