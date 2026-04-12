@@ -1,0 +1,30 @@
+[system]
+n_workers = 1
+bootstrap_workers = false
+
+[geometry]
+type = "ChainLattice"
+a = 1.5
+
+[kpoints]
+grid = [200, ]
+
+[model]
+type = "TightBinding"
+EF = -0.3
+t = 1.0
+
+[interaction]
+type = "Constant"
+V0 = -2.5
+
+[field]
+type = "BCSReducedPairing"
+symmetry = "s_wave"
+
+[task]
+type = "compute_phase_transition_data"
+phi_range = [0.0, 1.0]
+phi_points = 100
+T_range = [0.1, 0.4]
+T_points = 10

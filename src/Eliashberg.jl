@@ -15,6 +15,7 @@ using Optim
 using Distributed
 using SparseArrays
 using Logging
+using ProgressLogging
 using TimerOutputs
 
 const TO = TimerOutput()
@@ -137,5 +138,10 @@ export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plo
 export plot_landscape, plot_spectral_function, plot_phase_transition, plot_zeeman_pairing_landscape, plot_collective_modes
 export visualize_dispersion, dimensionality, visualize_landscape, visualize_spectral_function, visualize_phase_transition, visualize_renormalized_bands, visualize_zeeman_pairing_landscape, visualize_collective_modes
 export visualize_lattice, visualize_reciprocal_space
+
+# 8. Configuration System
+include("Config/Config.jl")
+using .Config: EliashbergConfig, load_config, build_from_config
+export EliashbergConfig, load_config, build_from_config
 
 end # module Eliashberg

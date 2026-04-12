@@ -1,0 +1,33 @@
+[system]
+
+[geometry]
+type = "ChainLattice"
+a = 1.5
+
+[kpoints]
+size = [2000]
+
+[model]
+type = "TightBinding"
+t = 1.0
+EF = -0.3
+use_spinor = false
+
+[interaction]
+type = "BareCoulomb"
+cutoff = 0.01
+
+[field]
+type = "DirectChannel"
+
+[task]
+type = "scan_spectral_function"
+qpath_points = [[0.0], [2.0943951]]
+qpath_labels = ["Γ", "X"]
+omega_range = [0.0, 5.0]
+omega_points = 400
+T = 0.01
+eta = 0.02
+
+[plot]
+enable = true

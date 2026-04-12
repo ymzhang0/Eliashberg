@@ -157,12 +157,12 @@ function _band_matrix_along_path(
 end
 
 function compute_phase_transition_data(
-    phis::AbstractVector{<:Real},
-    Ts::AbstractVector{<:Real},
-    field::AuxiliaryField,
     model::ElectronicDispersion,
     interaction::Interaction,
+    field::AuxiliaryField,
     kgrid::AbstractKGrid;
+    phis::AbstractVector{<:Real},
+    Ts::AbstractVector{<:Real},
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess::Real=0.2,
     warm_start::Bool=true
@@ -179,27 +179,35 @@ function compute_phase_transition_data(
         if warm_start
             current_guess = Float64(phi_guess)
 
-            for (idx, T) in enumerate(Ts)
-                energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
-                free_energy[:, idx] = energy_curve
-                condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+            @withprogress name="Scanning Temperatures" begin
+                for (idx, T) in enumerate(Ts)
+                    @logprogress idx / length(Ts)
 
-                phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
-                phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
-                order_parameters[idx] = phi_gs
-                current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
+                    energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
+                    free_energy[:, idx] = energy_curve
+                    condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+
+                    phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T, log_level=Logging.Debug)
+                    phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+                    order_parameters[idx] = phi_gs
+                    current_guess = phi_gs > 0.0 ? phi_gs : max(Float64(phi_guess), 0.05)
+                end
             end
         else
             base_guess = Float64(phi_guess)
 
-            Threads.@threads for idx in eachindex(Ts)
-                T = Ts[idx]
-                energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
-                free_energy[:, idx] = energy_curve
-                condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+            @withprogress name="Scanning Temperatures (Threaded)" begin
+                Threads.@threads for idx in eachindex(Ts)
+                    T = Ts[idx]
+                    @logprogress idx / length(Ts)
 
-                phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=base_guess, T=T)
-                order_parameters[idx] = phi_gs < 1e-4 ? 0.0 : phi_gs
+                    energy_curve = _evaluate_action_curve(phis, field, model, interaction, kgrid, approx; T=T)
+                    free_energy[:, idx] = energy_curve
+                    condensation_energy[:, idx] = energy_curve .- energy_curve[1]
+
+                    phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=base_guess, T=T, log_level=Logging.Debug)
+                    order_parameters[idx] = phi_gs < 1e-4 ? 0.0 : phi_gs
+                end
             end
         end
 
@@ -214,12 +222,12 @@ function compute_phase_transition_data(
 end
 
 function compute_phase_transition_data(
-    phis::AbstractVector{<:Real},
-    Ts::AbstractVector{<:Real},
-    field::CompositeField,
     model::ElectronicDispersion,
     interaction::Interaction,
+    field::CompositeField,
     kgrid::AbstractKGrid;
+    phis::AbstractVector{<:Real},
+    Ts::AbstractVector{<:Real},
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess=0.2
 )
@@ -265,12 +273,12 @@ Compute the mean-field gap and the corresponding renormalized bands for each
 temperature sample along a path in parameter space.
 """
 function compute_renormalized_band_data(
-    Ts::AbstractVector{<:Real},
-    field::AuxiliaryField,
     model::ElectronicDispersion,
     interaction::Interaction,
-    kgrid::AbstractKGrid,
-    kpath::KPath;
+    field::AuxiliaryField,
+    kgrid::AbstractKGrid;
+    kpath::KPath,
+    Ts::AbstractVector{<:Real},
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess=0.5,
     warm_start::Bool=true
@@ -287,24 +295,30 @@ function compute_renormalized_band_data(
         if warm_start
             current_guess = fallback_guess
 
-            for (idx, T) in enumerate(Ts)
-                phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T)
-                phi_gs = _regularize_order_parameter(phi_gs)
-                _store_gap!(gaps, idx, phi_gs)
-                current_guess = _next_phi_guess(phi_gs, fallback_guess)
+            @withprogress name="Computing Renormalized Bands" begin
+                for (idx, T) in enumerate(Ts)
+                    @logprogress idx / length(Ts)
+                    phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T, log_level=Logging.Debug)
+                    phi_gs = _regularize_order_parameter(phi_gs)
+                    _store_gap!(gaps, idx, phi_gs)
+                    current_guess = _next_phi_guess(phi_gs, fallback_guess)
 
-                renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
-                band_matrices[idx] = _band_matrix_along_path(renormalized_dispersion, kpath)
+                    renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
+                    band_matrices[idx] = _band_matrix_along_path(renormalized_dispersion, kpath)
+                end
             end
         else
-            Threads.@threads for idx in eachindex(Ts)
-                T = Ts[idx]
-                phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=fallback_guess, T=T)
-                phi_gs = _regularize_order_parameter(phi_gs)
-                _store_gap!(gaps, idx, phi_gs)
+            @withprogress name="Computing Renormalized Bands (Threaded)" begin
+                Threads.@threads for idx in eachindex(Ts)
+                    T = Ts[idx]
+                    @logprogress idx / length(Ts)
+                    phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=fallback_guess, T=T, log_level=Logging.Debug)
+                    phi_gs = _regularize_order_parameter(phi_gs)
+                    _store_gap!(gaps, idx, phi_gs)
 
-                renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
-                band_matrices[idx] = _band_matrix_along_path(renormalized_dispersion, kpath)
+                    renormalized_dispersion = MeanFieldDispersion(model, field, phi_gs)
+                    band_matrices[idx] = _band_matrix_along_path(renormalized_dispersion, kpath)
+                end
             end
         end
 
@@ -322,12 +336,12 @@ function compute_renormalized_band_data(
 end
 
 function compute_coexistence_landscape(
-    phis_1::AbstractVector{<:Real},
-    phis_2::AbstractVector{<:Real},
-    comp::CompositeField,
     model::ElectronicDispersion,
     interaction::Interaction,
+    comp::CompositeField,
     kgrid::AbstractKGrid;
+    phis_1::AbstractVector{<:Real},
+    phis_2::AbstractVector{<:Real},
     T::Real,
     approx::ApproximationLevel=ExactTrLn()
 )
@@ -361,12 +375,12 @@ Map a one-dimensional external parameter axis to optimized order parameters and
 condensation energies for FFLO-style scans.
 """
 function compute_zeeman_pairing_data(
-    T_val::Real,
-    h_val::Real,
-    q_vals::AbstractVector{<:Real},
     model::ElectronicDispersion,
     interaction::Interaction,
     kgrid::AbstractKGrid;
+    T_val::Real,
+    h_val::Real,
+    q_vals::AbstractVector{<:Real},
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess::Real=0.4,
     warm_start::Bool=true
@@ -383,28 +397,34 @@ function compute_zeeman_pairing_data(
         if warm_start
             current_guess = Float64(phi_guess)
 
-            for (idx, q) in enumerate(q_vals)
-                q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
-                fflo_field = FFLOPairing(q_vector, h_val)
-                phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T_val)
-                phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+            @withprogress name="Scanning Zeeman Pairing" begin
+                for (idx, q) in enumerate(q_vals)
+                    @logprogress idx / length(q_vals)
+                    q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
+                    fflo_field = FFLOPairing(q_vector, h_val)
+                    phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=current_guess, T=T_val, log_level=Logging.Debug)
+                    phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
 
-                optimal_gaps[idx] = phi_gs
-                minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
-                current_guess = phi_gs > 0.05 ? phi_gs : max(Float64(phi_guess), 0.05)
+                    optimal_gaps[idx] = phi_gs
+                    minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
+                    current_guess = phi_gs > 0.05 ? phi_gs : max(Float64(phi_guess), 0.05)
+                end
             end
         else
             base_guess = Float64(phi_guess)
 
-            Threads.@threads for idx in eachindex(q_vals)
-                q = q_vals[idx]
-                q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
-                fflo_field = FFLOPairing(q_vector, h_val)
-                phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=base_guess, T=T_val)
-                phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+            @withprogress name="Scanning Zeeman Pairing (Threaded)" begin
+                Threads.@threads for idx in eachindex(q_vals)
+                    q = q_vals[idx]
+                    @logprogress idx / length(q_vals)
+                    q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
+                    fflo_field = FFLOPairing(q_vector, h_val)
+                    phi_gs = solve_ground_state(fflo_field, model, interaction, kgrid, approx; phi_guess=base_guess, T=T_val, log_level=Logging.Debug)
+                    phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
 
-                optimal_gaps[idx] = phi_gs
-                minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
+                    optimal_gaps[idx] = phi_gs
+                    minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
+                end
             end
         end
 
@@ -430,12 +450,12 @@ Compute the dynamical spectral map of a mean-field state and return only pure
 array data for downstream visualization.
 """
 function compute_collective_mode_spectral_data(
-    T_val::Real,
-    field::AuxiliaryField,
     model::ElectronicDispersion,
     interaction::Interaction,
-    kgrid::AbstractKGrid,
-    qpath::KPath;
+    field::AuxiliaryField,
+    kgrid::AbstractKGrid;
+    qpath::KPath,
+    T_val::Real,
     omega_max_factor::Real=5.0,
     n_omegas::Integer=100,
     eta::Real=0.02,
@@ -451,7 +471,7 @@ function compute_collective_mode_spectral_data(
         context=(field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), kgrid=grid_summary(kgrid), qpath=kpath_summary(qpath), T=Float64(T_val), eta=Float64(eta), n_omegas=Int(n_omegas), approx=approx_summary(approx)),
         summarize_result=data -> (n_q=length(path_points(data.qpath)), n_omegas=length(data.omegas), gap=data.gap),
     ) do
-        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=Float64(phi_guess), T=T_val)
+        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=Float64(phi_guess), T=T_val, log_level=Logging.Debug)
         phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
 
         bdg_dispersion = MeanFieldDispersion(model, field, phi_gs)
