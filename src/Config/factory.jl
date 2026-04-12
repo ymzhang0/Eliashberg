@@ -183,7 +183,7 @@ end
 
 function build_task(task::SolveGroundStateOption)
     approx = _parse_approx(task.approx)
-    return (; phi_guess=task.phi_guess, T=task.T, approx, warm_start=task.warm_start)
+    return (; phi_guess=task.phi_guess, T=task.T_val, approx, warm_start=task.warm_start)
 end
 
 function build_task(task::ComputePhaseTransitionDataOption)
@@ -211,9 +211,9 @@ function build_task(task::ScanSpectralFunctionOption)
         D = length(task.qpath_points[1])
         nodes = [_svec(D, pt) for pt in task.qpath_points]
         qpath = generate_kpath(nodes, task.qpath_labels; n_pts_per_segment=50)
-        return (; qpath, omegas, T_val=task.T, eta=task.eta)
+        return (; qpath, omegas, T_val=task.T_val, eta=task.eta)
     end
-    return (; omegas, T_val=task.T, eta=task.eta)
+    return (; omegas, T_val=task.T_val, eta=task.eta)
 end
 
 function build_task(task::ComputeZeemanPairingDataOption)

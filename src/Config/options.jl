@@ -224,14 +224,14 @@ abstract type AbstractTaskOption end
 
 @option "solve_ground_state" struct SolveGroundStateOption <: AbstractTaskOption
     phi_guess::Float64 = 0.1
-    T::Float64 = 1e-3
+    T_val::Float64 = 1e-3
     approx::String = "ExactTrLn"
     warm_start::Bool = true
 end
 
 @option "scan_instability_landscape" struct ScanInstabilityLandscapeOption <: AbstractTaskOption
     qgrid_size::Union{Int,Vector{Int}} = 50
-    T::Float64 = 0.001
+    T_val::Float64 = 0.001
     eta::Float64 = 0.001
 end
 
@@ -240,7 +240,7 @@ end
     qpath_labels::Union{Vector{String},Nothing} = nothing
     omega_range::Union{Vector{Float64},Nothing} = nothing
     omega_points::Int = 100
-    T::Float64 = 0.001
+    T_val::Float64 = 0.001
     eta::Float64 = 0.05
 end
 
