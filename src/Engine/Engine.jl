@@ -2,6 +2,7 @@ module Engine
 
 using Distributed
 using Logging
+using ProgressLogging
 using TimerOutputs
 using ..Eliashberg: AbstractKGrid, TO
 

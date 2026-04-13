@@ -100,6 +100,10 @@ function (task::RPASpectralFunctionRowTask{D})(q::SVector{D,Float64}) where {D}
     return spectral_row
 end
 
+function _scan_progress_name(kind::AbstractString, n_points::Integer, n_omegas::Integer)
+    return string(kind, " (", n_points, " q-points x ", n_omegas, " omegas)")
+end
+
 function scan_instability_landscape(
     model::PhysicalModel,
     kgrid::KGrid{D},
@@ -178,7 +182,8 @@ function scan_rpa_spectral_function_hpc(
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
             project=project,
-            restrict=restrict
+            restrict=restrict,
+            progress_name=_scan_progress_name("RPA spectral scan along q-path", length(qaxis), length(omegas))
         )
 
         return _stack_spectral_rows(row_data, length(omegas))
@@ -210,7 +215,8 @@ function scan_rpa_spectral_function_hpc(
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
             project=project,
-            restrict=restrict
+            restrict=restrict,
+            progress_name=_scan_progress_name("Spectral scan along q-path", length(qaxis), length(omegas))
         )
 
         return _stack_spectral_rows(row_data, length(omegas))

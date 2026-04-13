@@ -7,6 +7,7 @@ using Dates
 using TOML
 using LinearAlgebra
 using Logging
+using TerminalLoggers
 using JLD2        # 用于无损保存 Julia 数据结构
 
 # 加载核心物理代码及其中嵌套的 Config 模块
@@ -30,6 +31,26 @@ function Logging.handle_message(logger::TeeLogger, level, message, _module, grou
         Logging.handle_message(child, level, message, _module, group, id, file, line; kwargs...)
     end
     return nothing
+end
+
+struct StageFilterLogger{L<:AbstractLogger} <: AbstractLogger
+    logger::L
+    min_stage_level::LogLevel
+end
+
+Logging.min_enabled_level(logger::StageFilterLogger) = Logging.min_enabled_level(logger.logger)
+Logging.catch_exceptions(logger::StageFilterLogger) = Logging.catch_exceptions(logger.logger)
+
+function Logging.shouldlog(logger::StageFilterLogger, level, _module, group, id)
+    stage_group = getfield(Eliashberg, :_LOG_STAGE_GROUP)
+    group == stage_group && level < logger.min_stage_level && return false
+    return Logging.shouldlog(logger.logger, level, _module, group, id)
+end
+
+function Logging.handle_message(logger::StageFilterLogger, level, message, _module, group, id, file, line; kwargs...)
+    stage_group = getfield(Eliashberg, :_LOG_STAGE_GROUP)
+    group == stage_group && level < logger.min_stage_level && return nothing
+    return Logging.handle_message(logger.logger, level, message, _module, group, id, file, line; kwargs...)
 end
 
 function _configure_blas_threads!(n::Integer=1)
@@ -84,14 +105,123 @@ end
 function _open_job_logger(system, log_file::Union{Nothing,AbstractString})
     file_level = _parse_log_level(system.log_level)
     console_level = system.quiet ? Logging.Warn : file_level
-    console_logger = ConsoleLogger(stderr, console_level)
+    stage_level = file_level <= Logging.Debug ? Logging.Debug : Logging.Warn
+    console_logger = StageFilterLogger(TerminalLogger(stderr, console_level), stage_level)
 
     isnothing(log_file) && return (console_logger, nothing)
 
     mkpath(dirname(log_file))
     io = open(log_file, "w")
-    file_logger = SimpleLogger(io, file_level)
+    file_logger = StageFilterLogger(SimpleLogger(io, file_level), stage_level)
     return (TeeLogger((console_logger, file_logger)), io)
+end
+
+_format_seconds(seconds::Real) = round(Float64(seconds); digits=3)
+
+function _format_bytes(bytes::Integer)
+    units = ("B", "KiB", "MiB", "GiB", "TiB")
+    value = Float64(bytes)
+    unit_idx = 1
+    while value >= 1024 && unit_idx < length(units)
+        value /= 1024
+        unit_idx += 1
+    end
+    return string(round(value; digits=value >= 100 ? 1 : 2), " ", units[unit_idx])
+end
+
+function _safe_maxrss_bytes()
+    if isdefined(Sys, :maxrss)
+        try
+            return Int(Sys.maxrss())
+        catch
+        end
+    end
+    return nothing
+end
+
+function _safe_live_heap_bytes()
+    try
+        GC.gc()
+        return Int(Base.gc_live_bytes())
+    catch
+        return nothing
+    end
+end
+
+function _resource_summary(config, project::AbstractString)
+    requested_workers = Int(config.system.n_workers)
+    current_workers = Distributed.nworkers()
+    planned_workers = if config.system.bootstrap_workers
+        max(requested_workers, current_workers)
+    else
+        current_workers
+    end
+
+    return (
+        project=project,
+        bootstrap_workers=config.system.bootstrap_workers,
+        requested_workers=requested_workers,
+        available_workers=current_workers,
+        planned_workers=planned_workers,
+        threads_per_process=Threads.nthreads(),
+        blas_threads=BLAS.get_num_threads(),
+        restrict=config.system.restrict,
+    )
+end
+
+function _task_run_summary(task_type::AbstractString, params)
+    if task_type == "scan_spectral_function"
+        omega_axis = params.task.omegas
+        qpath = params.task.qpath
+        return (
+            task="scan spectral function",
+            q_path=Eliashberg.kpath_summary(qpath),
+            omega_range=(minimum(omega_axis), maximum(omega_axis)),
+            n_omegas=length(omega_axis),
+            temperature=Float64(params.task.T_val),
+            eta=Float64(params.task.eta),
+        )
+    elseif task_type == "compute_phase_transition_data"
+        return (
+            task="compute phase transition data",
+            n_phis=length(params.task.phis),
+            n_temperatures=length(params.task.Ts),
+            approx=string(typeof(params.task.approx)),
+        )
+    elseif task_type == "compute_renormalized_band_data"
+        return (
+            task="compute renormalized band data",
+            k_path=Eliashberg.kpath_summary(params.task.kpath),
+            n_temperatures=length(params.task.Ts),
+            approx=string(typeof(params.task.approx)),
+        )
+    elseif task_type == "compute_collective_mode_spectral_data"
+        return (
+            task="compute collective mode spectral data",
+            q_path=Eliashberg.kpath_summary(params.task.qpath),
+            n_omegas=Int(params.task.n_omegas),
+            temperature=Float64(params.task.T_val),
+            eta=Float64(params.task.eta),
+            approx=string(typeof(params.task.approx)),
+        )
+    elseif task_type == "compute_zeeman_pairing_data"
+        return (
+            task="compute zeeman pairing data",
+            n_q=length(params.task.q_vals),
+            field_strength=Float64(params.task.h_val),
+            temperature=Float64(params.task.T_val),
+            approx=string(typeof(params.task.approx)),
+        )
+    end
+
+    return (task=task_type,)
+end
+
+function _result_summary(result)
+    if result isa AbstractArray
+        return (data_type=string(typeof(result)), array_shape=size(result), element_type=string(eltype(result)))
+    end
+    return (data_type=string(typeof(result)),)
 end
 
 function _activate_plot_backend!()
@@ -169,19 +299,25 @@ function submit_job(toml_path::String)
 
     try
         return with_logger(logger) do
-            @info "Parsing cluster job specification..." file = toml_path output_dir = out_dir log_file = paths.log_file
-
-            params = build_from_config(config)
             task_type = task_type_name(config.task)
             project = something(config.system.project, Base.active_project(), ".")
             restrict = config.system.restrict
             _configure_blas_threads!(1)
+            resource_summary = _resource_summary(config, project)
+
+            @info "Starting Eliashberg job" config_file = toml_path task_type = task_type output_dir = out_dir log_file = paths.log_file
+            @info "Execution resources" project = resource_summary.project bootstrap_workers = resource_summary.bootstrap_workers requested_workers = resource_summary.requested_workers available_workers = resource_summary.available_workers planned_workers = resource_summary.planned_workers threads_per_process = resource_summary.threads_per_process blas_threads = resource_summary.blas_threads restrict = resource_summary.restrict
+
+            @info "Building lattice and noninteracting model from input..."
+            params = build_from_config(config)
+            @info "Physical system ready" lattice = Eliashberg.cell_summary(params.geometry) kgrid = Eliashberg.grid_summary(params.kpoints) model = Eliashberg.model_summary(params.model) interaction = Eliashberg.interaction_summary(params.interaction) field = Eliashberg.field_summary(params.field)
+            @info "Running task" summary = _task_run_summary(task_type, params)
 
             n_requested = config.system.n_workers
             n_current = nworkers()
 
             if config.system.bootstrap_workers && n_requested > n_current
-                @info "Bootstrapping cluster workers..." requested = n_requested
+                @info "Preparing worker pool..." requested_workers = n_requested current_workers = n_current
                 addprocs(
                     n_requested - n_current;
                     exeflags="--project=$(project) --threads=1",
@@ -195,7 +331,7 @@ function submit_job(toml_path::String)
                 )
             end
 
-            @info "Loading Eliashberg.jl on all $(nworkers()) workers..."
+            @info "Loading Eliashberg runtime on workers..." worker_count = nworkers()
             for worker_id in workers()
                 remotecall_wait(Core.eval, worker_id, Main, quote
                     import Pkg
@@ -210,8 +346,6 @@ function submit_job(toml_path::String)
             end
 
             config.system.backup_config && cp(toml_path, joinpath(out_dir, "input_backup.toml"); force=true)
-
-            @info "Dispatching task to physics engine..." task_type = task_type
 
             result = nothing
             time_taken = @elapsed begin
@@ -267,8 +401,10 @@ function submit_job(toml_path::String)
             !isnothing(paths.jld2_file) && jldsave(paths.jld2_file; result=result, config=config)
             !isnothing(paths.hdf5_file) && write_result_hdf5(paths.hdf5_file, hdf5_result, config, toml_path; time_seconds=time_taken)
             plot_file = _maybe_save_plot(out_dir, task_type, result, params)
+            live_heap_bytes = _safe_live_heap_bytes()
+            maxrss_bytes = _safe_maxrss_bytes()
 
-            @info "Job completed successfully!" time_seconds = time_taken output_dir = out_dir jld2_file = paths.jld2_file hdf5_file = paths.hdf5_file plot_file = plot_file
+            @info "Job completed successfully" wall_time_seconds = _format_seconds(time_taken) worker_processes = nworkers() result_summary = _result_summary(result) output_directory = out_dir jld2_output = paths.jld2_file hdf5_output = paths.hdf5_file run_log = paths.log_file plot_output = plot_file julia_live_heap = isnothing(live_heap_bytes) ? nothing : _format_bytes(live_heap_bytes) peak_resident_memory = isnothing(maxrss_bytes) ? nothing : _format_bytes(maxrss_bytes)
             return (; result, output_dir=out_dir, jld2_file=paths.jld2_file, hdf5_file=paths.hdf5_file, log_file=paths.log_file, plot_file)
         end
     finally

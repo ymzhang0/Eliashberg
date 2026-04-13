@@ -12,7 +12,8 @@ function bootstrap_engine_workers!(
     restrict::Bool=true
 )
     return _with_stage_log(
-        "Bootstrap engine workers";
+        "Prepare worker pool";
+        level=Logging.Debug,
         context=(target_workers=max(0, Int(n_workers)), current_workers=Distributed.nworkers(), project=project, restrict=restrict),
         summarize_result=result -> (n_workers=length(result), worker_ids=collect(result)),
     ) do
@@ -48,10 +49,12 @@ function distributed_map_grid(
     bootstrap_workers::Bool=false,
     n_workers::Integer=max(0, Threads.nthreads() - 1),
     project::Union{Nothing,AbstractString}=Base.active_project(),
-    restrict::Bool=true
+    restrict::Bool=true,
+    progress_name::AbstractString="Parameter-space scan"
 ) where {F}
     return _with_stage_log(
-        "Distributed map";
+        "Evaluate parameter grid";
+        level=Logging.Debug,
         context=(
             kernel=string(typeof(f)),
             n_axes=length(grids),
@@ -75,7 +78,8 @@ function distributed_map_grid(
                 bootstrap_workers=bootstrap_workers,
                 n_workers=n_workers,
                 project=project,
-                restrict=restrict
+                restrict=restrict,
+                progress_name=progress_name
             )
 
             return reshape(values, dims...)
@@ -102,10 +106,12 @@ function _map_parameter_task(
     bootstrap_workers::Bool=false,
     n_workers::Integer=max(0, Threads.nthreads() - 1),
     project::Union{Nothing,AbstractString}=Base.active_project(),
-    restrict::Bool=true
+    restrict::Bool=true,
+    progress_name::AbstractString="Parameter-space scan"
 )
     return _with_stage_log(
-        "Map parameter task";
+        "Schedule parameter samples";
+        level=Logging.Debug,
         context=(dims=dims, bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers), current_workers=Distributed.nworkers()),
         summarize_result=result -> (n_results=length(result), execution_mode=Distributed.nworkers() > 1 ? :distributed : :serial),
     ) do
@@ -113,12 +119,73 @@ function _map_parameter_task(
         index_space = collect(CartesianIndices(dims))
 
         if Distributed.nworkers() > 1
-            worker_kernel = index -> map_task(index)
-            return Distributed.pmap(worker_kernel, index_space)
+            return _progressive_distributed_map(map_task, index_space; name=progress_name)
         end
 
-        return map(map_task, index_space)
+        return _progressive_local_map(map_task, index_space; name=progress_name)
     end
+end
+
+function _progressive_local_map(map_task, index_space; name::AbstractString)
+    total = length(index_space)
+    results = Vector{Any}(undef, total)
+
+    @withprogress name=name begin
+        for (idx, index) in enumerate(index_space)
+            results[idx] = map_task(index)
+            @logprogress idx / total
+        end
+    end
+
+    return _materialize_progress_results(results)
+end
+
+function _progressive_distributed_map(map_task, index_space; name::AbstractString)
+    total = length(index_space)
+    results = Vector{Any}(undef, total)
+    jobs = Channel{Tuple{Int,eltype(index_space)}}(total)
+    progress_lock = ReentrantLock()
+    completed = Ref(0)
+
+    for (flat_idx, index) in enumerate(index_space)
+        put!(jobs, (flat_idx, index))
+    end
+    close(jobs)
+
+    @withprogress name=name begin
+        @sync for worker_id in Distributed.workers()
+            @async begin
+                while true
+                    job = try
+                        take!(jobs)
+                    catch err
+                        err isa InvalidStateException && break
+                        rethrow()
+                    end
+
+                    flat_idx, index = job
+                    results[flat_idx] = Distributed.remotecall_fetch(map_task, worker_id, index)
+
+                    lock(progress_lock) do
+                        completed[] += 1
+                        @logprogress completed[] / total
+                    end
+                end
+            end
+        end
+    end
+
+    return _materialize_progress_results(results)
+end
+
+function _materialize_progress_results(results::Vector{Any})
+    isempty(results) && return Any[]
+    result_type = mapreduce(typeof, Base.promote_typejoin, results)
+    typed = Vector{result_type}(undef, length(results))
+    for idx in eachindex(results)
+        typed[idx] = results[idx]
+    end
+    return typed
 end
 
 function _add_engine_workers!(n_new::Int, project::Union{Nothing,AbstractString}, restrict::Bool)
