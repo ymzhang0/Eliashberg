@@ -3,7 +3,6 @@ module Eliashberg
 # 0. External Dependencies (Consolidated)
 using LinearAlgebra
 using StaticArrays
-using Makie
 using AtomsBase
 import AtomsBase: periodicity, PeriodicCell, FastSystem, ChemicalSpecies, mass
 import Brillouin
@@ -79,14 +78,50 @@ include("Solvers/observables.jl")
 include("Solvers/scanners.jl")
 include("Solvers/spectra.jl")
 
-# 5. Visualization Tier
-include("Visualization/utils.jl")
-include("Visualization/geometry.jl")
-include("Visualization/bands.jl")
-include("Visualization/responses.jl")
+# 5. Visualization-adjacent pure utilities
+include("Visualization/core_utils.jl")
 
 # 5.5 Logging helpers
 include("LoggingUtils.jl")
+
+const _VISUALIZATION_LOADED = Ref(false)
+
+function load_visualization!()
+    _VISUALIZATION_LOADED[] && return nothing
+
+    Base.include(@__MODULE__, joinpath(@__DIR__, "Visualization", "Visualization.jl"))
+    _VISUALIZATION_LOADED[] = true
+    return nothing
+end
+
+function _call_visualization(func::Symbol, args...; kwargs...)
+    load_visualization!()
+    visualization = Base.invokelatest(getproperty, @__MODULE__, :Visualization)
+    plotter = Base.invokelatest(getproperty, visualization, func)
+    return Base.invokelatest(plotter, args...; kwargs...)
+end
+
+plot_dispersion_curves(args...; kwargs...) = _call_visualization(:plot_dispersion_curves, args...; kwargs...)
+plot_dispersion_surface(args...; kwargs...) = _call_visualization(:plot_dispersion_surface, args...; kwargs...)
+plot_band_structure(args...; kwargs...) = _call_visualization(:plot_band_structure, args...; kwargs...)
+plot_wannier90_band_structure(args...; kwargs...) = _call_visualization(:plot_wannier90_band_structure, args...; kwargs...)
+plot_wannier90_tb_band_comparison(args...; kwargs...) = _call_visualization(:plot_wannier90_tb_band_comparison, args...; kwargs...)
+plot_fermi_surface(args...; kwargs...) = _call_visualization(:plot_fermi_surface, args...; kwargs...)
+plot_renormalized_bands(args...; kwargs...) = _call_visualization(:plot_renormalized_bands, args...; kwargs...)
+plot_landscape(args...; kwargs...) = _call_visualization(:plot_landscape, args...; kwargs...)
+plot_spectral_function(args...; kwargs...) = _call_visualization(:plot_spectral_function, args...; kwargs...)
+plot_phase_transition(args...; kwargs...) = _call_visualization(:plot_phase_transition, args...; kwargs...)
+plot_zeeman_pairing_landscape(args...; kwargs...) = _call_visualization(:plot_zeeman_pairing_landscape, args...; kwargs...)
+plot_collective_modes(args...; kwargs...) = _call_visualization(:plot_collective_modes, args...; kwargs...)
+visualize_dispersion(args...; kwargs...) = _call_visualization(:visualize_dispersion, args...; kwargs...)
+visualize_landscape(args...; kwargs...) = _call_visualization(:visualize_landscape, args...; kwargs...)
+visualize_spectral_function(args...; kwargs...) = _call_visualization(:visualize_spectral_function, args...; kwargs...)
+visualize_phase_transition(args...; kwargs...) = _call_visualization(:visualize_phase_transition, args...; kwargs...)
+visualize_renormalized_bands(args...; kwargs...) = _call_visualization(:visualize_renormalized_bands, args...; kwargs...)
+visualize_zeeman_pairing_landscape(args...; kwargs...) = _call_visualization(:visualize_zeeman_pairing_landscape, args...; kwargs...)
+visualize_collective_modes(args...; kwargs...) = _call_visualization(:visualize_collective_modes, args...; kwargs...)
+visualize_lattice(args...; kwargs...) = _call_visualization(:visualize_lattice, args...; kwargs...)
+visualize_reciprocal_space(args...; kwargs...) = _call_visualization(:visualize_reciprocal_space, args...; kwargs...)
 
 # 6. Backward Compatibility and Aliases
 const LindhardSusceptibility = GeneralizedSusceptibility

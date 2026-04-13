@@ -22,6 +22,74 @@ function _configure_blas_threads!(n::Integer=1)
     return nothing
 end
 
+function _default_plot_filename(task_type::AbstractString)
+    return task_type * ".png"
+end
+
+function _activate_plot_backend!()
+    for backend in (:CairoMakie, :GLMakie, :WGLMakie)
+        isnothing(Base.find_package(String(backend))) && continue
+        try
+            Core.eval(Main, :(import $(backend)))
+            return backend
+        catch err
+            @warn "Failed to activate plotting backend." backend=String(backend) error=err
+        end
+    end
+    return nothing
+end
+
+function _plot_result_payload(task_type::AbstractString, result, params)
+    if task_type == "scan_spectral_function"
+        data = SpectralMapData(
+            params.task.qpath,
+            params.task.omegas,
+            result,
+            0.0,
+            nothing,
+            params.task.T_val,
+        )
+        return plot_spectral_function(data)
+    elseif task_type == "compute_phase_transition_data"
+        return plot_phase_transition(result)
+    elseif task_type == "compute_renormalized_band_data"
+        return plot_renormalized_bands(result)
+    elseif task_type == "compute_collective_mode_spectral_data"
+        return plot_collective_modes(result)
+    elseif task_type == "compute_zeeman_pairing_data"
+        return plot_zeeman_pairing_landscape(result)
+    end
+    throw(ArgumentError("No plotter registered for task type $(task_type)."))
+end
+
+function _maybe_save_plot(out_dir::AbstractString, task_type::AbstractString, result, params)
+    params.plot.enable || return nothing
+
+    figure = _plot_result_payload(task_type, result, params)
+    plot_path = isnothing(params.plot.path) ? joinpath(out_dir, _default_plot_filename(task_type)) :
+        (isabspath(params.plot.path) ? params.plot.path : joinpath(out_dir, params.plot.path))
+    mkpath(dirname(plot_path))
+    backend = _activate_plot_backend!()
+
+    if isnothing(backend)
+        @warn "Plotting requested but no Makie backend is available; skipping figure export." file=plot_path
+        return nothing
+    end
+
+    try
+        Eliashberg.load_visualization!()
+        visualization = Base.invokelatest(getproperty, Eliashberg, :Visualization)
+        makie_module = Base.invokelatest(getproperty, visualization, :Makie)
+        save_fn = Base.invokelatest(getproperty, makie_module, :save)
+        Base.invokelatest(save_fn, plot_path, figure)
+        @info "Plot saved successfully." file = plot_path backend = String(backend)
+        return plot_path
+    catch err
+        @warn "Plotting failed; numerical outputs were still saved." file=plot_path backend=String(backend) error=err
+        return nothing
+    end
+end
+
 
 function submit_job(toml_path::String)
     @info "Parsing cluster job specification..." file = toml_path
@@ -134,8 +202,9 @@ function submit_job(toml_path::String)
     end
     jldsave(jld2_file; result=result, config=config)
     write_result_hdf5(hdf5_file, hdf5_result, config, toml_path; time_seconds=time_taken)
+    plot_file = _maybe_save_plot(out_dir, task_type, result, params)
 
-    @info "Job completed successfully!" time_seconds = time_taken output_dir = out_dir jld2_file = jld2_file hdf5_file = hdf5_file
+    @info "Job completed successfully!" time_seconds = time_taken output_dir = out_dir jld2_file = jld2_file hdf5_file = hdf5_file plot_file = plot_file
 end
 
 # 允许从命令行直接调用
