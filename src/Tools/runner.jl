@@ -351,7 +351,7 @@ function submit_job(toml_path::String)
                 🚀 Starting Eliashberg Cluster Job
                 ============================================================
                 [ Task Configuration ]
-                • Task Type     : $(config.task.type)
+                • Task Type     : $(task_type)
                 • Config File   : $(toml_path)
                 • Output Dir    : $(out_dir)
 
@@ -360,11 +360,11 @@ function submit_job(toml_path::String)
                 • Threading     : 1 Process Thread / 1 BLAS Thread
 
                 [ Physical System ]
-                • Geometry      : 2D $(config.geometry.type) (a = $(config.geometry.a))
-                • K-Grid        : $(prod(params.kpoints)) points
-                • Model         : 2D $(config.model.type) (EF = $(config.model.EF))
-                • Interaction   : $(config.interaction.type)
-                • Field Channel : $(config.field.type)
+                • Geometry      : $(Eliashberg.cell_summary(params.geometry))
+                • K-Grid        : $(Eliashberg.grid_summary(params.geometry))
+                • Model         : $(Eliashberg.model_summary(params.model))
+                • Interaction   : $(Eliashberg.interaction_summary(params.interaction))
+                • Field Channel : $(Eliashberg.field_summary(params.field))
 
                 [ Scan Parameters ]
                 • Frequency (ω) : $(config.task.omega_range[1]) to $(config.task.omega_range[2]) (400 points)
