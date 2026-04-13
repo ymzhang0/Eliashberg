@@ -24,6 +24,8 @@ export EliashbergConfig, load_config
     write_jld2::Bool = true
     backup_config::Bool = true
     log_filename::Union{String,Nothing} = "job.log"
+    log_level::String = "info"
+    quiet::Bool = false
 end
 
 # ---------------------------------------------------------

@@ -72,13 +72,26 @@ function _resolve_result_paths(out_dir::AbstractString, system)
     return (; jld2_file, hdf5_file, log_file)
 end
 
-function _open_job_logger(log_file::Union{Nothing,AbstractString})
-    isnothing(log_file) && return (current_logger(), nothing)
+function _parse_log_level(level::AbstractString)
+    normalized = lowercase(strip(level))
+    normalized in ("debug", "trace") && return Logging.Debug
+    normalized == "info" && return Logging.Info
+    normalized in ("warn", "warning") && return Logging.Warn
+    normalized == "error" && return Logging.Error
+    throw(ArgumentError("Unsupported system.log_level=$(repr(level)). Use one of: debug, info, warn, error."))
+end
+
+function _open_job_logger(system, log_file::Union{Nothing,AbstractString})
+    file_level = _parse_log_level(system.log_level)
+    console_level = system.quiet ? Logging.Warn : file_level
+    console_logger = ConsoleLogger(stderr, console_level)
+
+    isnothing(log_file) && return (console_logger, nothing)
 
     mkpath(dirname(log_file))
     io = open(log_file, "w")
-    file_logger = SimpleLogger(io, Logging.Info)
-    return (TeeLogger((current_logger(), file_logger)), io)
+    file_logger = SimpleLogger(io, file_level)
+    return (TeeLogger((console_logger, file_logger)), io)
 end
 
 function _activate_plot_backend!()
@@ -152,7 +165,7 @@ function submit_job(toml_path::String)
     out_dir = _resolve_job_directory(config.system, timestamp)
     mkpath(out_dir)
     paths = _resolve_result_paths(out_dir, config.system)
-    logger, log_io = _open_job_logger(paths.log_file)
+    logger, log_io = _open_job_logger(config.system, paths.log_file)
 
     try
         return with_logger(logger) do

@@ -8,6 +8,8 @@ write_hdf5 = true
 write_jld2 = true
 backup_config = true
 log_filename = "runner.log"
+log_level = "info"
+quiet = false
 
 [geometry]
 type = "SquareLattice"
