@@ -1,0 +1,69 @@
+┌ Info: Starting Eliashberg job
+│   config_file = examples/plasmon/plasmon_2d.toml
+│   task_type = scan_spectral_function
+│   output_dir = results/plasmon_2d_20260413_112021
+│   log_file = results/plasmon_2d_20260413_112021/runner.log
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:309
+┌ Info: Execution resources
+│   project = /Users/yimingzhang/Developer/theory/Eliashberg/Project.toml
+│   bootstrap_workers = true
+│   requested_workers = 31
+│   available_workers = 1
+│   planned_workers = 31
+│   threads_per_process = 1
+│   blas_threads = 1
+│   restrict = true
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:310
+┌ Info: Building lattice and noninteracting model from input...
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:312
+┌ Info: Physical system ready
+│   lattice = (dim = 2, lattice_norms = [1.5, 1.5], periodicity = (true, true))
+│   kgrid = (type = "KGrid{2}", dim = 2, n_points = 2500, weight_sum = 1.000000000000001)
+│   model = (type = "TightBinding", dim = 2, n_hoppings = 4, EF = -0.5)
+│   interaction = (type = "BareCoulombInteraction",)
+│   field = (type = "DirectChannel",)
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:314
+┌ Info: Running task
+│   summary = (task = "scan spectral function", q_path = (dim = 2, n_points = 151, n_branches = 1, n_nodes = 4, node_labels = ["Γ", "X", "M", "Γ"]), omega_range = (0.0, 5.0), n_omegas = 400, temperature = 0.01, eta = 0.02)
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:315
+┌ Info: Preparing worker pool...
+│   requested_workers = 31
+│   current_workers = 1
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:321
+┌ Info: Loading Eliashberg runtime on workers...
+│   worker_count = 30
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:335
+┌ Error: Schedule parameter samples failed
+│   stage = Schedule parameter samples
+│   status = error
+│   elapsed_s = 12.396017
+│   context = (dims = (151,), bootstrap_workers = true, requested_workers = 31, current_workers = 30)
+│   error_type = UndefVarError
+│   error_message = UndefVarError: `promote_typejoin` not defined in `Eliashberg.Engine`
+Suggestion: check for spelling errors or missing imports.
+└ @ Eliashberg /Users/yimingzhang/Developer/theory/Eliashberg/src/LoggingUtils.jl:0
+┌ Error: Evaluate parameter grid failed
+│   stage = Evaluate parameter grid
+│   status = error
+│   elapsed_s = 12.760800959
+│   context = (kernel = "Eliashberg.RPASpectralFunctionRowTask{2, GeneralizedSusceptibility{TightBinding{2}, KGrid{2}, DirectChannel}, BareCoulombInteraction, Vector{Float64}}", n_axes = 1, axes = [(type = "Vector{StaticArraysCore.SVector{2, Float64}}", length = 151)], bootstrap_workers = true, requested_workers = 31, project = "/Users/yimingzhang/Developer/theory/Eliashberg/Project.toml", restrict = true)
+│   error_type = UndefVarError
+│   error_message = UndefVarError: `promote_typejoin` not defined in `Eliashberg.Engine`
+Suggestion: check for spelling errors or missing imports.
+└ @ Eliashberg /Users/yimingzhang/Developer/theory/Eliashberg/src/LoggingUtils.jl:0
+┌ Error: Scan RPA spectral function failed
+│   stage = Scan RPA spectral function
+│   status = error
+│   elapsed_s = 12.99885525
+│   context = (model = (type = "TightBinding", dim = 2, n_hoppings = 4, EF = -0.5), interaction = (type = "BareCoulombInteraction",), field = (type = "DirectChannel",), kgrid = (type = "KGrid{2}", dim = 2, n_points = 2500, weight_sum = 1.000000000000001), qaxis = (type = "Vector{StaticArraysCore.SVector{2, Float64}}", length = 151), omegas = (type = "Vector{Float64}", length = 400), T = 0.01, eta = 0.02, bootstrap_workers = true, requested_workers = 31)
+│   error_type = UndefVarError
+│   error_message = UndefVarError: `promote_typejoin` not defined in `Eliashberg.Engine`
+Suggestion: check for spelling errors or missing imports.
+└ @ Eliashberg /Users/yimingzhang/Developer/theory/Eliashberg/src/LoggingUtils.jl:0
+┌ Error: Scan spectral function along path failed
+│   stage = Scan spectral function along path
+│   status = error
+│   elapsed_s = 13.141990458
+│   context = (model = (type = "TightBinding", dim = 2, n_hoppings = 4, EF = -0.5), interaction = (type = "BareCoulombInteraction",), field = (type = "DirectChannel",), kgrid = (type = "KGrid{2}", dim = 2, n_points = 2500, weight_sum = 1.000000000000001), qpath = (dim = 2, n_points = 151, n_branches = 1, n_nodes = 4, node_labels = ["Γ", "X", "M", "Γ"]), omegas = (type = "Vector{Float64}", length = 400), T = 0.01, eta = 0.02, bootstrap_workers = true, requested_workers = 31)
+│   exception = (UndefVarError(:promote_typejoin, 0x0000000000009846, Eliashberg.Engine), Union{Ptr{Nothing}, Base.InterpreterIP}[Ptr{Nothing}(0x0000000107ca66df), Ptr{Nothing}(0x000000016f60c26b), Ptr{Nothing}(0x000000016f5d4e57), Ptr{Nothing}(0x000000016f58428b), Ptr{Nothing}(0x000000016f5843c7), Ptr{Nothing}(0x000000016f50446b), Ptr{Nothing}(0x000000016f54c213), Ptr{Nothing}(0x000000016f53445f), Ptr{Nothing}(0x000000016f53c0bf), Ptr{Nothing}(0x000000016f53c22f), Ptr{Nothing}(0x0000000107c3a21f), Ptr{Nothing}(0x000000016f4fc14f), Ptr{Nothing}(0x000000016f48425f), Ptr{Nothing}(0x000000016f49c533), Ptr{Nothing}(0x000000016f4ac257), Ptr{Nothing}(0x000000016f4a41e3), Ptr{Nothing}(0x000000016f4544db), Ptr{Nothing}(0x000000016f48c2c7), Ptr{Nothing}(0x000000016f4440b7), Ptr{Nothing}(0x000000016f4441f7), Ptr{Nothing}(0x00000001406248bb), Ptr{Nothing}(0x00000001407cc213), Ptr{Nothing}(0x00000001407cc467), Ptr{Nothing}(0x0000000118a6813f), Ptr{Nothing}(0x0000000118ab0697), Ptr{Nothing}(0x0000000118ab0807), Ptr{Nothing}(0x0000000107c51c2b), Ptr{Nothing}(0x0000000107c5162b), Ptr{Nothing}(0x0000000107c5029b), Ptr{Nothing}(0x0000000107c50907), Base.InterpreterIP in top-level CodeInfo for Main at statement 19, Ptr{Nothing}(0x0000000107c6b2b7), Ptr{Nothing}(0x0000000107c6afb3), Ptr{Nothing}(0x0000000107c6c20f), Ptr{Nothing}(0x000000011c0cf977), Ptr{Nothing}(0x000000011c6c249f), Ptr{Nothing}(0x000000011c0d4317), Ptr{Nothing}(0x000000011c0d47cf), Ptr{Nothing}(0x000000011c6a76a7), Ptr{Nothing}(0x000000011cc53d6b), Ptr{Nothing}(0x000000011d28f313), Ptr{Nothing}(0x0000000107c8e45b), Ptr{Nothing}(0x0000000107c8e34b)])
+└ @ Eliashberg /Users/yimingzhang/Developer/theory/Eliashberg/src/LoggingUtils.jl:0

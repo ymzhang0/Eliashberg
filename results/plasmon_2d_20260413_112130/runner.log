@@ -1,0 +1,47 @@
+┌ Info: Starting Eliashberg job
+│   config_file = examples/plasmon/plasmon_2d.toml
+│   task_type = scan_spectral_function
+│   output_dir = results/plasmon_2d_20260413_112130
+│   log_file = results/plasmon_2d_20260413_112130/runner.log
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:309
+┌ Info: Execution resources
+│   project = /Users/yimingzhang/Developer/theory/Eliashberg/Project.toml
+│   bootstrap_workers = true
+│   requested_workers = 31
+│   available_workers = 1
+│   planned_workers = 31
+│   threads_per_process = 1
+│   blas_threads = 1
+│   restrict = true
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:310
+┌ Info: Building lattice and noninteracting model from input...
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:312
+┌ Info: Physical system ready
+│   lattice = (dim = 2, lattice_norms = [1.5, 1.5], periodicity = (true, true))
+│   kgrid = (type = "KGrid{2}", dim = 2, n_points = 2500, weight_sum = 1.000000000000001)
+│   model = (type = "TightBinding", dim = 2, n_hoppings = 4, EF = -0.5)
+│   interaction = (type = "BareCoulombInteraction",)
+│   field = (type = "DirectChannel",)
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:314
+┌ Info: Running task
+│   summary = (task = "scan spectral function", q_path = (dim = 2, n_points = 151, n_branches = 1, n_nodes = 4, node_labels = ["Γ", "X", "M", "Γ"]), omega_range = (0.0, 5.0), n_omegas = 400, temperature = 0.01, eta = 0.02)
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:315
+┌ Info: Preparing worker pool...
+│   requested_workers = 31
+│   current_workers = 1
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:321
+┌ Info: Loading Eliashberg runtime on workers...
+│   worker_count = 30
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:335
+┌ Info: Job completed successfully
+│   elapsed_s = 13.074
+│   workers_used = 31
+│   result = (result_type = "Matrix{Float64}", size = (151, 400), eltype = "Float64")
+│   output_dir = results/plasmon_2d_20260413_112130
+│   jld2_file = results/plasmon_2d_20260413_112130/plasmon_scan.jld2
+│   hdf5_file = results/plasmon_2d_20260413_112130/plasmon_scan.h5
+│   log_file = results/plasmon_2d_20260413_112130/runner.log
+│   plot_file = nothing
+│   live_heap = 54.74 MiB
+│   peak_rss = 922.6 MiB
+└ @ Main /Users/yimingzhang/Developer/theory/Eliashberg/src/Tools/runner.jl:408

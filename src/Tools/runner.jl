@@ -57,7 +57,7 @@ function _configure_blas_threads!(n::Integer=1)
     try
         BLAS.set_num_threads(n)
     catch err
-        @warn "Failed to set BLAS thread count." requested_threads=n error=err
+        @warn "Failed to set BLAS thread count." requested_threads = n error = err
     end
     return nothing
 end
@@ -231,7 +231,7 @@ function _activate_plot_backend!()
             Core.eval(Main, :(import $(backend)))
             return backend
         catch err
-            @warn "Failed to activate plotting backend." backend=String(backend) error=err
+            @warn "Failed to activate plotting backend." backend = String(backend) error = err
         end
     end
     return nothing
@@ -265,12 +265,12 @@ function _maybe_save_plot(out_dir::AbstractString, task_type::AbstractString, re
 
     figure = _plot_result_payload(task_type, result, params)
     plot_path = isnothing(params.plot.path) ? joinpath(out_dir, _default_plot_filename(task_type)) :
-        (isabspath(params.plot.path) ? params.plot.path : joinpath(out_dir, params.plot.path))
+                (isabspath(params.plot.path) ? params.plot.path : joinpath(out_dir, params.plot.path))
     mkpath(dirname(plot_path))
     backend = _activate_plot_backend!()
 
     if isnothing(backend)
-        @warn "Plotting requested but no Makie backend is available; skipping figure export." file=plot_path
+        @warn "Plotting requested but no Makie backend is available; skipping figure export." file = plot_path
         return nothing
     end
 
@@ -283,7 +283,7 @@ function _maybe_save_plot(out_dir::AbstractString, task_type::AbstractString, re
         @info "Plot saved successfully." file = plot_path backend = String(backend)
         return plot_path
     catch err
-        @warn "Plotting failed; numerical outputs were still saved." file=plot_path backend=String(backend) error=err
+        @warn "Plotting failed; numerical outputs were still saved." file = plot_path backend = String(backend) error = err
         return nothing
     end
 end
@@ -305,19 +305,19 @@ function submit_job(toml_path::String)
             _configure_blas_threads!(1)
             resource_summary = _resource_summary(config, project)
 
-            @info "Starting Eliashberg job" config_file = toml_path task_type = task_type output_dir = out_dir log_file = paths.log_file
-            @info "Execution resources" project = resource_summary.project bootstrap_workers = resource_summary.bootstrap_workers requested_workers = resource_summary.requested_workers available_workers = resource_summary.available_workers planned_workers = resource_summary.planned_workers threads_per_process = resource_summary.threads_per_process blas_threads = resource_summary.blas_threads restrict = resource_summary.restrict
+            # @info "Starting Eliashberg job" config_file = toml_path task_type = task_type output_dir = out_dir log_file = paths.log_file
+            # @info "Execution resources" project = resource_summary.project bootstrap_workers = resource_summary.bootstrap_workers requested_workers = resource_summary.requested_workers available_workers = resource_summary.available_workers planned_workers = resource_summary.planned_workers threads_per_process = resource_summary.threads_per_process blas_threads = resource_summary.blas_threads restrict = resource_summary.restrict
 
-            @info "Building lattice and noninteracting model from input..."
+            # @info "Building lattice and noninteracting model from input..."
             params = build_from_config(config)
-            @info "Physical system ready" lattice = Eliashberg.cell_summary(params.geometry) kgrid = Eliashberg.grid_summary(params.kpoints) model = Eliashberg.model_summary(params.model) interaction = Eliashberg.interaction_summary(params.interaction) field = Eliashberg.field_summary(params.field)
-            @info "Running task" summary = _task_run_summary(task_type, params)
+            # @info "Physical system ready" lattice = Eliashberg.cell_summary(params.geometry) kgrid = Eliashberg.grid_summary(params.kpoints) model = Eliashberg.model_summary(params.model) interaction = Eliashberg.interaction_summary(params.interaction) field = Eliashberg.field_summary(params.field)
+            # @info "Running task" summary = _task_run_summary(task_type, params)
 
             n_requested = config.system.n_workers
             n_current = nworkers()
 
             if config.system.bootstrap_workers && n_requested > n_current
-                @info "Preparing worker pool..." requested_workers = n_requested current_workers = n_current
+                # @info "Preparing worker pool..." requested_workers = n_requested current_workers = n_current
                 addprocs(
                     n_requested - n_current;
                     exeflags="--project=$(project) --threads=1",
@@ -331,7 +331,7 @@ function submit_job(toml_path::String)
                 )
             end
 
-            @info "Loading Eliashberg runtime on workers..." worker_count = nworkers()
+            # @info "Loading Eliashberg runtime on workers..." worker_count = nworkers()
             for worker_id in workers()
                 remotecall_wait(Core.eval, worker_id, Main, quote
                     import Pkg
@@ -347,7 +347,37 @@ function submit_job(toml_path::String)
 
             config.system.backup_config && cp(toml_path, joinpath(out_dir, "input_backup.toml"); force=true)
 
+            startup_msg = """
+                🚀 Starting Eliashberg Cluster Job
+                ============================================================
+                [ Task Configuration ]
+                • Task Type     : $(config.task.type)
+                • Config File   : $(toml_path)
+                • Output Dir    : $(out_dir)
+
+                [ Compute Resources ]
+                • Workers       : $(n_current) current -> $(n_requested) planned
+                • Threading     : 1 Process Thread / 1 BLAS Thread
+
+                [ Physical System ]
+                • Geometry      : 2D $(config.geometry.type) (a = $(config.geometry.a))
+                • K-Grid        : $(prod(params.kpoints)) points
+                • Model         : 2D $(config.model.type) (EF = $(config.model.EF))
+                • Interaction   : $(config.interaction.type)
+                • Field Channel : $(config.field.type)
+
+                [ Scan Parameters ]
+                • Frequency (ω) : $(config.task.omega_range[1]) to $(config.task.omega_range[2]) (400 points)
+                • Temperature   : $(config.task.T_val)
+                • Smearing (η)  : $(config.task.eta)
+                ============================================================"""
+
+            @info startup_msg
+
             result = nothing
+
+            @info "⏳ Provisioning workers and loading runtime on $(n_requested) nodes..."
+
             time_taken = @elapsed begin
                 if task_type == "scan_spectral_function"
                     result = scan_spectral_function(
@@ -403,8 +433,30 @@ function submit_job(toml_path::String)
             plot_file = _maybe_save_plot(out_dir, task_type, result, params)
             live_heap_bytes = _safe_live_heap_bytes()
             maxrss_bytes = _safe_maxrss_bytes()
+            julia_live_heap = isnothing(live_heap_bytes) ? nothing : _format_bytes(live_heap_bytes)
+            peak_resident_memory = isnothing(maxrss_bytes) ? nothing : _format_bytes(maxrss_bytes)
 
-            @info "Job completed successfully" wall_time_seconds = _format_seconds(time_taken) worker_processes = nworkers() result_summary = _result_summary(result) output_directory = out_dir jld2_output = paths.jld2_file hdf5_output = paths.hdf5_file run_log = paths.log_file plot_output = plot_file julia_live_heap = isnothing(live_heap_bytes) ? nothing : _format_bytes(live_heap_bytes) peak_resident_memory = isnothing(maxrss_bytes) ? nothing : _format_bytes(maxrss_bytes)
+            summary_msg = """
+✅ Job Completed Successfully!
+============================================================
+[ Performance ]
+  • Wall Time     : $(_format_seconds(time_taken))
+  • Workers Used  : $(nworkers())
+
+[ Outputs & Storage ]
+  • Directory     : $(out_dir)
+  • Data File     : 💾 $(paths.jld2_file)
+  • HDF5 Backup   : 💾 $(paths.hdf5_file)
+  • Raw Log       : 📄 $(paths.log_file)
+
+[ Data Summary ]
+  • Result Shape  : $(size(result))  # 直接打印矩阵维度，比如 (151, 400)
+  • Julia Live Heap : $(julia_live_heap)
+  • Memory Peak   : $(peak_resident_memory)
+============================================================"""
+
+            @info summary_msg
+            # @info "Job completed successfully" wall_time_seconds = _format_seconds(time_taken) worker_processes = nworkers() result_summary = _result_summary(result) output_directory = out_dir jld2_output = paths.jld2_file hdf5_output = paths.hdf5_file run_log = paths.log_file plot_output = plot_file julia_live_heap = isnothing(live_heap_bytes) ? nothing : _format_bytes(live_heap_bytes) peak_resident_memory = isnothing(maxrss_bytes) ? nothing : _format_bytes(maxrss_bytes)
             return (; result, output_dir=out_dir, jld2_file=paths.jld2_file, hdf5_file=paths.hdf5_file, log_file=paths.log_file, plot_file)
         end
     finally
