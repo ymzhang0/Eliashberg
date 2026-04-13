@@ -1,4 +1,5 @@
 const _LOG_STAGE_GROUP = :eliashberg_stage
+const _LOG_STAGE_DEPTH_KEY = :eliashberg_stage_depth
 
 function _stage_log(level::LogLevel, message::AbstractString; kwargs...)
     logger = current_logger()
@@ -20,6 +21,8 @@ end
 
 function with_stage_log(f::F, stage::AbstractString; level::LogLevel=Logging.Info, context::NamedTuple=NamedTuple(), summarize_result=nothing) where {F}
     start_ns = time_ns()
+    depth = get(task_local_storage(), _LOG_STAGE_DEPTH_KEY, 0)
+    task_local_storage(_LOG_STAGE_DEPTH_KEY, depth + 1)
     _stage_log(level, "$(stage) started"; stage, status=:start, context)
 
     try
@@ -30,8 +33,23 @@ function with_stage_log(f::F, stage::AbstractString; level::LogLevel=Logging.Inf
         return result
     catch err
         elapsed_s = (time_ns() - start_ns) / 1.0e9
-        _stage_log(Logging.Error, "$(stage) failed"; stage, status=:error, elapsed_s, context, exception=(err, catch_backtrace()))
+        if depth == 0
+            _stage_log(Logging.Error, "$(stage) failed"; stage, status=:error, elapsed_s, context, exception=(err, catch_backtrace()))
+        else
+            _stage_log(
+                Logging.Error,
+                "$(stage) failed";
+                stage,
+                status=:error,
+                elapsed_s,
+                context,
+                error_type=string(typeof(err)),
+                error_message=sprint(showerror, err),
+            )
+        end
         rethrow()
+    finally
+        task_local_storage(_LOG_STAGE_DEPTH_KEY, depth)
     end
 end
 

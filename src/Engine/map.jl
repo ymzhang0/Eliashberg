@@ -113,7 +113,8 @@ function _map_parameter_task(
         index_space = collect(CartesianIndices(dims))
 
         if Distributed.nworkers() > 1
-            return Distributed.pmap(map_task, index_space)
+            worker_kernel = index -> map_task(index)
+            return Distributed.pmap(worker_kernel, index_space)
         end
 
         return map(map_task, index_space)

@@ -17,6 +17,13 @@ export EliashbergConfig, load_config
     bootstrap_workers::Bool = false
     project::Union{String,Nothing} = nothing
     restrict::Bool = true
+    output_dir::String = "results"
+    job_name::Union{String,Nothing} = nothing
+    output_filename::String = "data"
+    write_hdf5::Bool = true
+    write_jld2::Bool = true
+    backup_config::Bool = true
+    log_filename::Union{String,Nothing} = "job.log"
 end
 
 # ---------------------------------------------------------
