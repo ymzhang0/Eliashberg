@@ -49,9 +49,9 @@ function solve_bcs(
     return with_stage_log(
         "Solve BCS";
         context=(
-            grid=grid_summary(kgrid),
-            model=model_summary(dispersion_model),
-            interaction=interaction_summary(interaction_model),
+            grid=kgrid,
+            model=dispersion_model,
+            interaction=interaction_model,
             matrix_format=matrix_format,
             sparse_atol=Float64(sparse_atol),
             bootstrap_workers=bootstrap_workers,
@@ -74,7 +74,7 @@ function solve_bcs(
                 restrict=restrict
             )
             if !isfinite_value(kinetic_vector)
-                @error "BCS kinetic vector contains non-finite entries." nonfinite_entries=count_nonfinite(kinetic_vector) grid=grid_summary(kgrid) model=model_summary(dispersion_model)
+                @error "BCS kinetic vector contains non-finite entries." nonfinite_entries = count_nonfinite(kinetic_vector) grid = kgrid model = dispersion_model
                 throw(PhysicalParameterError("kinetic_vector", "NaN/Inf", "Evaluated BCS kinetic vector contains non-finite entries. Check if dispersion model or grid produces singularities."))
             end
             pairing_matrix = @timeit TO "Pairing Matrix Assembly" _assemble_bcs_pairing_matrix(
@@ -89,62 +89,25 @@ function solve_bcs(
                 restrict=restrict
             )
 
-            H = _materialize_bcs_matrix(pairing_matrix)
+            H = Engine.prepare_matrix_for_diagonal_update(pairing_matrix)
             H[diagind(H)] .+= kinetic_vector
             if !isfinite_value(H)
-                @error "BCS matrix contains non-finite entries before eigensolve." nonfinite_entries=count_nonfinite(H) matrix=matrix_summary(H)
+                @error "BCS matrix contains non-finite entries before eigensolve." nonfinite_entries = count_nonfinite(H) matrix = H
                 throw(PhysicalParameterError("BCS Matrix", "NaN/Inf", "Assembled Hamiltonian contains non-finite entries. Check model parameters or sparse_atol."))
             end
 
-            spectrum = Engine.solve_assembled_eigensystem(H; solver=_resolve_bcs_eigensolver(H, eigensolver))
-            !isfinite_value(spectrum.values) && @warn "BCS eigenspectrum contains non-finite eigenvalues." nonfinite_values=count_nonfinite(spectrum.values) matrix_format=matrix_format grid=grid_summary(kgrid)
+            spectrum = Engine.solve_assembled_eigensystem(
+                H;
+                solver=Engine.resolve_assembled_eigensolver(
+                    H,
+                    eigensolver;
+                    sparse_warning="Sparse BCS matrix is using dense eigensolver fallback. Provide `eigensolver=Engine.SparseEigenSolverHook(...)` for large problems.",
+                ),
+            )
+            !isfinite_value(spectrum.values) && @warn "BCS eigenspectrum contains non-finite eigenvalues." nonfinite_values = count_nonfinite(spectrum.values) matrix_format = matrix_format grid = kgrid
             return spectrum.values, spectrum.vectors
         end
     end
-end
-
-function _assemble_bcs_pairing_matrix(
-    ::Val{:dense},
-    samples,
-    interaction_model::Interaction,
-    dispersion_model::ElectronicDispersion;
-    bootstrap_workers::Bool=false,
-    n_workers::Integer=max(0, Threads.nthreads() - 1),
-    project::Union{Nothing,AbstractString}=Base.active_project(),
-    restrict::Bool=true
-)
-    return Engine.assemble_grid_matrix(
-        BCSPairingAssemblyTask(interaction_model, dispersion_model),
-        samples,
-        samples;
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
-end
-
-function _assemble_bcs_pairing_matrix(
-    ::Val{:sparse},
-    samples,
-    interaction_model::Interaction,
-    dispersion_model::ElectronicDispersion;
-    sparse_atol::Real=0.0,
-    bootstrap_workers::Bool=false,
-    n_workers::Integer=max(0, Threads.nthreads() - 1),
-    project::Union{Nothing,AbstractString}=Base.active_project(),
-    restrict::Bool=true
-)
-    return Engine.assemble_sparse_grid_matrix(
-        BCSPairingAssemblyTask(interaction_model, dispersion_model),
-        samples,
-        samples;
-        atol=sparse_atol,
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
 end
 
 function _assemble_bcs_pairing_matrix(
@@ -158,42 +121,25 @@ function _assemble_bcs_pairing_matrix(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 )
-    if matrix_format == :dense
-        return _assemble_bcs_pairing_matrix(
-            Val(:dense),
-            samples,
-            interaction_model,
-            dispersion_model;
-            bootstrap_workers=bootstrap_workers,
-            n_workers=n_workers,
-            project=project,
-            restrict=restrict
-        )
-    elseif matrix_format == :sparse
-        return _assemble_bcs_pairing_matrix(
-            Val(:sparse),
-            samples,
-            interaction_model,
-            dispersion_model;
-            sparse_atol=sparse_atol,
-            bootstrap_workers=bootstrap_workers,
-            n_workers=n_workers,
-            project=project,
-            restrict=restrict
-        )
-    end
-
-    throw(ConfigurationError("matrix_format", matrix_format, "Unsupported matrix_format. Expected `:dense` or `:sparse`."))
-end
-
-_materialize_bcs_matrix(matrix::AbstractMatrix) = matrix
-_materialize_bcs_matrix(matrix::SparseMatrixCSC) = copy(matrix)
-
-function _resolve_bcs_eigensolver(::SparseMatrixCSC, eigensolver)
-    isnothing(eigensolver) && @warn "Sparse BCS matrix is using dense eigensolver fallback. Provide `eigensolver=Engine.SparseEigenSolverHook(...)` for large problems."
-    return isnothing(eigensolver) ? Engine.DenseEigenSolver() : eigensolver
-end
-
-function _resolve_bcs_eigensolver(::AbstractMatrix, eigensolver)
-    return isnothing(eigensolver) ? Engine.DenseEigenSolver() : eigensolver
+    task = BCSPairingAssemblyTask(interaction_model, dispersion_model)
+    dense_builder = () -> Engine.assemble_grid_matrix(
+        task,
+        samples,
+        samples;
+        bootstrap_workers=bootstrap_workers,
+        n_workers=n_workers,
+        project=project,
+        restrict=restrict
+    )
+    sparse_builder = () -> Engine.assemble_sparse_grid_matrix(
+        task,
+        samples,
+        samples;
+        atol=sparse_atol,
+        bootstrap_workers=bootstrap_workers,
+        n_workers=n_workers,
+        project=project,
+        restrict=restrict
+    )
+    return Engine.assemble_by_storage(matrix_format, dense_builder, sparse_builder)
 end

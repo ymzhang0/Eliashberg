@@ -8,6 +8,7 @@ struct FreeElectron{D} <: ElectronicDispersion{D}
     EF::Float64
     mass::Float64
 end
+Base.show(io::IO, m::FreeElectron{D}) where {D} = print(io, "FreeElectron (", D, "D, EF=", m.EF, ")")
 FreeElectron{D}(EF::Float64) where D = FreeElectron{D}(EF, 1.0) # default mass=1
 
 """
@@ -20,6 +21,7 @@ struct TightBinding{D} <: ElectronicDispersion{D}
     hoppings::Vector{Tuple{SVector{D,Int},Float64}}
     EF::Float64
 end
+Base.show(io::IO, m::TightBinding{D}) where {D} = print(io, "TightBinding (", D, "D, ", length(m.hoppings), " hoppings, EF=", m.EF, ")")
 
 """
     SpinorDispersion{D,M} <: ElectronicDispersion{D}
@@ -32,6 +34,7 @@ spin-down sectors.
 struct SpinorDispersion{D,M<:ElectronicDispersion{D}} <: ElectronicDispersion{D}
     bare::M
 end
+Base.show(io::IO, m::SpinorDispersion{D}) where {D} = print(io, "SpinorDispersion (", D, "D, bare=", m.bare, ")")
 
 SpinorDispersion(model::SpinorDispersion) = model
 
@@ -51,6 +54,7 @@ struct MultiOrbitalTightBinding{D} <: ElectronicDispersion{D}
     hoppings::Vector{Tuple{Int,Int,SVector{D,Int},ComplexF64}}
     EF::Float64
 end
+Base.show(io::IO, m::MultiOrbitalTightBinding{D}) where {D} = print(io, "MultiOrbitalTightBinding (", D, "D, ", m.num_orbitals, " orbitals, EF=", m.EF, ")")
 
 primitive_vectors(model::MultiOrbitalTightBinding) = getfield(model, :lattice)
 periodicity(model::MultiOrbitalTightBinding) = getfield(model, :periodicity)
@@ -71,8 +75,8 @@ end
 function MultiOrbitalTightBinding(cell::AbstractMatrix{<:Number}, num_orbitals, hoppings, EF)
     return with_stage_log(
         "Construct MultiOrbitalTightBinding";
-        context=(cell=cell_summary(cell), num_orbitals=Int(num_orbitals), EF=Float64(EF)),
-        summarize_result=model_summary,
+        context=(cell=cell, num_orbitals=Int(num_orbitals), EF=Float64(EF)),
+        summarize_result=identity,
     ) do
         primitive_cell = primitive_vectors(cell)
         D = size(primitive_cell, 1)
@@ -106,8 +110,8 @@ end
 function MultiOrbitalTightBinding(cell::PeriodicCell{D}, num_orbitals, hoppings, EF) where {D}
     return with_stage_log(
         "Construct MultiOrbitalTightBinding";
-        context=(cell=cell_summary(cell), num_orbitals=Int(num_orbitals), EF=Float64(EF)),
-        summarize_result=model_summary,
+        context=(cell=cell, num_orbitals=Int(num_orbitals), EF=Float64(EF)),
+        summarize_result=identity,
     ) do
         primitive_cell = primitive_vectors(cell)
         typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
@@ -121,8 +125,8 @@ end
 function MultiOrbitalTightBinding(system::AbstractSystem{D}, num_orbitals, hoppings, EF) where {D}
     return with_stage_log(
         "Construct MultiOrbitalTightBinding";
-        context=(cell=cell_summary(system), num_orbitals=Int(num_orbitals), EF=Float64(EF)),
-        summarize_result=model_summary,
+        context=(cell=system, num_orbitals=Int(num_orbitals), EF=Float64(EF)),
+        summarize_result=identity,
     ) do
         primitive_cell = primitive_vectors(system)
         typed_hoppings = Tuple{Int,Int,SVector{D,Int},ComplexF64}[
@@ -267,8 +271,8 @@ end
 function TightBinding(lattice::AbstractMatrix{<:Number}, hoppings, EF)
     return with_stage_log(
         "Construct TightBinding";
-        context=(cell=cell_summary(lattice), EF=Float64(EF), n_hoppings=length(hoppings)),
-        summarize_result=model_summary,
+        context=(cell=lattice, EF=Float64(EF), n_hoppings=length(hoppings)),
+        summarize_result=identity,
     ) do
         primitive_lattice = primitive_vectors(lattice)
         D = size(primitive_lattice, 1)
@@ -357,3 +361,103 @@ SSHModel(t1::Float64, t2::Float64, EF::Float64=0.0) = SSHModel(ChainLattice(1.0)
 MonoatomicLatticeModel{1}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{1}(ChainLattice(a), K, M)
 MonoatomicLatticeModel{2}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{2}(SquareLattice(a), K, M)
 MonoatomicLatticeModel{3}(K::Float64, M::Float64, a::Float64=1.0) = MonoatomicLatticeModel{3}(CubicLattice(a), K, M)
+
+
+
+"""
+    compute_dispersion_surface_data(disp::Dispersion, kgrid::AbstractKGrid{2})
+
+Compute a two-dimensional scalar field over a rectangular parameter grid.
+"""
+function compute_dispersion_surface_data(disp::Dispersion, kgrid::AbstractKGrid{2})
+    return with_stage_log(
+        "Compute dispersion surface data";
+        context=(model=disp, grid=kgrid),
+        summarize_result=data -> (nx=length(data.kxs), ny=length(data.kys)),
+    ) do
+        kxs = unique(sort([k[1] for k in kgrid.points]))
+        kys = unique(sort([k[2] for k in kgrid.points]))
+        ix = Dict(kx => idx for (idx, kx) in enumerate(kxs))
+        iy = Dict(ky => idx for (idx, ky) in enumerate(kys))
+        energy_matrix = zeros(Float64, length(kxs), length(kys))
+
+        for k in kgrid.points
+            values = real(band_structure(disp, k).values)
+            energy_matrix[ix[k[1]], iy[k[2]]] = values[1]
+        end
+
+        return DispersionSurfaceData(kxs, kys, energy_matrix)
+    end
+end
+
+"""
+    compute_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
+
+Compute band values along a path in parameter space. The returned dense matrix
+has one column per band and one row per path sample.
+"""
+function compute_band_data(disp::ElectronicDispersion, kpath::KPath{D}) where {D}
+    return with_stage_log(
+        "Compute band data";
+        context=(model=disp, kpath=kpath),
+        summarize_result=identity,
+    ) do
+        points = path_points(kpath)
+        bands = [real(band_structure(disp, k).values) for k in points]
+        num_bands = length(bands[1])
+        band_matrix = fill(NaN, length(points), num_bands)
+
+        for band_idx in 1:num_bands
+            band_matrix[:, band_idx] = [values[band_idx] for values in bands]
+        end
+
+        return BandStructureData(
+            kpath=kpath,
+            bands=band_matrix,
+            num_bands=num_bands
+        )
+    end
+end
+
+"""
+    compute_fermi_surface_volume(disp::ElectronicDispersion; n_pts=100)
+
+Compute a dense scalar field over a cubic sampling box for isosurface rendering.
+"""
+function compute_fermi_surface_volume(disp::ElectronicDispersion; n_pts::Integer=100)
+    return with_stage_log(
+        "Compute Fermi surface volume";
+        context=(model=disp, n_pts=Int(n_pts)),
+        summarize_result=data -> (nx=length(data.kxs), ny=length(data.kys), nz=length(data.kzs)),
+    ) do
+        kxs = range(-π, π, length=n_pts)
+        kys = range(-π, π, length=n_pts)
+        kzs = range(-π, π, length=n_pts)
+        energy_volume = zeros(Float32, length(kxs), length(kys), length(kzs))
+
+        for (i, kx) in enumerate(kxs)
+            for (j, ky) in enumerate(kys)
+                for (k, kz) in enumerate(kzs)
+                    values = real(band_structure(disp, SVector{3,Float64}(kx, ky, kz)).values)
+                    energy_volume[i, j, k] = Float32(values[1])
+                end
+            end
+        end
+
+        return FermiSurfaceData(kxs, kys, kzs, energy_volume)
+    end
+end
+
+function _band_matrix_along_path(
+    disp::ElectronicDispersion,
+    kpath::KPath
+)
+    points = path_points(kpath)
+    bands_k = Vector{Vector{Float64}}(undef, length(points))
+
+    Threads.@threads for idx in eachindex(points)
+        bands_k[idx] = collect(real.(band_structure(disp, points[idx]).values))
+    end
+
+    return stack(bands_k, dims=1)
+end

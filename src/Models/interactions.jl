@@ -2,6 +2,7 @@
 struct ConstantInteraction <: ElectronPhononInteraction
     V0::Float64
 end
+Base.show(io::IO, i::ConstantInteraction) = print(io, "ConstantInteraction V0=", i.V0, "")
 
 struct LocalInteraction <: ElectronPhononInteraction
     V0::Float64
@@ -31,6 +32,7 @@ end
 struct BareCoulombInteraction <: CoulombInteraction
     cutoff::Float64
 end
+Base.show(io::IO, i::BareCoulombInteraction) = print(io, "BareCoulombInteraction(cutoff=", i.cutoff, ")")
 
 # Legacy polarization types removed. GeneralizedSusceptibility is the new source of truth.
 
@@ -59,6 +61,7 @@ end
 struct CompositeInteraction{T<:Tuple} <: Interaction
     interactions::T
 end
+Base.show(io::IO, i::CompositeInteraction) = print(io, "CompositeInteraction (", length(i), " terms)")
 CompositeInteraction(ints::Vararg{Interaction}) = CompositeInteraction(ints)
 
 Base.length(comp::CompositeInteraction) = length(comp.interactions)
@@ -71,7 +74,7 @@ function _nearest_grid_index(q::SVector{D,Float64}, qgrid::AbstractKGrid{D}) whe
     best_idx = firstindex(qgrid)
     best_distance = norm(q - qgrid[best_idx])
 
-    for idx in (best_idx + 1):lastindex(qgrid)
+    for idx in (best_idx+1):lastindex(qgrid)
         distance = norm(q - qgrid[idx])
         if distance < best_distance
             best_idx = idx
@@ -261,6 +264,7 @@ end
 struct CombinedInteraction{T<:Tuple} <: Interaction
     interactions::T
 end
+Base.show(io::IO, i::CombinedInteraction) = print(io, "CombinedInteraction (", length(i.interactions), " terms)")
 
 # 重载 Julia 的 '+' 运算符！
 Base.:+(a::Interaction, b::Interaction) = CombinedInteraction((a, b))

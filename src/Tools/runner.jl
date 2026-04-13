@@ -7,6 +7,7 @@ using Dates
 using TOML
 using LinearAlgebra
 using Logging
+using LoggingExtras
 using TerminalLoggers
 using JLD2        # 用于无损保存 Julia 数据结构
 
@@ -15,23 +16,40 @@ using Eliashberg
 using Eliashberg.Config: EliashbergConfig, Configurations, build_from_config
 include("exports.jl")
 
-struct TeeLogger{L<:Tuple} <: AbstractLogger
-    loggers::L
-end
+# ========================================================
+# 初始化全局基础 Logger（作为保底）
+# 注意：每个任务具体的 Logger 会在 _open_job_logger 中动态生成
+# ========================================================
 
-Logging.min_enabled_level(logger::TeeLogger) = minimum(Logging.min_enabled_level(child) for child in logger.loggers)
-Logging.catch_exceptions(logger::TeeLogger) = any(Logging.catch_exceptions(child) for child in logger.loggers)
-Logging.shouldlog(logger::TeeLogger, level, _module, group, id) =
-    any(Logging.shouldlog(child, level, _module, group, id) for child in logger.loggers)
+# 1. 配置文件专属 Logger：保存极其详细的机器可读数据
+file_logger = MinLevelLogger(
+    FileLogger("results/runner_global.log", append=true),
+    Logging.Debug # 文件里连 Debug 信息都存下来
+)
 
-function Logging.handle_message(logger::TeeLogger, level, message, _module, group, id, file, line; kwargs...)
-    for child in logger.loggers
-        Logging.min_enabled_level(child) <= level || continue
-        Logging.shouldlog(child, level, _module, group, id) || continue
-        Logging.handle_message(child, level, message, _module, group, id, file, line; kwargs...)
-    end
-    return nothing
-end
+# 2. 配置控制台专属 Logger：丢弃那些带大括号的详细 Context，只保留精简文字
+console_logger = MinLevelLogger(
+    ConsoleLogger(stdout),
+    Logging.Info # 屏幕上只看 Info 及以上
+)
+
+# 3. 把它们合并成一个 "Tee" Logger（直接使用 LoggingExtras 内置的！）
+# 注意：内置的 TeeLogger 不需要加内层括号，直接传多个参数即可
+global_logger(TeeLogger(file_logger, console_logger))
+
+# Logging.min_enabled_level(logger::TeeLogger) = minimum(Logging.min_enabled_level(child) for child in logger.loggers)
+# Logging.catch_exceptions(logger::TeeLogger) = any(Logging.catch_exceptions(child) for child in logger.loggers)
+# Logging.shouldlog(logger::TeeLogger, level, _module, group, id) =
+#     any(Logging.shouldlog(child, level, _module, group, id) for child in logger.loggers)
+
+# function Logging.handle_message(logger::TeeLogger, level, message, _module, group, id, file, line; kwargs...)
+#     for child in logger.loggers
+#         Logging.min_enabled_level(child) <= level || continue
+#         Logging.shouldlog(child, level, _module, group, id) || continue
+#         Logging.handle_message(child, level, message, _module, group, id, file, line; kwargs...)
+#     end
+#     return nothing
+# end
 
 struct StageFilterLogger{L<:AbstractLogger} <: AbstractLogger
     logger::L
@@ -113,7 +131,53 @@ function _open_job_logger(system, log_file::Union{Nothing,AbstractString})
     mkpath(dirname(log_file))
     io = open(log_file, "w")
     file_logger = StageFilterLogger(SimpleLogger(io, file_level), stage_level)
-    return (TeeLogger((console_logger, file_logger)), io)
+    return (TeeLogger(console_logger, file_logger), io)
+end
+
+function _startup_banner(config, params)
+    return """
+    ============================================================
+    🚀 ELIASHBERG PHYSICS ENGINE
+    ============================================================
+    [ Task Configuration ]
+      • Task Type   : $(config.task)
+      • Output Dir  : $(params.system.output_dir)
+
+    [ Compute Resources ]
+      • Workers     : $(params.system.n_workers)
+      • Threading   : 1 Process / 1 BLAS
+
+    [ Physical System ]
+      • Geometry    : $(params.geometry)
+      • K-Grid      : $(params.kpoints)
+      • Model       : $(params.model)
+      • Interaction : $(params.interaction)
+      • Field       : $(params.field)
+    ============================================================
+    """
+end
+
+function _completion_banner(out_dir, paths, julia_live_heap, peak_resident_memory, time_taken)
+    # 取矩阵/数组的维度作为结果的大小展示
+    return """
+    ============================================================
+    ✅ JOB COMPLETED SUCCESSFULLY
+    ============================================================
+    [ Performance ]
+    • Wall Time     : $(time_taken)
+    • Workers Used  : $(nworkers())
+
+    [ Outputs & Storage ]
+    • Directory     : $(out_dir)
+    • Data File     : 💾 $(paths.jld2_file)
+    • HDF5 Backup   : 💾 $(paths.hdf5_file)
+    • Raw Log       : 📄 $(paths.log_file)
+
+    [ Data Summary ]
+    • Julia Live Heap : $(julia_live_heap)
+    • Memory Peak   : $(peak_resident_memory)
+    ============================================================
+        """
 end
 
 _format_seconds(seconds::Real) = round(Float64(seconds); digits=3)
@@ -175,7 +239,7 @@ function _task_run_summary(task_type::AbstractString, params)
         qpath = params.task.qpath
         return (
             task="scan spectral function",
-            q_path=Eliashberg.kpath_summary(qpath),
+            q_path=Eliashberg.qpath,
             omega_range=(minimum(omega_axis), maximum(omega_axis)),
             n_omegas=length(omega_axis),
             temperature=Float64(params.task.T_val),
@@ -191,14 +255,14 @@ function _task_run_summary(task_type::AbstractString, params)
     elseif task_type == "compute_renormalized_band_data"
         return (
             task="compute renormalized band data",
-            k_path=Eliashberg.kpath_summary(params.task.kpath),
+            k_path=Eliashberg.params.task.kpath,
             n_temperatures=length(params.task.Ts),
             approx=string(typeof(params.task.approx)),
         )
     elseif task_type == "compute_collective_mode_spectral_data"
         return (
             task="compute collective mode spectral data",
-            q_path=Eliashberg.kpath_summary(params.task.qpath),
+            q_path=Eliashberg.params.task.qpath,
             n_omegas=Int(params.task.n_omegas),
             temperature=Float64(params.task.T_val),
             eta=Float64(params.task.eta),
@@ -310,7 +374,7 @@ function submit_job(toml_path::String)
 
             # @info "Building lattice and noninteracting model from input..."
             params = build_from_config(config)
-            # @info "Physical system ready" lattice = Eliashberg.cell_summary(params.geometry) kgrid = Eliashberg.grid_summary(params.kpoints) model = Eliashberg.model_summary(params.model) interaction = Eliashberg.interaction_summary(params.interaction) field = Eliashberg.field_summary(params.field)
+            # @info "Physical system ready" lattice = Eliashberg.params.geometry kgrid = Eliashberg.params.kpoints model = Eliashberg.params.model interaction = Eliashberg.params.interaction field = Eliashberg.params.field
             # @info "Running task" summary = _task_run_summary(task_type, params)
 
             n_requested = config.system.n_workers
@@ -347,32 +411,13 @@ function submit_job(toml_path::String)
 
             config.system.backup_config && cp(toml_path, joinpath(out_dir, "input_backup.toml"); force=true)
 
-            startup_msg = """
-                🚀 Starting Eliashberg Cluster Job
-                ============================================================
-                [ Task Configuration ]
-                • Task Type     : $(task_type)
-                • Config File   : $(toml_path)
-                • Output Dir    : $(out_dir)
-
-                [ Compute Resources ]
-                • Workers       : $(n_current) current -> $(n_requested) planned
-                • Threading     : 1 Process Thread / 1 BLAS Thread
-
-                [ Physical System ]
-                • Geometry      : $(Eliashberg.cell_summary(params.geometry))
-                • K-Grid        : $(Eliashberg.grid_summary(params.geometry))
-                • Model         : $(Eliashberg.model_summary(params.model))
-                • Interaction   : $(Eliashberg.interaction_summary(params.interaction))
-                • Field Channel : $(Eliashberg.field_summary(params.field))
-
-                [ Scan Parameters ]
-                • Frequency (ω) : $(config.task.omega_range[1]) to $(config.task.omega_range[2]) (400 points)
-                • Temperature   : $(config.task.T_val)
-                • Smearing (η)  : $(config.task.eta)
-                ============================================================"""
-
-            @info startup_msg
+            # @info _startup_banner(params)
+            startup_msg = _startup_banner(config, params)
+            println(stdout, startup_msg)
+            if !isnothing(log_io)
+                println(log_io, startup_msg)
+                flush(log_io)
+            end
 
             result = nothing
 
@@ -436,26 +481,13 @@ function submit_job(toml_path::String)
             julia_live_heap = isnothing(live_heap_bytes) ? nothing : _format_bytes(live_heap_bytes)
             peak_resident_memory = isnothing(maxrss_bytes) ? nothing : _format_bytes(maxrss_bytes)
 
-            summary_msg = """
-✅ Job Completed Successfully!
-============================================================
-[ Performance ]
-  • Wall Time     : $(_format_seconds(time_taken))
-  • Workers Used  : $(nworkers())
-
-[ Outputs & Storage ]
-  • Directory     : $(out_dir)
-  • Data File     : 💾 $(paths.jld2_file)
-  • HDF5 Backup   : 💾 $(paths.hdf5_file)
-  • Raw Log       : 📄 $(paths.log_file)
-
-[ Data Summary ]
-  • Result Shape  : $(size(result))  # 直接打印矩阵维度，比如 (151, 400)
-  • Julia Live Heap : $(julia_live_heap)
-  • Memory Peak   : $(peak_resident_memory)
-============================================================"""
-
-            @info summary_msg
+            completion_msg = _completion_banner(out_dir, paths, julia_live_heap, peak_resident_memory, _format_seconds(time_taken))
+            println(stdout, completion_msg)
+            if !isnothing(log_io)
+                println(log_io, completion_msg)
+                flush(log_io)
+            end
+            # @info _completion_banner(out_dir, paths, julia_live_heap, peak_resident_memory, _format_seconds(time_taken))
             # @info "Job completed successfully" wall_time_seconds = _format_seconds(time_taken) worker_processes = nworkers() result_summary = _result_summary(result) output_directory = out_dir jld2_output = paths.jld2_file hdf5_output = paths.hdf5_file run_log = paths.log_file plot_output = plot_file julia_live_heap = isnothing(live_heap_bytes) ? nothing : _format_bytes(live_heap_bytes) peak_resident_memory = isnothing(maxrss_bytes) ? nothing : _format_bytes(maxrss_bytes)
             return (; result, output_dir=out_dir, jld2_file=paths.jld2_file, hdf5_file=paths.hdf5_file, log_file=paths.log_file, plot_file)
         end

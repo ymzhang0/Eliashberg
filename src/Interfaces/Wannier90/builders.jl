@@ -38,7 +38,7 @@ function cell_from_wannier90_tb(filename::String; periodicity=nothing)
     return with_stage_log(
         "Build cell from Wannier90 TB";
         context=(filename=filename, periodicity=periodicity),
-        summarize_result=cell_summary,
+        summarize_result=identity,
     ) do
         return parse_wannier90_tb(filename; periodicity).cell
     end
@@ -63,7 +63,7 @@ function periodic_cell_from_wannier90_tb(filename::String; periodicity=nothing)
     return with_stage_log(
         "Build periodic cell from Wannier90 TB";
         context=(filename=filename, periodicity=periodicity),
-        summarize_result=cell_summary,
+        summarize_result=identity,
     ) do
         return parse_wannier90_tb(filename; periodicity).cell
     end
@@ -94,8 +94,8 @@ vector matrix.
 function build_model_from_wannier90(filename::String, cell::AbstractMatrix{<:Number}, EF::Float64)
     return with_stage_log(
         "Build model from Wannier90";
-        context=(filename=filename, cell=cell_summary(cell), EF=EF),
-        summarize_result=model_summary,
+        context=(filename=filename, cell=cell, EF=EF),
+        summarize_result=identity,
     ) do
         if endswith(lowercase(basename(filename)), "_tb.dat")
             parsed = parse_wannier90_tb(filename)
@@ -116,8 +116,8 @@ end
 function build_model_from_wannier90(filename::String, cell::PeriodicCell, EF::Float64)
     return with_stage_log(
         "Build model from Wannier90";
-        context=(filename=filename, cell=cell_summary(cell), EF=EF),
-        summarize_result=model_summary,
+        context=(filename=filename, cell=cell, EF=EF),
+        summarize_result=identity,
     ) do
         if endswith(lowercase(basename(filename)), "_tb.dat")
             parsed = parse_wannier90_tb(filename; periodicity=periodicity(cell))
@@ -133,8 +133,8 @@ end
 function build_model_from_wannier90(filename::String, system::AbstractSystem, EF::Float64)
     return with_stage_log(
         "Build model from Wannier90";
-        context=(filename=filename, cell=cell_summary(system), EF=EF),
-        summarize_result=model_summary,
+        context=(filename=filename, cell=system, EF=EF),
+        summarize_result=identity,
     ) do
         if endswith(lowercase(basename(filename)), "_tb.dat")
             parsed = parse_wannier90_tb(filename; periodicity=periodicity(system))
@@ -157,7 +157,7 @@ function build_model_from_wannier90(filename::String, EF::Float64, periodicity=n
     return with_stage_log(
         "Build model from Wannier90";
         context=(filename=filename, periodicity=periodicity, EF=EF),
-        summarize_result=model_summary,
+        summarize_result=identity,
     ) do
         endswith(lowercase(basename(filename)), "_tb.dat") || error("A standalone cell can only be reconstructed from a Wannier90 TB file.")
         parsed = parse_wannier90_tb(filename; periodicity)
@@ -185,8 +185,8 @@ function kpath_from_wannier90_kpoints(
 )
     return with_stage_log(
         "Build KPath from Wannier90 k-points";
-        context=(n_kpoints=length(kpoints), cell=cell_summary(cell), coordinates=coordinates, has_labelinfo=!isnothing(labelinfo)),
-        summarize_result=kpath_summary,
+        context=(n_kpoints=length(kpoints), cell=cell, coordinates=coordinates, has_labelinfo=!isnothing(labelinfo)),
+        summarize_result=identity,
     ) do
         node_labels = labelinfo === nothing ? nothing : _wannier90_node_labels(labelinfo, length(kpoints))
         return kpath_from_quantum_espresso_bands(
@@ -230,7 +230,7 @@ function kpath_from_wannier90_bands(
     return with_stage_log(
         "Build KPath from Wannier90 band distances";
         context=(n_distances=length(distances), has_labelinfo=!isnothing(labelinfo)),
-        summarize_result=kpath_summary,
+        summarize_result=identity,
     ) do
         isempty(distances) && throw(ArgumentError("`distances` must contain at least one Wannier90 path sample."))
 
@@ -272,7 +272,7 @@ function band_data_from_wannier90_bands(
     return with_stage_log(
         "Build band data from Wannier90 bands";
         context=(bands_filename=bands_filename, labelinfo_filename=labelinfo_filename),
-        summarize_result=band_data_summary,
+        summarize_result=identity,
     ) do
         parsed = parse_wannier90_band_dat(bands_filename)
         resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
@@ -305,8 +305,8 @@ function compare_wannier90_tb_to_bands(
 )
     return with_stage_log(
         "Compare Wannier90 TB to bands";
-        context=(model=model_summary(model), bands_filename=bands_filename, kpoints_filename=kpoints_filename, labelinfo_filename=labelinfo_filename, energy_shift=energy_shift),
-        summarize_result=comparison_summary,
+        context=(model=model, bands_filename=bands_filename, kpoints_filename=kpoints_filename, labelinfo_filename=labelinfo_filename, energy_shift=energy_shift),
+        summarize_result=identity,
     ) do
         resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
         resolved_kpoints = isnothing(kpoints_filename) ? _infer_wannier90_kpoints_filename(bands_filename) : String(kpoints_filename)

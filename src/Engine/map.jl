@@ -58,7 +58,7 @@ function distributed_map_grid(
         context=(
             kernel=string(typeof(f)),
             n_axes=length(grids),
-            axes=[_axis_summary(_parameter_axis(grid)) for grid in grids],
+            axes=[_parameter_axis(grid) for grid in grids],
             bootstrap_workers=bootstrap_workers,
             requested_workers=Int(n_workers),
             project=project,

@@ -318,7 +318,7 @@ function parse_quantum_espresso_cell(filename::String; periodicity=nothing)
     return with_stage_log(
         "Parse Quantum ESPRESSO cell";
         context=(filename=filename, periodicity=periodicity),
-        summarize_result=cell_summary,
+        summarize_result=identity,
     ) do
         lines = readlines(filename)
         isempty(lines) && error("Quantum ESPRESSO cell file $filename is empty.")

@@ -10,7 +10,7 @@ function integrate_grid(f::F, grid::AbstractKGrid) where {F}
     return _with_stage_log(
         "Integrate grid";
         level=Logging.Debug,
-        context=(kernel=string(typeof(f)), grid=_grid_summary(grid), n_chunks=min(length(grid), max(1, Threads.nthreads()))),
+        context=(kernel=string(typeof(f)), grid=grid, n_chunks=min(length(grid), max(1, Threads.nthreads()))),
         summarize_result=result -> (result_type=string(typeof(result)),),
     ) do
         n_items = length(grid)

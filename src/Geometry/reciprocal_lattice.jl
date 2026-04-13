@@ -16,7 +16,12 @@ struct KGrid{D} <: AbstractKGrid{D}
     weights::Vector{Float64}
 end
 
-const KPath = Brillouin.KPathInterpolant
+Base.show(io::IO, g::KGrid{D}) where {D} = print(io, "KGrid (", D, "D, ", length(g), " points)")
+function Base.show(io::IO, kp::KPath{D}) where {D}
+    _, labels = path_node_metadata(kp)
+    unique_labels = unique(labels)
+    print(io, "KPath (", D, "D, ", length(path_points(kp)), " points, ", length(path_branches(kp)), " branches, labels=", unique_labels, ")")
+end
 
 # ---------------------------------------------------------
 # Base Method Overloads for K-Grids

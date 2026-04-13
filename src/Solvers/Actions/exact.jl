@@ -37,7 +37,7 @@ function _quadratic_action_term(
     q_vec = _field_wavevector(field, kgrid)
     interaction_strength = abs(V(q_vec, interaction))
     if !isfinite_value(interaction_strength) || interaction_strength <= sqrt(eps(Float64))
-        @warn "Quadratic action term is ill-conditioned because |V(q)| is too small or non-finite." field=field_summary(field) interaction=interaction_summary(interaction) q=q_vec abs_V=interaction_strength
+        @warn "Quadratic action term is ill-conditioned because |V(q)| is too small or non-finite." field interaction q = q_vec abs_V = interaction_strength
     end
     return Float64(phi)^2 / interaction_strength
 end
@@ -89,7 +89,7 @@ function evaluate_action(
     return with_stage_log(
         "Evaluate effective action";
         level=Logging.Debug,
-        context=(phi=Float64(phi), field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx="ExactTrLn", T=T),
+        context=(phi=Float64(phi), field=field, model=model, interaction=interaction, grid=kgrid, approx="ExactTrLn", T=T),
         summarize_result=result -> (quadratic_term=quadratic_term[], tr_ln_term=tr_ln_term[], total_action=Float64(result)),
     ) do
         quadratic_term[] = _quadratic_action_term(phi, field, interaction, kgrid)
@@ -97,10 +97,10 @@ function evaluate_action(
         mf_disp = MeanFieldDispersion(model, field, phi)
         tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
         tr_ln_term[] = Engine.integrate_grid(tr_ln_kernel, kgrid)
-        (!isfinite_value(quadratic_term[]) || !isfinite_value(tr_ln_term[])) && @warn "Effective-action components contain non-finite values." field=field_summary(field) approx="ExactTrLn" quadratic_term=quadratic_term[] tr_ln_term=tr_ln_term[] T=T
+        (!isfinite_value(quadratic_term[]) || !isfinite_value(tr_ln_term[])) && @warn "Effective-action components contain non-finite values." field approx = "ExactTrLn" quadratic_term = quadratic_term[] tr_ln_term = tr_ln_term[] T = T
 
         total_action = quadratic_term[] + tr_ln_term[]
-        !isfinite_value(total_action) && @warn "Effective action evaluated to a non-finite value." field=field_summary(field) approx="ExactTrLn" phi=Float64(phi) total_action=total_action T=T
+        !isfinite_value(total_action) && @warn "Effective action evaluated to a non-finite value." field approx = "ExactTrLn" phi = Float64(phi) total_action = total_action T = T
         return total_action
     end
 end
@@ -121,7 +121,7 @@ function evaluate_action(
     return with_stage_log(
         "Evaluate effective action";
         level=Logging.Debug,
-        context=(phi=Float64(phi), field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx="RPA", T=T),
+        context=(phi=Float64(phi), field=field, model=model, interaction=interaction, grid=kgrid, approx="RPA", T=T),
         summarize_result=result -> (inverse_vertex_term=inverse_vertex_term[], susceptibility_term=susceptibility_term[], total_action=Float64(result)),
     ) do
         normal_model = normal_state_basis(model, field)
@@ -132,14 +132,14 @@ function evaluate_action(
         interaction_strength = abs(V_total)
         chi_val = chi0(q_vec)
         if !isfinite_value(interaction_strength) || interaction_strength <= sqrt(eps(Float64))
-            @warn "RPA action inverse vertex is ill-conditioned because |V(q)| is too small or non-finite." field=field_summary(field) interaction=interaction_summary(interaction) q=q_vec abs_V=interaction_strength
+            @warn "RPA action inverse vertex is ill-conditioned because |V(q)| is too small or non-finite." field interaction q = q_vec abs_V = interaction_strength
         end
-        !isfinite_value(chi_val) && @warn "RPA susceptibility is non-finite during effective-action evaluation." field=field_summary(field) q=q_vec chi0=chi_val T=T
+        !isfinite_value(chi_val) && @warn "RPA susceptibility is non-finite during effective-action evaluation." field q = q_vec chi0 = chi_val T = T
         inverse_vertex_term[] = 1.0 / interaction_strength
         susceptibility_term[] = real(chi_val)
 
         total_action = (inverse_vertex_term[] - susceptibility_term[]) * phi^2
-        !isfinite_value(total_action) && @warn "RPA effective action evaluated to a non-finite value." field=field_summary(field) phi=Float64(phi) q=q_vec total_action=total_action T=T
+        !isfinite_value(total_action) && @warn "RPA effective action evaluated to a non-finite value." field phi = Float64(phi) q = q_vec total_action = total_action T = T
         return total_action
     end
 end
@@ -159,7 +159,7 @@ function evaluate_action(
     return with_stage_log(
         "Evaluate effective action";
         level=Logging.Debug,
-        context=(phis=Float64.(phis), field=field_summary(field), model=model_summary(model), interaction=interaction_summary(interaction), grid=grid_summary(kgrid), approx="ExactTrLn", T=T),
+        context=(phis=Float64.(phis), field=field, model=model, interaction=interaction, grid=kgrid, approx="ExactTrLn", T=T),
         summarize_result=result -> (quadratic_term=quadratic_term[], tr_ln_term=tr_ln_term[], total_action=Float64(result)),
     ) do
         length(field) == length(phis) || throw(DimensionMismatch("Number of fields must match number of phis."))
@@ -169,10 +169,10 @@ function evaluate_action(
         mf_disp = MeanFieldDispersion(model, field, phis)
         tr_ln_kernel = ExactTrLnContributionKernel(mf_disp, T)
         tr_ln_term[] = Engine.integrate_grid(tr_ln_kernel, kgrid)
-        (!isfinite_value(quadratic_term[]) || !isfinite_value(tr_ln_term[])) && @warn "Composite effective-action components contain non-finite values." field=field_summary(field) approx="ExactTrLn" quadratic_term=quadratic_term[] tr_ln_term=tr_ln_term[] T=T
+        (!isfinite_value(quadratic_term[]) || !isfinite_value(tr_ln_term[])) && @warn "Composite effective-action components contain non-finite values." field approx = "ExactTrLn" quadratic_term = quadratic_term[] tr_ln_term = tr_ln_term[] T = T
 
         total_action = quadratic_term[] + tr_ln_term[]
-        !isfinite_value(total_action) && @warn "Composite effective action evaluated to a non-finite value." field=field_summary(field) phis=Float64.(phis) total_action=total_action T=T
+        !isfinite_value(total_action) && @warn "Composite effective action evaluated to a non-finite value." field phis = Float64.(phis) total_action = total_action T = T
         return total_action
     end
 end
@@ -207,3 +207,61 @@ function evaluate_action(
     # 使用推导式遍历所有的 phi，并强制转换为 Float64 以匹配底层函数签名
     return [evaluate_action(Float64(phi), field, model, interaction, kgrid, approx; T=T) for phi in phi_values]
 end
+
+const _GROUND_STATE_DEBUG_EVERY = 5
+
+function _optimization_progress_callback(stage::AbstractString; every::Integer=_GROUND_STATE_DEBUG_EVERY)
+    callback_iteration = Ref(-1)
+
+    return state -> begin
+        callback_iteration[] += 1
+        iteration = callback_iteration[]
+
+        if iteration == 0 || iteration % every == 0
+            context = (iteration=iteration,)
+
+            if hasproperty(state, :f_x)
+                context = (; context..., objective=getproperty(state, :f_x))
+            end
+
+            if hasproperty(state, :x)
+                context = (; context..., x=Float64.(collect(getproperty(state, :x))))
+            end
+
+            if hasproperty(state, :g_x)
+                context = (; context..., grad_norm=norm(getproperty(state, :g_x)))
+            end
+
+            _stage_log(Logging.Debug, "$(stage) iteration"; stage, status=:progress, context)
+        end
+
+        return false
+    end
+end
+
+
+"""
+    compute_phase_transition_data(phis, Ts, field, model, interaction, kgrid; approx=ExactTrLn(), phi_guess=0.2)
+
+Map temperature samples to free-energy curves and reduce each point through the
+effective-action solver. Returns pure arrays suitable for plotting.
+"""
+function _evaluate_action_curve(
+    phis::AbstractVector{<:Real},
+    field::AuxiliaryField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid,
+    approx::ApproximationLevel;
+    T::Real
+)
+    values = zeros(Float64, length(phis))
+    temperature = Float64(T)
+
+    Threads.@threads for idx in eachindex(phis)
+        values[idx] = evaluate_action(Float64(phis[idx]), field, model, interaction, kgrid, approx; T=temperature)
+    end
+
+    return values
+end
+

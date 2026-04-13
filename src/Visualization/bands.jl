@@ -133,7 +133,7 @@ end
 function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, band_color=:royalblue, axis=(;), kwargs...)
     return with_stage_log(
         "Plot band structure";
-        context=(kpath=kpath_summary(kpath), n_bands=size(band_matrix, 2), E_Fermi=Float64(E_Fermi)),
+        context=(kpath=kpath, n_bands=size(band_matrix, 2), E_Fermi=Float64(E_Fermi)),
         summarize_result=result -> (figure_type=string(typeof(result)),),
     ) do
         points = path_points(kpath)
@@ -223,7 +223,7 @@ function plot_wannier90_tb_band_comparison(
 )
     return with_stage_log(
         "Plot Wannier90 TB comparison";
-        context=(comparison=comparison_summary(comparison), n_bands=size(comparison.reference.bands, 2)),
+        context=(comparison=comparison, n_bands=size(comparison.reference.bands, 2)),
         summarize_result=result -> (figure_type=string(typeof(result)),),
     ) do
         reference = comparison.reference

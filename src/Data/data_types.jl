@@ -1,4 +1,5 @@
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
+export compute_landscape_line_data, compute_landscape_surface_data
 export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
 
 Base.@kwdef struct BandStructureData{D}
@@ -12,6 +13,7 @@ Base.@kwdef struct BandStructureData{D}
         return new{D}(kpath, bands, num_bands)
     end
 end
+Base.show(io::IO, d::BandStructureData) = print(io, "BandStructureData(", d.num_bands, " bands, ", size(d.bands, 1), " k-points)")
 BandStructureData(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int) where {D} = BandStructureData{D}(kpath, bands, num_bands)
 
 Base.@kwdef struct DispersionSurfaceData
@@ -78,6 +80,28 @@ Base.@kwdef struct LandscapeSurfaceData
             Float64.(landscape_matrix)
         )
     end
+end
+
+function compute_landscape_line_data(qs::AbstractVector{<:Real}, values::AbstractVector{<:Real})
+    return LandscapeLineData(qs, values)
+end
+
+function compute_landscape_line_data(grid::AbstractKGrid{1}, values::AbstractVector{<:Real})
+    return compute_landscape_line_data([point[1] for point in grid.points], values)
+end
+
+function compute_landscape_surface_data(
+    qxs::AbstractVector{<:Real},
+    qys::AbstractVector{<:Real},
+    landscape_matrix::AbstractMatrix{<:Real},
+)
+    return LandscapeSurfaceData(qxs, qys, landscape_matrix)
+end
+
+function compute_landscape_surface_data(grid::AbstractKGrid{2}, landscape_matrix::AbstractMatrix{<:Real})
+    qxs = unique(sort([point[1] for point in grid.points]))
+    qys = unique(sort([point[2] for point in grid.points]))
+    return compute_landscape_surface_data(qxs, qys, landscape_matrix)
 end
 
 Base.@kwdef struct PhaseDiagramData

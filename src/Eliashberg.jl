@@ -20,13 +20,14 @@ using TimerOutputs
 const TO = TimerOutput()
 
 # 1. Fundamental Constants and Linear Algebra (Base Tier)
-include("Constants.jl")
-include("la.jl")
+include("Numerics/Constants.jl")
+include("Numerics/la.jl")
 
 # 2. Abstract Tier (Topological Order - Only abstract types)
 include("Geometry/types.jl")
 include("Models/types.jl")
-include("Responses/types.jl")
+include("Correlations/types.jl")
+include("Numerics/smearings.jl")
 include("Solvers/types.jl")
 
 # 2.5 Engine Tier (Pure execution and scheduling abstractions)
@@ -44,39 +45,41 @@ include("Models/interactions.jl")
 # Interfaces
 include("Interfaces/Interfaces.jl")
 
-# Responses
-include("Responses/fields.jl")
-include("Responses/propagators.jl")
-include("Responses/smearings.jl")
-include("Responses/self_energies.jl")
-include("Responses/vertex.jl")
 
 # 4. Method & Logic Tier (Computational algorithms and dispatch)
 # Geometry methods
 include("Geometry/reciprocal_lattice.jl")
 
 # Response data objects
-include("Responses/data_types.jl")
+include("Data/data_types.jl")
 
 # Interface data objects
 include("Interfaces/Wannier90/data_types.jl")
 
+# Correlation data objects needed by model evaluators
+include("Correlations/self_energies.jl")
+
 # Models methods
 include("Models/evaluators.jl")
 
-# Responses methods
-include("Responses/mean_field.jl")
-include("Responses/susceptibilities.jl")
-include("Models/bosons.jl")
+# Correlations methods
+# Correlations
+include("Correlations/mean_fields.jl")
+include("Correlations/propagators.jl")
+include("Correlations/vertex.jl")
+include("Correlations/renormalization.jl")
+include("Correlations/susceptibilities.jl")
+include("Correlations/bosons.jl")
 
 # Numerical solvers and algorithms
-include("Solvers/integrals.jl")
-include("Solvers/bcs_equations.jl")
+include("Solvers/Thermodynamics/self_consistency.jl")
+include("Solvers/Thermodynamics/minimization.jl")
+include("Solvers/Thermodynamics/bse.jl")
 include("Solvers/sampled_hamiltonians.jl")
-include("Solvers/effective_action.jl")
-include("Solvers/observables.jl")
-include("Solvers/scanners.jl")
-include("Solvers/spectra.jl")
+include("Solvers/Actions/exact.jl")
+include("Solvers/Actions/rpa.jl")
+include("Solvers/Observables/bands.jl")
+include("Solvers/Observables/phase_transition.jl")
 
 # 5. Visualization-adjacent pure utilities
 include("Visualization/core_utils.jl")
@@ -150,13 +153,14 @@ export parse_wannier90_band_dat, parse_wannier90_kpoints, parse_wannier90_labeli
 export kpath_from_wannier90_bands, kpath_from_wannier90_kpoints, band_data_from_wannier90_bands, compare_wannier90_tb_to_bands
 export Wannier90BandComparison
 
-# Responses
+# Correlations
 export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave, CompositeField
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
 export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
 export RPABoson, CachedBoson, evaluate_boson_propagator, materialize_boson
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
+export compute_landscape_line_data, compute_landscape_surface_data
 export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
 
 # Solvers
@@ -165,7 +169,6 @@ export Engine, GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLay
 export SampledHamiltonianAssembly, assemble_sampled_hamiltonian, solve_sampled_hamiltonian
 export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
 export compute_dispersion_surface_data, compute_band_data, compute_fermi_surface_volume
-export compute_landscape_line_data, compute_landscape_surface_data, compute_landscape_axes
 export compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data, compute_coexistence_landscape
 
 # Visualization

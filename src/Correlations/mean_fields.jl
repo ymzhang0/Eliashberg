@@ -22,6 +22,9 @@ struct DirectChannel <: ParticleHoleChannel{Any} end
 耦合到自旋算符 `S^α`。`direction` 可取 `:z`, `:x`, `:y`, `:transverse`，
 默认是纵向的 `:z` 通道。
 """
+Base.show(io::IO, f::DirectChannel) = print(io, "Direct Channel")
+
+
 struct ExchangeChannel{Dir} <: ParticleHoleChannel{Any} end
 ExchangeChannel(direction::Symbol=:z) = ExchangeChannel{_validate_spin_direction(direction)}()
 """
@@ -30,9 +33,13 @@ ExchangeChannel(direction::Symbol=:z) = ExchangeChannel{_validate_spin_direction
 代表宏观凝聚的电荷密度波序。
 (物理上它是 DirectChannel 发生相变后的产物，基矢结构完全一致)
 """
+Base.show(io::IO, f::ExchangeChannel) = print(io, "Exchange Channel (direction=", spin_direction(f), ")")
+
+
 struct ChargeDensityWave{D} <: ParticleHoleChannel{D}
     q::SVector{D,Float64}
 end
+Base.show(io::IO, f::ChargeDensityWave{D}) where {D} = print(io, "ChargeDensityWave(q=", f.q, ")")
 
 _to_static_momentum(q::AbstractVector{<:Real}) = SVector{length(q),Float64}(q...)
 _to_static_momentum(q::Tuple{Vararg{Real}}) = SVector{length(q),Float64}(q...)
@@ -50,6 +57,7 @@ ChargeDensityWave(q::Tuple{Vararg{Real}}) = ChargeDensityWave(_to_static_momentu
 struct SpinDensityWave{D,Dir} <: ParticleHoleChannel{D}
     q::SVector{D,Float64}
 end
+Base.show(io::IO, f::SpinDensityWave{D,Dir}) where {D,Dir} = print(io, "SpinDensityWave(", Dir, ", q=", f.q, ")")
 
 SpinDensityWave(q::SVector{D,Float64}, direction::Symbol=:z) where {D} =
     SpinDensityWave{D,_validate_spin_direction(direction)}(q)
@@ -69,6 +77,7 @@ Pairs electrons with momenta (k, -k).
 struct BCSReducedPairing <: AuxiliaryField
     symmetry::Symbol
 end
+Base.show(io::IO, f::BCSReducedPairing) = print(io, "BCSReducedPairing(", f.symmetry, ")")
 BCSReducedPairing() = BCSReducedPairing(:s_wave)
 
 """
@@ -81,6 +90,7 @@ Hamiltonian.
 struct CompositeField{T<:Tuple} <: AuxiliaryField
     fields::T
 end
+Base.show(io::IO, f::CompositeField) = print(io, "CompositeField(", length(f), " fields)")
 CompositeField(fields::Vararg{AuxiliaryField}) = CompositeField(fields)
 
 Base.length(comp::CompositeField) = length(comp.fields)
@@ -98,6 +108,7 @@ struct FFLOPairing{D} <: AuxiliaryField
     symmetry::Symbol
     h::Float64 # Zeeman magnetic field strength
 end
+Base.show(io::IO, f::FFLOPairing{D}) where {D} = print(io, "FFLOPairing(", f.symmetry, ", q=", f.q, ", h=", f.h, ")")
 FFLOPairing(q::SVector{D,Float64}, h::Float64=0.0) where {D} = FFLOPairing{D}(q, :s_wave, h)
 FFLOPairing(q::SVector{D,<:Real}, h::Real=0.0) where {D} = FFLOPairing(SVector{D,Float64}(q), Float64(h))
 FFLOPairing(q::AbstractVector{<:Real}, h::Real=0.0) = FFLOPairing(_to_static_momentum(q), Float64(h))
@@ -113,6 +124,7 @@ struct PairDensityWave{D} <: AuxiliaryField
     q::SVector{D,Float64}
     symmetry::Symbol
 end
+Base.show(io::IO, f::PairDensityWave{D}) where {D} = print(io, "PairDensityWave(", f.symmetry, ", q=", f.q, ")")
 PairDensityWave(q::SVector{D,Float64}) where {D} = PairDensityWave{D}(q, :s_wave)
 PairDensityWave(q::SVector{D,<:Real}) where {D} = PairDensityWave(SVector{D,Float64}(q))
 PairDensityWave(q::AbstractVector{<:Real}) = PairDensityWave(_to_static_momentum(q))
@@ -124,10 +136,11 @@ PairDensityWave(q::Tuple{Vararg{Real}}) = PairDensityWave(_to_static_momentum(q)
 代表一个完全由微观相互作用驱动的、在动量网格上具有连续分布的超导能隙。
 它不再依赖于任何先验的对称性假设 (如 :d_wave)。
 """
-struct MomentumDependentPairing{D, T} <: AuxiliaryField
+struct MomentumDependentPairing{D,T} <: AuxiliaryField
     # 存储网格上每一个点的能隙值
-    gap_values::Vector{T} 
+    gap_values::Vector{T}
 end
+Base.show(io::IO, f::MomentumDependentPairing{D}) where {D} = print(io, "MomentumDependentPairing(", D, "D, ", length(f.gap_values), " points)")
 
 # 初始化的便利构造器：传入一个全 0 数组，或者给一点微小的随机噪声/d波种子破缺对称性
 function MomentumDependentPairing(kgrid::AbstractKGrid{D}; seed=:d_wave, amp=0.01) where {D}
@@ -147,7 +160,7 @@ function MomentumDependentPairing(kgrid::AbstractKGrid{D}; seed=:d_wave, amp=0.0
     else
         @warn "Unsupported seed type $D dimension $seed for MomentumDependentPairing. Initializing with zeros."
     end
-    return MomentumDependentPairing{D, ComplexF64}(gaps)
+    return MomentumDependentPairing{D,ComplexF64}(gaps)
 end
 
 """
@@ -158,6 +171,7 @@ Represents a macroscopic, frozen condensate (e.g., T=0 CDW ground state).
 struct StaticMeanField{D} <: AuxiliaryField
     q::SVector{D,Float64}
 end
+Base.show(io::IO, f::StaticMeanField{D}) where {D} = print(io, "StaticMeanField(q=", f.q, ")")
 StaticMeanField(q::SVector{S,<:Real}) where S = StaticMeanField{S}(SVector{S,Float64}(q))
 StaticMeanField(q::AbstractVector{<:Real}) = StaticMeanField(_to_static_momentum(q))
 StaticMeanField(q::Tuple{Vararg{Real}}) = StaticMeanField(_to_static_momentum(q))
@@ -171,6 +185,7 @@ struct DynamicalFluctuation{D} <: AuxiliaryField
     q::SVector{D,Float64}
     ω::Float64
 end
+Base.show(io::IO, f::DynamicalFluctuation{D}) where {D} = print(io, "DynamicalFluctuation(q=", f.q, ", ω=", f.ω, ")")
 DynamicalFluctuation(q::SVector{D,<:Real}, ω::Real) where D = DynamicalFluctuation{D}(SVector{D,Float64}(q), Float64(ω))
 DynamicalFluctuation(q::AbstractVector{<:Real}, ω::Real) = DynamicalFluctuation(_to_static_momentum(q), Float64(ω))
 DynamicalFluctuation(q::Tuple{Vararg{Real}}, ω::Real) = DynamicalFluctuation(_to_static_momentum(q), Float64(ω))

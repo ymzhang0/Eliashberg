@@ -11,9 +11,9 @@ Convenience fallback method. Converts a standard array or tuple `k` into an `SVe
 and delegates to the highly optimized core `ε` methods. This allows users to evaluate
 the Hamiltonian interactively without importing StaticArrays.
 """
-function ε(k::Union{AbstractVector{<:Real}, Tuple{Vararg{Real}}}, model::Dispersion{D}) where {D}
+function ε(k::Union{AbstractVector{<:Real},Tuple{Vararg{Real}}}, model::Dispersion{D}) where {D}
     length(k) == D || throw(DimensionMismatch("Expected k-point of dimension $D, got $(length(k))"))
-    return ε(SVector{D, Float64}(k...), model)
+    return ε(SVector{D,Float64}(k...), model)
 end
 
 """
@@ -138,16 +138,16 @@ _matrix_data(H::AbstractMatrix) = H
 
 function _block_diagonal(A::StaticMatrix{N,N,TA}, B::StaticMatrix{N,N,TB}) where {N,TA,TB}
     T = promote_type(TA, TB)
-    return Hermitian(SMatrix{2N,2N,T,4N*N}(ntuple(idx -> begin
-        row = (idx - 1) % (2N) + 1
-        col = (idx - 1) ÷ (2N) + 1
-        if row <= N && col <= N
-            return T(A[row, col])
-        elseif row > N && col > N
-            return T(B[row - N, col - N])
-        end
-        return zero(T)
-    end, 4N*N)))
+    return Hermitian(SMatrix{2N,2N,T,4N * N}(ntuple(idx -> begin
+            row = (idx - 1) % (2N) + 1
+            col = (idx - 1) ÷ (2N) + 1
+            if row <= N && col <= N
+                return T(A[row, col])
+            elseif row > N && col > N
+                return T(B[row-N, col-N])
+            end
+            return zero(T)
+        end, 4N * N)))
 end
 
 function _block_diagonal(A::AbstractMatrix{TA}, B::AbstractMatrix{TB}) where {TA,TB}

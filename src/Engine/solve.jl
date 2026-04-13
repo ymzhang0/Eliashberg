@@ -12,6 +12,14 @@ struct AssemblySpectrum{V,M}
     values::V
     vectors::M
 end
+function Base.show(io::IO, spectrum::AssemblySpectrum)
+    v = spectrum.values
+    if isempty(v)
+        print(io, "AssemblySpectrum(0 eigenvalues)")
+    else
+        print(io, "AssemblySpectrum(", length(v), " eigenvalues, min=", minimum(v), ", max=", maximum(v), ")")
+    end
+end
 
 Base.length(::AssemblySpectrum) = 2
 
@@ -56,28 +64,28 @@ fallback by passing `solver=DenseEigenSolver()`.
 function solve_assembled_eigensystem(matrix::AbstractMatrix; solver=DenseEigenSolver(), kwargs...)
     return _with_stage_log(
         "Solve assembled eigensystem";
-        context=(matrix=_matrix_summary(matrix), solver=string(typeof(solver))),
-        summarize_result=_spectrum_summary,
+        context=(matrix=matrix, solver=string(typeof(solver))),
+        summarize_result=identity,
     ) do
         @timeit TO "Eigensystem Solve" return _solve_assembled_eigensystem(solver, matrix; kwargs...)
     end
 end
 
 function solve_assembled_eigensystem(matrix::SparseMatrixCSC; solver=SparseEigenSolverHook(), kwargs...)
-    solver isa DenseEigenSolver && @warn "Dense eigensolver requested for sparse assembled matrix; materializing a dense copy." matrix=_matrix_summary(matrix)
+    solver isa DenseEigenSolver && @warn "Dense eigensolver requested for sparse assembled matrix; materializing a dense copy." matrix=matrix
     return _with_stage_log(
         "Solve assembled eigensystem";
-        context=(matrix=_matrix_summary(matrix), solver=string(typeof(solver))),
-        summarize_result=_spectrum_summary,
+        context=(matrix=matrix, solver=string(typeof(solver))),
+        summarize_result=identity,
     ) do
         @timeit TO "Eigensystem Solve" return _solve_assembled_eigensystem(solver, matrix; kwargs...)
     end
 end
 
 function _solve_assembled_eigensystem(::DenseEigenSolver, matrix::AbstractMatrix; kwargs...)
-    !_isfinite_value(matrix) && @warn "Assembled matrix contains non-finite entries before dense eigensolve." matrix=_matrix_summary(matrix) nonfinite_entries=_count_nonfinite(matrix)
+    !_isfinite_value(matrix) && @warn "Assembled matrix contains non-finite entries before dense eigensolve." matrix=matrix nonfinite_entries=_count_nonfinite(matrix)
     eig = eigen(Matrix(matrix))
-    !_isfinite_value(eig.values) && @warn "Dense eigensolver returned non-finite eigenvalues." nonfinite_values=_count_nonfinite(eig.values) matrix=_matrix_summary(matrix)
+    !_isfinite_value(eig.values) && @warn "Dense eigensolver returned non-finite eigenvalues." nonfinite_values=_count_nonfinite(eig.values) matrix=matrix
     return AssemblySpectrum(eig.values, eig.vectors)
 end
 
@@ -109,4 +117,13 @@ function _missing_sparse_eigensolver_hook(::SparseMatrixCSC; kwargs...)
         "No sparse eigensolver hook configured. Pass `solver=SparseEigenSolverHook(f)` " *
         "or explicitly request dense fallback with `solver=DenseEigenSolver()`."
     ))
+end
+
+function resolve_assembled_eigensolver(::AbstractMatrix, eigensolver; sparse_warning::Union{Nothing,AbstractString}=nothing)
+    return isnothing(eigensolver) ? DenseEigenSolver() : eigensolver
+end
+
+function resolve_assembled_eigensolver(::SparseMatrixCSC, eigensolver; sparse_warning::Union{Nothing,AbstractString}=nothing)
+    isnothing(eigensolver) && !isnothing(sparse_warning) && @warn sparse_warning
+    return isnothing(eigensolver) ? DenseEigenSolver() : eigensolver
 end

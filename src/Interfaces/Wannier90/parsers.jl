@@ -236,7 +236,7 @@ function parse_wannier90_tb(filename::String; periodicity=nothing)
         "Parse Wannier90 TB";
         context=(filename=filename, periodicity=periodicity),
         summarize_result=result -> (
-            cell=cell_summary(result.cell),
+            cell=result.cell,
             num_wann=result.num_wann,
             n_hoppings=length(result.hoppings),
             n_position_matrices=length(result.position_matrices),

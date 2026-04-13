@@ -82,7 +82,7 @@ function solve_sampled_hamiltonian(
 
     spectrum = Engine.solve_assembled_eigensystem(
         assembly.matrix;
-        solver=_resolve_sampled_hamiltonian_eigensolver(assembly.matrix, eigensolver)
+        solver=Engine.resolve_assembled_eigensolver(assembly.matrix, eigensolver)
     )
     return spectrum
 end
@@ -90,52 +90,6 @@ end
 function _sampled_hamiltonian_layout(samples, dispersion::ElectronicDispersion)
     block_sizes = [size(ε(sample.value, dispersion), 1) for sample in samples]
     return VariableBlockLayout(block_sizes, block_sizes)
-end
-
-function _assemble_sampled_hamiltonian_matrix(
-    ::Val{:dense},
-    block_task,
-    samples,
-    layout::VariableBlockLayout;
-    bootstrap_workers::Bool=false,
-    n_workers::Integer=max(0, Threads.nthreads() - 1),
-    project::Union{Nothing,AbstractString}=Base.active_project(),
-    restrict::Bool=true,
-    kwargs...
-)
-    return Engine.assemble_block_diagonal_matrix(
-        block_task,
-        samples,
-        layout;
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
-end
-
-function _assemble_sampled_hamiltonian_matrix(
-    ::Val{:sparse},
-    block_task,
-    samples,
-    layout::VariableBlockLayout;
-    sparse_atol::Real=0.0,
-    bootstrap_workers::Bool=false,
-    n_workers::Integer=max(0, Threads.nthreads() - 1),
-    project::Union{Nothing,AbstractString}=Base.active_project(),
-    restrict::Bool=true,
-    kwargs...
-)
-    return Engine.assemble_sparse_block_diagonal_matrix(
-        block_task,
-        samples,
-        layout;
-        atol=sparse_atol,
-        bootstrap_workers=bootstrap_workers,
-        n_workers=n_workers,
-        project=project,
-        restrict=restrict
-    )
 end
 
 function _assemble_sampled_hamiltonian_matrix(
@@ -149,38 +103,24 @@ function _assemble_sampled_hamiltonian_matrix(
     project::Union{Nothing,AbstractString}=Base.active_project(),
     restrict::Bool=true
 )
-    if matrix_format == :dense
-        return _assemble_sampled_hamiltonian_matrix(
-            Val(:dense),
-            block_task,
-            samples,
-            layout;
-            bootstrap_workers=bootstrap_workers,
-            n_workers=n_workers,
-            project=project,
-            restrict=restrict
-        )
-    elseif matrix_format == :sparse
-        return _assemble_sampled_hamiltonian_matrix(
-            Val(:sparse),
-            block_task,
-            samples,
-            layout;
-            sparse_atol=sparse_atol,
-            bootstrap_workers=bootstrap_workers,
-            n_workers=n_workers,
-            project=project,
-            restrict=restrict
-        )
-    end
-
-    throw(ArgumentError("Unsupported matrix_format `$matrix_format`. Expected `:dense` or `:sparse`."))
-end
-
-function _resolve_sampled_hamiltonian_eigensolver(::SparseMatrixCSC, eigensolver)
-    return isnothing(eigensolver) ? Engine.DenseEigenSolver() : eigensolver
-end
-
-function _resolve_sampled_hamiltonian_eigensolver(::AbstractMatrix, eigensolver)
-    return isnothing(eigensolver) ? Engine.DenseEigenSolver() : eigensolver
+    dense_builder = () -> Engine.assemble_block_diagonal_matrix(
+        block_task,
+        samples,
+        layout;
+        bootstrap_workers=bootstrap_workers,
+        n_workers=n_workers,
+        project=project,
+        restrict=restrict
+    )
+    sparse_builder = () -> Engine.assemble_sparse_block_diagonal_matrix(
+        block_task,
+        samples,
+        layout;
+        atol=sparse_atol,
+        bootstrap_workers=bootstrap_workers,
+        n_workers=n_workers,
+        project=project,
+        restrict=restrict
+    )
+    return Engine.assemble_by_storage(matrix_format, dense_builder, sparse_builder)
 end

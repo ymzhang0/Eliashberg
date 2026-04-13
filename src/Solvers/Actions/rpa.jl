@@ -44,30 +44,36 @@ function (task::SpectralFunctionRowTask)(q::SVector{D,Float64}) where {D}
     return imag.(susceptibility_spectrum(task.susceptibility, q, task.omegas))
 end
 
-struct RPASpectralFunctionTask{D, C, I<:Interaction}
+struct RPASpectralFunctionTask{D,C,I<:Interaction}
     susceptibility::C
     interaction::I
 end
 
-function (task::RPASpectralFunctionTask{D})(q::SVector{D,Float64}, omega::Real) where {D}
-    # 1. 计算复数裸极化率 χ₀(q, ω)
-    chi0 = task.susceptibility(DynamicalFluctuation(q, Float64(omega)))
-    
-    # 2. 计算当前 q 下的库仑排斥力 V(q)
-    vq = V(q, task.interaction)
-    
-    # 3. RPA Dyson 方程：当 1 - V*Re(χ₀) 接近 0 时，虚部会产生极锐的等离激元共振峰
+const _RPA_SINGULAR_DENOMINATOR_ATOL = 100 * eps(Float64)
+
+function _rpa_spectral_weight(
+    chi0,
+    vq,
+    q,
+    omega::Real,
+    interaction::Interaction,
+)
     denominator = 1.0 - vq * chi0
-    !isfinite_value(denominator) && @warn "RPA denominator became non-finite during spectral scan." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
-    if abs(denominator) <= 100 * eps(Float64)
-        @warn "RPA denominator is numerically singular during spectral scan. Returning NaN." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
+    !isfinite_value(denominator) && @warn "RPA denominator became non-finite during spectral scan." q = q omega = Float64(omega) interaction = interaction chi0 = chi0 denominator = denominator
+    if abs(denominator) <= _RPA_SINGULAR_DENOMINATOR_ATOL
+        @warn "RPA denominator is numerically singular during spectral scan. Returning NaN." q = q omega = Float64(omega) interaction = interaction chi0 = chi0 denominator = denominator
         return NaN
     end
-    
+
     chi_rpa = chi0 / denominator
-    !isfinite_value(chi_rpa) && @warn "RPA susceptibility became non-finite during spectral scan." q=q omega=Float64(omega) interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator chi_rpa=chi_rpa
-    
+    !isfinite_value(chi_rpa) && @warn "RPA susceptibility became non-finite during spectral scan." q = q omega = Float64(omega) interaction = interaction chi0 = chi0 denominator = denominator chi_rpa = chi_rpa
     return imag(chi_rpa)
+end
+
+function (task::RPASpectralFunctionTask{D})(q::SVector{D,Float64}, omega::Real) where {D}
+    chi0 = task.susceptibility(DynamicalFluctuation(q, Float64(omega)))
+    vq = V(q, task.interaction)
+    return _rpa_spectral_weight(chi0, vq, q, omega, task.interaction)
 end
 
 struct RPASpectralFunctionRowTask{D,C,I<:Interaction,O}
@@ -82,19 +88,13 @@ function (task::RPASpectralFunctionRowTask{D})(q::SVector{D,Float64}) where {D}
     spectral_row = Vector{Float64}(undef, length(task.omegas))
 
     for idx in eachindex(task.omegas)
-        chi0 = chi0_spectrum[idx]
-        omega = Float64(task.omegas[idx])
-        denominator = 1.0 - vq * chi0
-        !isfinite_value(denominator) && @warn "RPA denominator became non-finite during spectral scan." q=q omega=omega interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
-        if abs(denominator) <= 100 * eps(Float64)
-            @warn "RPA denominator is numerically singular during spectral scan. Returning NaN." q=q omega=omega interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator
-            spectral_row[idx] = NaN
-            continue
-        end
-
-        chi_rpa = chi0 / denominator
-        !isfinite_value(chi_rpa) && @warn "RPA susceptibility became non-finite during spectral scan." q=q omega=omega interaction=interaction_summary(task.interaction) chi0=chi0 denominator=denominator chi_rpa=chi_rpa
-        spectral_row[idx] = imag(chi_rpa)
+        spectral_row[idx] = _rpa_spectral_weight(
+            chi0_spectrum[idx],
+            vq,
+            q,
+            task.omegas[idx],
+            task.interaction,
+        )
     end
 
     return spectral_row
@@ -118,7 +118,7 @@ function scan_instability_landscape(
 ) where {D}
     return with_stage_log(
         "Scan instability landscape";
-        context=(model=model_summary(model), field=field_summary(field), kgrid=grid_summary(kgrid), qgrid=grid_summary(qgrid), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, field=field, kgrid=kgrid, qgrid=qgrid, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
@@ -158,7 +158,7 @@ physics task and passes it to `Engine.distributed_map_grid`. Set
 """
 function scan_rpa_spectral_function_hpc(
     model::PhysicalModel,
-    interaction::Interaction, 
+    interaction::Interaction,
     field::AuxiliaryField,
     kgrid::AbstractKGrid{D},
     qaxis::AbstractVector{SVector{D,Float64}},
@@ -172,12 +172,12 @@ function scan_rpa_spectral_function_hpc(
 ) where {D}
     return with_stage_log(
         "Scan RPA spectral function";
-        context=(model=model_summary(model), interaction=interaction_summary(interaction), field=field_summary(field), kgrid=grid_summary(kgrid), qaxis=axis_summary(qaxis), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qaxis=qaxis, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
         row_data = Engine.distributed_map_grid(
-            RPASpectralFunctionRowTask{D, typeof(chi_functor), typeof(interaction), typeof(omegas)}(chi_functor, interaction, omegas),
+            RPASpectralFunctionRowTask{D,typeof(chi_functor),typeof(interaction),typeof(omegas)}(chi_functor, interaction, omegas),
             qaxis;
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
@@ -205,12 +205,12 @@ function scan_rpa_spectral_function_hpc(
 ) where {D}
     return with_stage_log(
         "Scan spectral function";
-        context=(model=model_summary(model), field=field_summary(field), kgrid=grid_summary(kgrid), qaxis=axis_summary(qaxis), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, field=field, kgrid=kgrid, qaxis=qaxis, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
         row_data = Engine.distributed_map_grid(
-            SpectralFunctionRowTask{typeof(chi_functor), typeof(omegas)}(chi_functor, omegas),
+            SpectralFunctionRowTask{typeof(chi_functor),typeof(omegas)}(chi_functor, omegas),
             qaxis;
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
@@ -244,7 +244,7 @@ the internal grid with `GeneralizedSusceptibility`. Set
 """
 function scan_spectral_function(
     model::PhysicalModel,
-    interaction::Interaction, 
+    interaction::Interaction,
     field::AuxiliaryField,
     kgrid::AbstractKGrid{D},
     qpath::KPath{D},
@@ -258,12 +258,12 @@ function scan_spectral_function(
 ) where {D}
     return with_stage_log(
         "Scan spectral function along path";
-        context=(model=model_summary(model), interaction=interaction_summary(interaction), field=field_summary(field), kgrid=grid_summary(kgrid), qpath=kpath_summary(qpath), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         @timeit TO "Spectral Function Scan" return scan_rpa_spectral_function_hpc(
             model,
-            interaction, 
+            interaction,
             field,
             kgrid,
             path_points(qpath),
@@ -293,7 +293,7 @@ function scan_spectral_function(
 ) where {D}
     return with_stage_log(
         "Scan spectral function along path";
-        context=(model=model_summary(model), field=field_summary(field), kgrid=grid_summary(kgrid), qpath=kpath_summary(qpath), omegas=axis_summary(omegas), T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         return scan_rpa_spectral_function_hpc(
@@ -319,4 +319,85 @@ end
 
 function _point_from_coordinates(::Val{D}, coords::Vararg{<:Real,D}) where {D}
     return SVector{D,Float64}(ntuple(dim -> Float64(coords[dim]), Val(D)))
+end
+
+"""
+    compute_collective_mode_spectral_data(T_val, field, model, interaction, kgrid, qpath; omega_max_factor=5.0, n_omegas=100, eta=0.02, approx=ExactTrLn(), phi_guess=0.4, kwargs...)
+
+Compute the dynamical spectral map of a mean-field state and return only pure
+array data for downstream visualization.
+"""
+function compute_collective_mode_spectral_data(
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    field::AuxiliaryField,
+    kgrid::AbstractKGrid;
+    qpath::KPath,
+    T_val::Real,
+    omega_max_factor::Real=5.0,
+    n_omegas::Integer=100,
+    eta::Real=0.02,
+    approx::ApproximationLevel=ExactTrLn(),
+    phi_guess::Real=0.4,
+    bootstrap_workers::Bool=false,
+    n_workers::Integer=max(0, Threads.nthreads() - 1),
+    project::Union{Nothing,AbstractString}=Base.active_project(),
+    restrict::Bool=true
+)
+    return with_stage_log(
+        "Compute collective mode spectral data";
+        context=(field=field, model=model, interaction=interaction, kgrid=kgrid, qpath=qpath, T=Float64(T_val), eta=Float64(eta), n_omegas=Int(n_omegas), approx=approx),
+        summarize_result=data -> (n_q=length(path_points(data.qpath)), n_omegas=length(data.omegas), gap=data.gap),
+    ) do
+        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=Float64(phi_guess), T=T_val, log_level=Logging.Debug)
+        phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
+
+        bdg_dispersion = MeanFieldDispersion(model, field, phi_gs)
+        omega_max = phi_gs > 0.0 ? omega_max_factor * phi_gs : 2.0
+        omegas = collect(range(0.0, omega_max, length=n_omegas))
+        spectral_matrix = scan_rpa_spectral_function_hpc(
+            bdg_dispersion,
+            interaction,
+            field,
+            kgrid,
+            path_points(qpath),
+            omegas;
+            T=T_val,
+            η=eta,
+            bootstrap_workers=bootstrap_workers,
+            n_workers=n_workers,
+            project=project,
+            restrict=restrict
+        )
+
+        pair_breaking_edge = phi_gs > 0.0 ? 2.0 * phi_gs : nothing
+        return SpectralMapData(
+            qpath=qpath,
+            omegas=omegas,
+            spectral_matrix=spectral_matrix,
+            gap=phi_gs,
+            pair_breaking_edge=pair_breaking_edge,
+            temperature=Float64(T_val)
+        )
+    end
+end
+
+function compute_collective_mode_spectral_data(
+    T_val::Real,
+    field::AuxiliaryField,
+    model::ElectronicDispersion,
+    interaction::Interaction,
+    kgrid::AbstractKGrid,
+    qpath::KPath;
+    kwargs...
+)
+    return compute_collective_mode_spectral_data(
+        model,
+        interaction,
+        field,
+        kgrid;
+        qpath=qpath,
+        T_val=T_val,
+        kwargs...,
+    )
 end
