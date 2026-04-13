@@ -247,6 +247,7 @@ end
 @option "scan_spectral_function" struct ScanSpectralFunctionOption <: AbstractTaskOption
     qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
     qpath_labels::Union{Vector{String},Nothing} = nothing
+    npoints_each_line::Int = 50
     omega_range::Union{Vector{Float64},Nothing} = nothing
     omega_points::Int = 100
     T_val::Float64 = 0.001
@@ -266,6 +267,7 @@ end
 @option "compute_renormalized_band_data" struct ComputeRenormalizedBandDataOption <: AbstractTaskOption
     qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
     qpath_labels::Union{Vector{String},Nothing} = nothing
+    npoints_each_line::Int = 50
     T_range::Union{Vector{Float64},Nothing} = nothing
     T_points::Int = 10
     phi_guess::Float64 = 0.5
@@ -286,6 +288,7 @@ end
 @option "compute_collective_mode_spectral_data" struct ComputeCollectiveModeSpectralDataOption <: AbstractTaskOption
     qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
     qpath_labels::Union{Vector{String},Nothing} = nothing
+    npoints_each_line::Int = 50
     T_val::Float64 = 0.01
     omega_max_factor::Float64 = 5.0
     n_omegas::Int = 100

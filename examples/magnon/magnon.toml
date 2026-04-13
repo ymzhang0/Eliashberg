@@ -25,6 +25,7 @@ direction = "z"
 type = "scan_spectral_function"
 qpath_points = [[0.0], [2.0943951]]
 qpath_labels = ["Γ", "X"]
+npoints_each_line = 100
 omega_range = [0.0, 5.0]
 omega_points = 400
 T_val = 0.01

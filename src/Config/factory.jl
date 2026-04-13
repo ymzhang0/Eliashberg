@@ -22,6 +22,16 @@ _dim(disp::ElectronicDispersion{D}) where {D} = D
 _svec(D::Int, v::AbstractVector) = SVector{D,eltype(v)}(v)
 _svec(D::Int, v::Tuple) = SVector{D,eltype(v)}(v)
 
+function _build_configured_kpath(
+    points::AbstractVector{<:AbstractVector},
+    labels::AbstractVector{<:AbstractString},
+    npoints_each_line::Integer,
+)
+    D = length(points[1])
+    nodes = [_svec(D, pt) for pt in points]
+    return generate_kpath(nodes, collect(String.(labels)); n_pts_per_segment=Int(npoints_each_line))
+end
+
 # ---------------------------------------------------------
 # Geometry Factory
 # ---------------------------------------------------------
@@ -202,9 +212,7 @@ function build_task(task::ComputeRenormalizedBandDataOption)
     Ts = collect(range(task.T_range[1], task.T_range[2], length=task.T_points))
     approx = _parse_approx(task.approx)
     if !isnothing(task.qpath_points)
-        D = length(task.qpath_points[1])
-        nodes = [_svec(D, pt) for pt in task.qpath_points]
-        kpath = generate_kpath(nodes, task.qpath_labels; n_pts_per_segment=50) # default segment
+        kpath = _build_configured_kpath(task.qpath_points, task.qpath_labels, task.npoints_each_line)
         return (; Ts, kpath, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
     end
     return (; Ts, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
@@ -213,9 +221,7 @@ end
 function build_task(task::ScanSpectralFunctionOption)
     omegas = collect(range(task.omega_range[1], task.omega_range[2], length=task.omega_points))
     if !isnothing(task.qpath_points)
-        D = length(task.qpath_points[1])
-        nodes = [_svec(D, pt) for pt in task.qpath_points]
-        qpath = generate_kpath(nodes, task.qpath_labels; n_pts_per_segment=50)
+        qpath = _build_configured_kpath(task.qpath_points, task.qpath_labels, task.npoints_each_line)
         return (; qpath, omegas, T_val=task.T_val, eta=task.eta)
     end
     return (; omegas, T_val=task.T_val, eta=task.eta)
@@ -229,9 +235,7 @@ end
 
 function build_task(task::ComputeCollectiveModeSpectralDataOption)
     approx = _parse_approx(task.approx)
-    D = length(task.qpath_points[1])
-    nodes = [_svec(D, pt) for pt in task.qpath_points]
-    qpath = generate_kpath(nodes, task.qpath_labels; n_pts_per_segment=50)
+    qpath = _build_configured_kpath(task.qpath_points, task.qpath_labels, task.npoints_each_line)
     return (;
         qpath,
         T_val=task.T_val,

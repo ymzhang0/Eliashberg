@@ -36,6 +36,7 @@ type = "DirectChannel"
 type = "scan_spectral_function"
 qpath_points = [[0.0, 0.0], [2.0943951, 0.0], [2.0943951, 2.0943951], [0.0, 0.0]]
 qpath_labels = ["Γ", "X", "M", "Γ"]
+npoints_each_line = 100
 omega_range = [0.0, 5.0]
 omega_points = 400
 T_val = 0.01
