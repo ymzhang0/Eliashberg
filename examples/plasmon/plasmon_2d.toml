@@ -1,7 +1,7 @@
 [system]
 n_workers = 31             # 集群上留 1 个核给主进程，剩下全做 worker
 bootstrap_workers = true   # 允许引擎自动初始化这些 workers
-output_dir = "results"
+output_dir = "examples/plasmon/results"
 job_name = "plasmon_2d"
 output_filename = "plasmon_scan"
 write_hdf5 = true

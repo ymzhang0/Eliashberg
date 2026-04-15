@@ -84,7 +84,7 @@ If you prefer using Julia's native threads (usually faster for a single node), e
 
 ```bash
 export JULIA_NUM_THREADS=32
-julia --project run.jl config.toml
+julia --project src/Tools/runner.jl examples/plasmon/plasmon_2d.toml
 ```
 
 ### Slurm Submission Example
@@ -106,7 +106,42 @@ For more details on cluster-specific optimizations, see the [Lucia Cluster Workf
 
 ---
 
-## 5. Handling Results and Plotting
+## 5. Manual Band Structure Analysis
+
+While the `scan_spectral_function` task computes the collective excitation spectrum, it is often useful to visualize the underlying single-particle electronic bands. You can compute both the bare Tight-Binding bands and the many-body renormalized bands directly without using a configuration file.
+
+### Calculating Bare TB Bands
+Using the manual interface, you can calculate the dispersion along the defined $k$-path:
+
+```julia
+# Manual calculation of bare bands
+bare_bands = Eliashberg._band_matrix_along_path(tb, path)
+
+# Visualize using the band structure plotter
+fig_bare = plot_band_structure(path, bare_bands; title="Bare TB Bands")
+```
+
+### Calculating Renormalized Bands
+The `compute_renormalized_band_data` function allows you to calculate the quasiparticle energy levels after accounting for many-body interaction effects (self-energy corrections).
+
+```julia
+# Compute renormalized band data at T = 0.01
+renorm_data = compute_renormalized_band_data(
+    tb, 
+    interaction, 
+    fluctuation, 
+    kgrid; 
+    kpath=path, 
+    Ts=[0.01]
+)
+
+# Generate a comparison plot showing both bare (dotted) and renormalized (solid) bands
+fig_renorm = Eliashberg.plot(renorm_data)
+```
+
+---
+
+## 6. Handling Results and Plotting
 
 Once the simulation is complete, you can load the data and visualize the excitation spectrum.
 
