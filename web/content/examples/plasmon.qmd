@@ -1,0 +1,141 @@
+---
+title: "Plasmon (RPA Spectral Function)"
+---
+
+# Example: Plasmon Calculation
+
+This example demonstrates how to calculate the **RPA Spectral Function** (collective modes like Plasmons) using the consolidated configuration system.
+
+## 1. Overview
+
+The goal is to compute the imaginary part of the charge susceptibility $\chi(q, \omega)$ on a specific momentum path. Physically, the peaks in this function correspond to collective charge oscillations (plasmons).
+
+## 2. Configuration Analysis
+
+We use a TOML file to define the system and the calculation task. Below is the configuration for a 1D Chain model:
+
+```toml
+[geometry]
+type = "ChainLattice"
+a = 1.5
+
+[model]
+type = "TightBinding"
+t = 1.0
+EF = -0.3
+
+[interaction]
+type = "BareCoulomb"
+cutoff = 0.01
+
+[field]
+type = "DirectChannel"
+
+[task]
+type = "scan_spectral_function"
+qpath_points = [[0.0], [2.0943951]]  # Γ to X
+qpath_labels = ["Γ", "X"]
+npoints_each_line = 100
+omega_range = [0.0, 5.0]
+omega_points = 100
+T_val = 0.01
+eta = 0.02
+```
+
+### Key Parameters:
+- **`field.type = "DirectChannel"`**: Specifies that we are looking at density fluctuations (Charge Channel).
+- **`interaction.type = "BareCoulomb"`**: Uses the long-range Coulomb potential which is screened by RPA.
+- **`task.type = "scan_spectral_function"`**: Triggers the calculation of $\text{Im}[\chi^{RPA}(q, \omega)]$ across the specified $(q, \omega)$ grid.
+
+---
+
+## 3. Running the Simulation
+
+You can run the simulation directly from a Julia script using the provided factory function:
+
+```julia
+using Eliashberg
+
+# This will parse the TOML, initialize workers, and run the task
+Eliashberg.run_config("examples/plasmon/plasmon_1d.toml")
+```
+
+The results will be saved in the `results/` directory as specified in the `[system]` section of the TOML.
+
+---
+
+## 4. Running on HPC Clusters (Multi-core)
+
+For large-scale simulations (e.g., dense $k$-point grids or high-resolution frequency scans), you should utilize multiple CPU cores. `Eliashberg.jl` supports both **threading** (shared memory) and **distributed** (multi-process) parallelism.
+
+### Distributed Parallelism (TOML Config)
+You can configure the simulation engine to automatically spawn worker processes by adding a `[system]` block to your TOML:
+
+```toml
+[system]
+n_workers = 32             # Total number of worker processes
+bootstrap_workers = true   # Let the engine initialize workers automatically
+output_dir = "results"
+job_name = "plasmon_hpc"
+```
+
+### Threading 
+If you prefer using Julia's native threads (usually faster for a single node), ensure your environment variable is set before running:
+
+```bash
+export JULIA_NUM_THREADS=32
+julia --project run.jl config.toml
+```
+
+### Slurm Submission Example
+On a cluster like **Lucia**, you can submit the job using a script like this:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=plasmon_scan
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --time=02:00:00
+
+export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
+julia --project run.jl examples/plasmon/plasmon_1d.toml
+```
+
+For more details on cluster-specific optimizations, see the [Lucia Cluster Workflows](../hpc/cluster_workflows.qmd) chapter.
+
+---
+
+## 5. Handling Results and Plotting
+
+Once the simulation is complete, you can load the data and visualize the excitation spectrum.
+
+### Loading Data
+The unified IO system allows you to load the entire result object from JLD2 or HDF5 files:
+
+```julia
+# Load the result payload
+data = Eliashberg.load("results/plasmon_scan.jld2")
+
+# 'data' will be an instance of SpectralMapData
+println("Loaded path: ", data.qpath)
+```
+
+### Visualizing the Spectrum
+Use the `plot` interface (powered by Makie) to generate the spectral intensity map:
+
+```julia
+using CairoMakie
+
+# Generate the plot
+fig = Eliashberg.plot(data)
+
+# You can further customize the Makie figure
+ax = fig.content[1]
+ax.title = "1D Plasmon Dispersion"
+ax.ylabel = "Frequency ω"
+
+display(fig)
+```
+
+For 2D lattices (like `SquareLattice`), the `scan_spectral_function` task will produce a similar `SpectralMapData` object, and the `plot` function will automatically handle the multi-segment momentum path.

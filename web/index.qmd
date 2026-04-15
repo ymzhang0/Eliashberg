@@ -1,10 +1,21 @@
 # Preface {.unnumbered}
 
-Welcome to the **Eliashberg Theory Notes**.
+Welcome to the documentation and theoretical notes for **Eliashberg.jl**.
 
-These notes cover:
-- Hubbard-Stratonovich Transformation
-- BCS Theory Mean Field
-- Dynamic effects and self-energy
+This book serves a dual purpose: it is both a **comprehensive user manual** for our high-performance Julia engine and a **pedagogical guide** to the modern many-body physics that powers it.
 
-Use the sidebar navigation to read the chapters.
+## What is this engine?
+Eliashberg.jl is a declarative, data-driven framework designed to bridge the gap between abstract quantum field theory and realistic material computations. It seamlessly connects tight-binding models and ab-initio DFT outputs (Wannier90/Quantum ESPRESSO) with advanced many-body perturbation theory.
+
+## What will you learn here?
+In these notes, we do not just present the code; we build the physics from the ground up. The chapters cover:
+
+* **The Path Integral Formulation:** A rigorous derivation of the Hubbard-Stratonovich transformation, moving from zero-dimensional toy models to full momentum-dependent effective actions (see **Chapter 0**).
+* **Electron-Phonon Dynamics:** Understanding the equivalence between canonical transformations and functional integration, leading to the Anderson-Higgs mechanism (see **Chapter 1**).
+* **Collective Excitations & Instabilities:** Utilizing the Random Phase Approximation (RPA) to hunt for Plasmons, Magnons, and Charge/Spin Density Waves.
+* **Superconductivity:** Solving the linearized BCS/Eliashberg gap equations as eigenvalue problems to determine pairing symmetries without a priori assumptions.
+
+## Who is this for?
+Whether you are a condensed matter theorist looking to numerically verify an effective action, or a computational physicist aiming to deploy massive calculation of many-body effect an HPC cluster, this guide will walk you through the architecture, the physics, and the code.
+
+Use the sidebar navigation to begin your journey. We recommend starting with the **Getting Started** section for a quick tutorial, or diving straight into the **Physics Foundations** if you want to explore the mathematical engine under the hood.

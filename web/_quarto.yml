@@ -2,17 +2,31 @@ project:
   type: book
 
 book:
-  title: "Eliashberg Theory Notes"
+  title: "Eliashberg.jl Documentation"
   author: "Yiming Zhang"
   chapters:
     - index.qmd
-    - content/parameters.qmd
-    - content/data_types.qmd
-    - content/cluster_workflows.qmd
-    - content/CH0.ipynb
-    - content/CH1.ipynb
-    - content/RPA.ipynb
-    - content/BCS.ipynb
+    - part: "Getting Started"
+      chapters: []
+    - part: "Physics Foundations (Theory)"
+      chapters:
+        - content/physics/CH0.ipynb
+        - content/physics/CH1.ipynb
+    - part: "Examples"
+      chapters:
+        - content/examples/plasmon.qmd
+    - part: "Applications & Workflows"
+      chapters:
+        - content/applications/RPA.ipynb
+        - content/applications/BCS.ipynb
+    - part: "HPC & Architecture"
+      chapters:
+        - content/hpc/cluster_workflows.qmd
+    - part: "API Reference"
+      chapters:
+        - content/api/parameters.qmd
+        - content/api/data_types.qmd
+        - content/api/appendix.ipynb
 format:
   html:
     theme: flatly
