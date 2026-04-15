@@ -418,34 +418,7 @@ plot_renormalized_bands(data::RenormalizedBandData; kwargs...) =
         kwargs...
     )
 
-visualize_dispersion(k_coords::AbstractVector{<:Real}, band_matrix::AbstractMatrix{<:Real}; kwargs...) =
-    plot_dispersion_curves(k_coords, band_matrix; kwargs...)
-
-visualize_dispersion(kxs::AbstractVector{<:Real}, kys::AbstractVector{<:Real}, energy_matrix::AbstractMatrix{<:Real}; kwargs...) =
-    plot_dispersion_surface(kxs, kys, energy_matrix; kwargs...)
-
-visualize_dispersion(data::DispersionSurfaceData; kwargs...) =
-    plot_dispersion_surface(data; kwargs...)
-
-visualize_dispersion(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; kwargs...) =
-    plot_band_structure(kpath, band_matrix; kwargs...)
-
-visualize_dispersion(data::BandStructureData; kwargs...) =
-    plot_band_structure(data; kwargs...)
-
-visualize_dispersion(
-    kxs::AbstractVector{<:Real},
-    kys::AbstractVector{<:Real},
-    kzs::AbstractVector{<:Real},
-    energy_volume::AbstractArray{<:Real,3};
-    kwargs...
-) = plot_fermi_surface(kxs, kys, kzs, energy_volume; kwargs...)
-
-visualize_dispersion(data::FermiSurfaceData; kwargs...) =
-    plot_fermi_surface(data; kwargs...)
-
-visualize_renormalized_bands(data::RenormalizedBandData; kwargs...) =
-    plot_renormalized_bands(data; kwargs...)
+# Makie Multiple Dispatch Overloads
 
 Makie.plot(data::DispersionSurfaceData; kwargs...) = plot_dispersion_surface(data; kwargs...)
 Makie.plot(data::BandStructureData; kwargs...) = plot_band_structure(data; kwargs...)

@@ -1,6 +1,4 @@
-export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
-export compute_landscape_line_data, compute_landscape_surface_data
-export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
+# src/Data/types.jl
 
 Base.@kwdef struct BandStructureData{D}
     kpath::KPath{D}
@@ -80,28 +78,6 @@ Base.@kwdef struct LandscapeSurfaceData
             Float64.(landscape_matrix)
         )
     end
-end
-
-function compute_landscape_line_data(qs::AbstractVector{<:Real}, values::AbstractVector{<:Real})
-    return LandscapeLineData(qs, values)
-end
-
-function compute_landscape_line_data(grid::AbstractKGrid{1}, values::AbstractVector{<:Real})
-    return compute_landscape_line_data([point[1] for point in grid.points], values)
-end
-
-function compute_landscape_surface_data(
-    qxs::AbstractVector{<:Real},
-    qys::AbstractVector{<:Real},
-    landscape_matrix::AbstractMatrix{<:Real},
-)
-    return LandscapeSurfaceData(qxs, qys, landscape_matrix)
-end
-
-function compute_landscape_surface_data(grid::AbstractKGrid{2}, landscape_matrix::AbstractMatrix{<:Real})
-    qxs = unique(sort([point[1] for point in grid.points]))
-    qys = unique(sort([point[2] for point in grid.points]))
-    return compute_landscape_surface_data(qxs, qys, landscape_matrix)
 end
 
 Base.@kwdef struct PhaseDiagramData
@@ -241,3 +217,53 @@ Base.@kwdef struct CoexistenceLandscapeData
         )
     end
 end
+
+Base.@kwdef struct Wannier90BandComparison{D}
+    reference::BandStructureData{D}
+    model::BandStructureData{D}
+    shifted_model::BandStructureData{D}
+    kpoints_fractional::Vector{SVector{3, Float64}}
+    energy_shift::Float64
+    rms_error::Float64
+    max_error::Float64
+    difference::Matrix{Float64}
+
+    function Wannier90BandComparison{D}(
+        reference::BandStructureData{D},
+        model::BandStructureData{D},
+        shifted_model::BandStructureData{D},
+        kpoints_fractional::AbstractVector{<:SVector{3, <:Real}},
+        energy_shift::Real,
+        rms_error::Real,
+        max_error::Real,
+        difference::AbstractMatrix{<:Real},
+    ) where {D}
+        size(reference.bands) == size(model.bands) == size(shifted_model.bands) ||
+            throw(DimensionMismatch("Compared band matrices must all have the same shape."))
+        size(reference.bands) == size(difference) ||
+            throw(DimensionMismatch("Difference matrix shape must match the compared band matrices."))
+        length(reference.kpath) == length(kpoints_fractional) ||
+            throw(DimensionMismatch("The fractional k-point list must match the number of path samples."))
+
+        return new{D}(
+            reference,
+            model,
+            shifted_model,
+            [SVector{3, Float64}(point) for point in kpoints_fractional],
+            Float64(energy_shift),
+            Float64(rms_error),
+            Float64(max_error),
+            Float64.(difference),
+        )
+    end
+end
+Wannier90BandComparison(
+    reference::BandStructureData{D},
+    model::BandStructureData{D},
+    shifted_model::BandStructureData{D},
+    kpoints_fractional::AbstractVector{<:SVector{3, <:Real}},
+    energy_shift::Real,
+    rms_error::Real,
+    max_error::Real,
+    difference::AbstractMatrix{<:Real},
+) where {D} = Wannier90BandComparison{D}(reference, model, shifted_model, kpoints_fractional, energy_shift, rms_error, max_error, difference)

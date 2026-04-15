@@ -186,14 +186,6 @@ plot_collective_modes(data::SpectralMapData; kwargs...) =
         kwargs...
     )
 
-visualize_phase_transition(data::PhaseDiagramData; kwargs...) =
-    plot_phase_transition(data; kwargs...)
-visualize_landscape(args...; kwargs...) = plot_landscape(args...; kwargs...)
-visualize_spectral_function(args...; kwargs...) = plot_spectral_function(args...; kwargs...)
-visualize_zeeman_pairing_landscape(args...; kwargs...) = plot_zeeman_pairing_landscape(args...; kwargs...)
-visualize_collective_modes(data::SpectralMapData; kwargs...) =
-    plot_collective_modes(data; kwargs...)
-
 Makie.plot(data::LandscapeLineData; kwargs...) = plot_landscape(data; kwargs...)
 Makie.plot(data::LandscapeSurfaceData; kwargs...) = plot_landscape(data; kwargs...)
 Makie.plot(data::PhaseDiagramData; kwargs...) = plot_phase_transition(data; kwargs...)

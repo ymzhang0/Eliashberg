@@ -4,6 +4,8 @@ module Eliashberg
 using LinearAlgebra
 using StaticArrays
 using AtomsBase
+using HDF5
+using JLD2
 import AtomsBase: periodicity, PeriodicCell, FastSystem, ChemicalSpecies, mass
 import Brillouin
 using Spglib
@@ -51,10 +53,8 @@ include("Interfaces/Interfaces.jl")
 include("Geometry/reciprocal_lattice.jl")
 
 # Response data objects
-include("Data/data_types.jl")
-
-# Interface data objects
-include("Interfaces/Wannier90/data_types.jl")
+include("Data/types.jl")
+include("Data/factories.jl")
 
 # Correlation data objects needed by model evaluators
 include("Correlations/self_energies.jl")
@@ -116,15 +116,8 @@ plot_spectral_function(args...; kwargs...) = _call_visualization(:plot_spectral_
 plot_phase_transition(args...; kwargs...) = _call_visualization(:plot_phase_transition, args...; kwargs...)
 plot_zeeman_pairing_landscape(args...; kwargs...) = _call_visualization(:plot_zeeman_pairing_landscape, args...; kwargs...)
 plot_collective_modes(args...; kwargs...) = _call_visualization(:plot_collective_modes, args...; kwargs...)
-visualize_dispersion(args...; kwargs...) = _call_visualization(:visualize_dispersion, args...; kwargs...)
-visualize_landscape(args...; kwargs...) = _call_visualization(:visualize_landscape, args...; kwargs...)
-visualize_spectral_function(args...; kwargs...) = _call_visualization(:visualize_spectral_function, args...; kwargs...)
-visualize_phase_transition(args...; kwargs...) = _call_visualization(:visualize_phase_transition, args...; kwargs...)
-visualize_renormalized_bands(args...; kwargs...) = _call_visualization(:visualize_renormalized_bands, args...; kwargs...)
-visualize_zeeman_pairing_landscape(args...; kwargs...) = _call_visualization(:visualize_zeeman_pairing_landscape, args...; kwargs...)
-visualize_collective_modes(args...; kwargs...) = _call_visualization(:visualize_collective_modes, args...; kwargs...)
-visualize_lattice(args...; kwargs...) = _call_visualization(:visualize_lattice, args...; kwargs...)
-visualize_reciprocal_space(args...; kwargs...) = _call_visualization(:visualize_reciprocal_space, args...; kwargs...)
+plot_lattice(args...; kwargs...) = _call_visualization(:plot_lattice, args...; kwargs...)
+plot_reciprocal_space(args...; kwargs...) = _call_visualization(:plot_reciprocal_space, args...; kwargs...)
 
 # 6. Backward Compatibility and Aliases
 const LindhardSusceptibility = GeneralizedSusceptibility
@@ -161,7 +154,7 @@ export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_st
 export RPABoson, CachedBoson, evaluate_boson_propagator, materialize_boson
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
 export compute_landscape_line_data, compute_landscape_surface_data
-export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData
+export PhaseDiagramData, RenormalizedBandData, SpectralMapData, ZeemanPairingData, CoexistenceLandscapeData, Wannier90BandComparison
 
 # Solvers
 export ApproximationLevel, ExactTrLn, RPA, TO
@@ -174,12 +167,15 @@ export compute_phase_transition_data, compute_renormalized_band_data, compute_ze
 # Visualization
 export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plot_wannier90_band_structure, plot_wannier90_tb_band_comparison, plot_fermi_surface, plot_renormalized_bands
 export plot_landscape, plot_spectral_function, plot_phase_transition, plot_zeeman_pairing_landscape, plot_collective_modes
-export visualize_dispersion, dimensionality, visualize_landscape, visualize_spectral_function, visualize_phase_transition, visualize_renormalized_bands, visualize_zeeman_pairing_landscape, visualize_collective_modes
-export visualize_lattice, visualize_reciprocal_space
+export plot_lattice, plot_reciprocal_space, dimensionality
 
 # 8. Configuration System
 include("Config/Config.jl")
 using .Config: EliashbergConfig, load_config, build_from_config
 export EliashbergConfig, load_config, build_from_config
+
+# 9. Result File IO
+include("IO/IO.jl")
+export save, load
 
 end # module Eliashberg

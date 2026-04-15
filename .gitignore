@@ -14,3 +14,4 @@ _build/
 test_output.log
 
 todo
+results/
