@@ -1,0 +1,199 @@
+---
+title: Data Type Reference
+---
+
+# Data Type Reference
+
+This page describes the internal type system of `Eliashberg.jl`, including the physical object hierarchies and the result data containers.
+
+## Geometry
+
+Core types for representing lattices and momentum grids.
+
+```{mermaid}
+graph TD
+    AbstractKGrid["AbstractKGrid{D}"]
+    Crystal["Crystal{D}"]
+    IBravInfo["IBravInfo"]
+```
+
+| Type | Description | Key Fields |
+| :--- | :--- | :--- |
+| `AbstractKGrid{D}` | Abstract base for Brillouin zone sampling (grids and paths). | - |
+| `Crystal{D}` | Unitless internal representation of a crystal structure. | `lattice`, `fractional_positions`, `atomic_symbols` |
+
+### Examples
+
+```julia
+# Construct a square lattice crystal
+lattice = [1.0 0.0; 0.0 1.0]
+atoms = [:Cu => [0.0, 0.0]]
+crystal = Crystal(lattice, atoms)
+```
+
+---
+
+## Dispersion Models
+
+Hierarchical representation of electronic and bosonic dispersions.
+
+```{mermaid}
+classDiagram
+    class PhysicalModel {
+        <<abstract>>
+    }
+    class Dispersion {
+        <<abstract>>
+    }
+    class ElectronicDispersion {
+        <<abstract>>
+    }
+    class PhononDispersion {
+        <<abstract>>
+    }
+
+    PhysicalModel <|-- Dispersion
+    Dispersion <|-- ElectronicDispersion
+    Dispersion <|-- PhononDispersion
+
+    ElectronicDispersion <|-- FreeElectron
+    ElectronicDispersion <|-- TightBinding
+    ElectronicDispersion <|-- MultiOrbitalTightBinding
+    ElectronicDispersion <|-- SpinorDispersion
+    ElectronicDispersion <|-- KagomeLattice
+    ElectronicDispersion <|-- Graphene
+    ElectronicDispersion <|-- SSHModel
+
+    PhononDispersion <|-- EinsteinModel
+    PhononDispersion <|-- DebyeModel
+    PhononDispersion <|-- PolaritonModel
+    PhononDispersion <|-- MonoatomicLatticeModel
+```
+
+### Electronic Dispersions
+
+| Type | Description | Key Fields |
+| :--- | :--- | :--- |
+| `FreeElectron{D}` | Parabolic dispersion model. | `EF`, `mass` |
+| `TightBinding{D}` | Real-space tight-binding model. | `lattice`, `hoppings`, `EF` |
+| `MultiOrbitalTightBinding{D}` | General Wannier-style multi-orbital model. | `num_orbitals`, `hoppings`, `EF` |
+| `SpinorDispersion{D, M}` | Wrapper to promote a model to a spin-degenerate basis. | `bare` model |
+
+### Phonon Dispersions
+
+| Type | Description | Key Fields |
+| :--- | :--- | :--- |
+| `EinsteinModel{D}` | Constant frequency phonon mode. | `ωE` |
+| `DebyeModel{D}` | Acoustic phonon mode with linear dispersion. | `vs`, `ωD` |
+
+### Examples
+
+```julia
+# 2D Tight-Binding on a square lattice
+lattice = [1.0 0.0; 0.0 1.0]
+t = 1.0; EF = -0.5
+model = TightBinding(lattice, t, EF)
+```
+
+---
+
+## Interactions
+
+Hierarchical representation of interaction kernels.
+
+```{mermaid}
+classDiagram
+    class Interaction {
+        <<abstract>>
+    }
+    class ElectronPhononInteraction {
+        <<abstract>>
+    }
+    class CoulombInteraction {
+        <<abstract>>
+    }
+    class ScreenedInteraction {
+        <<abstract>>
+    }
+
+    Interaction <|-- ElectronPhononInteraction
+    Interaction <|-- CoulombInteraction
+    Interaction <|-- ScreenedInteraction
+
+    ElectronPhononInteraction <|-- ConstantInteraction
+    ElectronPhononInteraction <|-- LocalInteraction
+    ElectronPhononInteraction <|-- YukawaInteraction
+    ElectronPhononInteraction <|-- LimitedConstantInteraction
+
+    CoulombInteraction <|-- BareCoulombInteraction
+    ScreenedInteraction <|-- ScreenedCoulombInteraction
+```
+
+| Type | Description | Key Fields |
+| :--- | :--- | :--- |
+| `ConstantInteraction` | Momentum-independent interaction. | `V0` |
+| `YukawaInteraction` | Screened interaction with $V(q) \sim 1/(q^2 + \lambda^2)$. | `V0`, `λ` |
+| `CompositeInteraction` | Linear combination of multiple interactions. | `interactions` (Tuple) |
+
+### Examples
+
+```julia
+# Combined attractice phonon and repulsive Coulomb
+V_ph = ConstantInteraction(-2.0)
+V_c  = BareCoulombInteraction(0.1)
+interaction = V_ph + V_c
+```
+
+---
+
+## Mean Field (Auxiliary Fields)
+
+Symmetry-breaking fields and order parameters.
+
+```{mermaid}
+classDiagram
+    class AuxiliaryField {
+        <<abstract>>
+    }
+    class ParticleHoleChannel {
+        <<abstract>>
+    }
+
+    AuxiliaryField <|-- ParticleHoleChannel
+    ParticleHoleChannel <|-- DirectChannel
+    ParticleHoleChannel <|-- ExchangeChannel
+    ParticleHoleChannel <|-- ChargeDensityWave
+    ParticleHoleChannel <|-- SpinDensityWave
+
+    AuxiliaryField <|-- BCSReducedPairing
+    AuxiliaryField <|-- FFLOPairing
+    AuxiliaryField <|-- PairDensityWave
+    AuxiliaryField <|-- MomentumDependentPairing
+```
+
+| Type | Description | Key Fields |
+| :--- | :--- | :--- |
+| `BCSReducedPairing` | Uniform superconducting gap ($q=0$). | `symmetry` (e.g. `:s_wave`) |
+| `FFLOPairing{D}` | Superconductivity with finite center-of-mass momentum. | `q`, `symmetry`, `h` |
+| `ChargeDensityWave{D}` | Static charge modulation. | `q` |
+
+### Examples
+
+```julia
+# FFLO field in 1D
+q = [0.1]
+field = FFLOPairing(q; h=0.2)
+```
+
+---
+
+## Result Payloads (Data Containers)
+
+Objects used to store and visualize calculation results.
+
+| Type | Description | Key Contents |
+| :--- | :--- | :--- |
+| `BandStructureData{D}` | Dispersion curves along a k-path. | `kpath`, `bands` |
+| `SpectralMapData{D}` | Collective mode or electronic spectral intensity. | `qpath`, `omegas`, `spectral_matrix` |
+| `PhaseDiagramData` | Free energy and order parameters across $T$ and $\phi$. | `phis`, `Ts`, `free_energy` |
+| `RenormalizedBandData` | Bands and gaps as a function of temperature. | `kpath`, `bare_bands`, `renormalized_bands`, `gaps`, `temperatures` |

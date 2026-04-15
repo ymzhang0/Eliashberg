@@ -1,0 +1,176 @@
+---
+title: Parameter Reference
+---
+
+# Parameter Reference
+
+This page provides a comprehensive list of all parameters that can be specified in the `Eliashberg.jl` configuration file (TOML).
+
+## System Options (`[system]`)
+
+Configuration for the execution environment, input/output behavior, and logging.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `n_workers` | `Int` | `1` | Number of parallel worker processes. |
+| `bootstrap_workers` | `Bool` | `false` | Whether to automatically bootstrap workers on remote nodes. |
+| `project` | `String` | `nothing` | Path to the Julia project environment. |
+| `restrict` | `Bool` | `true` | Restrict parallel workers to the specified project. |
+| `output_dir` | `String` | `"results"` | Root directory for storing simulation outputs. |
+| `job_name` | `String` | `nothing` | Optional name for the job (used for sub-directory naming). |
+| `output_filename` | `String` | `"data"` | Base filename for the saved result objects. |
+| `write_hdf5` | `Bool` | `true` | Enable saving results in HDF5 format. |
+| `write_jld2` | `Bool` | `true` | Enable saving results in JLD2 format. |
+| `backup_config` | `Bool` | `true` | Save a copy of the input TOML file in the result directory. |
+| `log_filename` | `String` | `"job.log"` | Filename for logging messages. |
+| `log_level` | `String` | `"info"` | Minimum level for log messages (`debug`, `info`, `warn`, `error`). |
+| `quiet` | `Bool` | `false` | If true, silence console output. |
+
+## Geometry Options (`[geometry]`)
+
+Defines the crystal structure or lattice geometry. The `type` field determines which parameters are required.
+
+### `type = "ChainLattice"` / `"SquareLattice"` / `"HexagonalLattice"` / `"CubicLattice"` / `"BCCLattice"` / `"FCCLattice"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `a` | `Float64` | `1.0` | Lattice constant. |
+
+### `type = "QE"` (Quantum ESPRESSO)
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `ibrav` | `Int` | **Required** | Bravais-lattice index (as defined in QE). |
+| `a` | `Float64` | **Required** | Lattice parameter $a$. |
+| `celldm2`...`celldm6` | `Float64` | `nothing` | Dimensional parameters for the specific Bravais lattice. |
+
+## K-points Options (`[kpoints]`)
+
+Specifies the discretization of the Brillouin zone.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `grid` | `Int` or `Vector{Int}` | `10` | Grid dimensions (e.g., `10` for $10^D$ or `[12, 12, 8]` for anisotropic). |
+
+## Model Options (`[model]`)
+
+Specifies the underlying electronic or bosonic dispersion model.
+
+### `type = "FreeElectron"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `EF` | `Float64` | `0.0` | Fermi energy level. |
+| `mass` | `Float64` | `1.0` | Effective mass of the electron (in units of $m_e$). |
+
+### `type = "TightBinding"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `EF` | `Float64` | `0.0` | Fermi energy level. |
+| `t` | `Float64` | `nothing` | Nearest-neighbor hopping amplitude. |
+| `tp` | `Float64` | `nothing` | Next-nearest-neighbor hopping amplitude. |
+| `use_spinor` | `Bool` | `false` | Whether to use spinor representations for electrons. |
+| `hoppings` | `List` | `[]` | Explicit list of hopping vectors $R$ and amplitudes $t$. |
+
+### `type = "MultiOrbitalTightBinding"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `EF` | `Float64` | `0.0` | Fermi energy level. |
+| `num_orbitals` | `Int` | **Required** | Total number of orbitals in the unit cell. |
+| `hoppings` | `List` | **Required** | List of hopping definitions: `[orb_i, orb_j, Rx, Ry, Rz, t_real, t_imag]`. |
+
+### `type = "KagomeLattice"` / `"Graphene"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `t` | `Float64` | **Required** | Hopping amplitude. |
+| `EF` | `Float64` | `0.0` | Fermi energy. |
+
+### `type = "SSHModel"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `t1` | `Float64` | **Required** | Intra-cell hopping amplitude. |
+| `t2` | `Float64` | **Required** | Inter-cell hopping amplitude. |
+| `EF` | `Float64` | `0.0` | Fermi energy. |
+
+### `type = "EinsteinModel"` / `"DebyeModel"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `omega_E` / `omega_D` | `Float64` | **Required** | Phonon frequency (Einstein) or Debye frequency (Debye). |
+| `vs` | `Float64` | **Required** | Sound velocity (for Debye model). |
+
+## Interaction Options (`[interaction]`)
+
+Defines the effective interaction kernel.
+
+### `type = "Constant"` / `"Yukawa"` / `"LimitedConstant"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `V0` | `Float64` | **Required** | Overall interaction strength. |
+| `lambda` | `Float64` | **Required** | Screening length (for Yukawa). |
+| `omega_c` | `Float64` | **Required** | Frequency cutoff (for LimitedConstant). |
+
+### `type = "Local"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `V0` | `Float64` | **Required** | Interaction strength. |
+| `threshold` | `Float64` | **Required** | Momentum distance threshold for locality. |
+| `fsthick` | `Float64` | **Required** | Energy thickness around the Fermi surface. |
+
+## Field Options (`[field]`)
+
+Defines the symmetry-breaking field or order parameter type.
+
+### `type = "ChargeDensityWave"` / `"SpinDensityWave"` / `"FFLOPairing"` / `"PairDensityWave"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `q` | `Vector{Float64}` | **Required** | Ordering wave vector (fractional coordinates). |
+| `direction` | `String` | `"z"` | Internal direction for the spin/exchange field. |
+| `symmetry` | `String` | `"s_wave"` | Symmetry of the pairing order parameter. |
+| `h` | `Float64` | `0.0` | External Zeeman field (for FFLO). |
+
+### `type = "MomentumDependentPairing"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `seed` | `String` | `"random"` | Initialization seed for the momentum-dependent gap. |
+| `amplitude` | `Float64` | `0.01` | Initial guess amplitude. |
+
+## Task Options (`[task]`)
+
+Specifies the calculation to performed.
+
+### `type = "solve_ground_state"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `phi_guess` | `Float64` | `0.1` | Initial guess for the gap/order parameter. |
+| `T_val` | `Float64` | `0.001` | Temperature at which to solve. |
+| `approx` | `String` | `"ExactTrLn"` | Linearization approximation method (`ExactTrLn` or `RPA`). |
+
+### `type = "compute_phase_transition_data"`
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `phi_range` | `Vector{Float64}` | `nothing` | Start and end of gap range. |
+| `phi_points` | `Int` | `100` | Number of samples in the gap range. |
+| `T_range` | `Vector{Float64}` | `nothing` | Start and end of temperature range. |
+| `T_points` | `Int` | `10` | Number of samples in the T range. |
+
+## Plot Options (`[plot]`)
+
+Configuration for automatic post-calculation plotting.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `enable` | `Bool` | `false` | Enable automatic plot generation. |
+| `title` | `String` | `nothing` | Title for the generated plot. |
+| `colormap` | `String` | `"viridis"` | Colormap used for surface and heatmap plots. |
+| `dpi` | `Int` | `300` | Resolution of saved plot images. |
