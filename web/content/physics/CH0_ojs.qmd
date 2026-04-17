@@ -17,7 +17,7 @@ import {
   rpaFreeEnergyFigure,
   exchangeFigure,
   bcsFigure
-} from "./ojs/eliashberg-plots.js"
+} from "../ojs/eliashberg-plots.js"
 
 legendSwatch = (item) => {
   if (item.kind === "point") {

@@ -70,7 +70,7 @@ _exchange_vertex(::SpinorVertexStyle, model::ElectronicDispersion, k::SVector, :
     _spin_operator_for_model(model, k, _σ₁_static)
 
 function _spin_operator_for_model(model::SpinorDispersion{D}, k::SVector{D,Float64}, pauli::StaticMatrix{2,2}) where {D}
-    bare_block = _matrix_data(ε(k, model.bare))
+    bare_block = _matrix_data(H(k, model.bare))
     return _spin_operator(bare_block, pauli)
 end
 

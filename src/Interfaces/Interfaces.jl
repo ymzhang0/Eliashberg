@@ -1,3 +1,14 @@
+function _read_next_nonempty_line(io::IO, filename::AbstractString)
+    while !eof(io)
+        line = readline(io)
+        stripped = strip(line)
+        if !isempty(stripped) && !startswith(stripped, "#") && !startswith(stripped, "!")
+            return stripped
+        end
+    end
+    error("Unexpected end of file in $filename while looking for a non-empty line.")
+end
+
 include("Wannier90/parsers.jl")
 include("Wannier90/builders.jl")
 include("EPW/epw.jl")

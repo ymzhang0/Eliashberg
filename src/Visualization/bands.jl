@@ -1,11 +1,11 @@
 # src/Visualization/bands.jl
 
 """
-    plot_dispersion_curves(k_coords, band_matrix; E_Fermi=0.0, axis=(;), kwargs...)
+    _plot_dispersion_curves(k_coords, band_matrix; E_Fermi=0.0, axis=(;), kwargs...)
 
-Plot one or more band curves over a one-dimensional coordinate axis.
+Plot one or more band curves over a one-dimensional coordinate axis. Internal function.
 """
-function plot_dispersion_curves(k_coords::AbstractVector{<:Real}, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
+function _plot_dispersion_curves(k_coords::AbstractVector{<:Real}, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
     return with_stage_log(
         "Plot dispersion curves";
         context=(n_coords=length(k_coords), n_bands=size(band_matrix, 2), E_Fermi=Float64(E_Fermi)),
@@ -26,11 +26,11 @@ function plot_dispersion_curves(k_coords::AbstractVector{<:Real}, band_matrix::A
 end
 
 """
-    plot_dispersion_surface(kxs, kys, energy_matrix; E_Fermi=0.0, axis=(;), kwargs...)
+    _plot_dispersion_surface(kxs, kys, energy_matrix; E_Fermi=0.0, axis=(;), kwargs...)
 
-Plot a two-dimensional scalar field together with an iso-energy contour.
+Plot a two-dimensional scalar field together with an iso-energy contour. Internal function.
 """
-function plot_dispersion_surface(kxs::AbstractVector{<:Real}, kys::AbstractVector{<:Real}, energy_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
+function _plot_dispersion_surface(kxs::AbstractVector{<:Real}, kys::AbstractVector{<:Real}, energy_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, axis=(;), kwargs...)
     return with_stage_log(
         "Plot dispersion surface";
         context=(nx=length(kxs), ny=length(kys), E_Fermi=Float64(E_Fermi)),
@@ -48,8 +48,8 @@ function plot_dispersion_surface(kxs::AbstractVector{<:Real}, kys::AbstractVecto
     end
 end
 
-plot_dispersion_surface(data::DispersionSurfaceData; kwargs...) =
-    plot_dispersion_surface(data.kxs, data.kys, data.energy_matrix; kwargs...)
+_plot_dispersion_surface(data::DispersionSurfaceData; kwargs...) =
+    _plot_dispersion_surface(data.kxs, data.kys, data.energy_matrix; kwargs...)
 
 """
     plot_band_structure(kpath, band_matrix; E_Fermi=0.0, axis=(;), kwargs...)
@@ -130,7 +130,7 @@ function _band_path_axes!(
     return branch_axes
 end
 
-function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, band_color=:royalblue, axis=(;), kwargs...)
+function _plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; E_Fermi=0.0, band_color=:royalblue, axis=(;), kwargs...)
     return with_stage_log(
         "Plot band structure";
         context=(kpath=kpath, n_bands=size(band_matrix, 2), E_Fermi=Float64(E_Fermi)),
@@ -169,17 +169,16 @@ function plot_band_structure(kpath::KPath, band_matrix::AbstractMatrix{<:Real}; 
     end
 end
 
-plot_band_structure(data::BandStructureData; kwargs...) =
-    plot_band_structure(data.kpath, data.bands; kwargs...)
+_plot_band_structure(data::BandStructureData; kwargs...) =
+    _plot_band_structure(data.kpath, data.bands; kwargs...)
 
 """
-    plot_wannier90_band_structure(bands_filename::String; labelinfo_filename=nothing, kwargs...)
+    _plot_wannier90_band_structure(bands_filename::String; labelinfo_filename=nothing, kwargs...)
 
 Parse Wannier90 `*_band.dat` output and render it with the standard band
-structure plotter. A sibling `*.labelinfo.dat` file is picked up
-automatically when available.
+structure plotter. Internal function.
 """
-function plot_wannier90_band_structure(
+function _plot_wannier90_band_structure(
     bands_filename::String;
     labelinfo_filename::Union{Nothing, AbstractString}=nothing,
     kwargs...
@@ -189,13 +188,13 @@ function plot_wannier90_band_structure(
         context=(bands_filename=bands_filename, labelinfo_filename=labelinfo_filename),
         summarize_result=result -> (figure_type=string(typeof(result)),),
     ) do
-        data = band_data_from_wannier90_bands(bands_filename; labelinfo_filename)
-        return plot_band_structure(data; kwargs...)
+        data = band_data_from_wannier90_bands(bands_filename; labelinfoinfo_filename)
+        return _plot_band_structure(data; kwargs...)
     end
 end
 
 """
-    plot_wannier90_tb_band_comparison(
+    _plot_wannier90_tb_band_comparison(
         comparison::Wannier90BandComparison;
         model_label="TB model (shifted)",
         reference_label="Wannier90 band.dat",
@@ -208,9 +207,9 @@ end
     )
 
 Overlay a reconstructed Wannier90 tight-binding model against the reference
-Wannier90 `*_band.dat` energies on the exact sampled path.
+Wannier90 `*_band.dat` energies. Internal function.
 """
-function plot_wannier90_tb_band_comparison(
+function _plot_wannier90_tb_band_comparison(
     comparison::Wannier90BandComparison;
     model_label::AbstractString="TB model (shifted)",
     reference_label::AbstractString="Wannier90 band.dat",
@@ -272,11 +271,11 @@ function plot_wannier90_tb_band_comparison(
 end
 
 """
-    plot_fermi_surface(kxs, kys, kzs, energy_volume; E_Fermi=0.0, axis=(;), kwargs...)
+    _plot_fermi_surface(kxs, kys, kzs, energy_volume; E_Fermi=0.0, axis=(;), kwargs...)
 
-Render an isosurface from a precomputed three-dimensional scalar field.
+Render an isosurface from a precomputed three-dimensional scalar field. Internal function.
 """
-function plot_fermi_surface(
+function _plot_fermi_surface(
     kxs::AbstractVector{<:Real},
     kys::AbstractVector{<:Real},
     kzs::AbstractVector{<:Real},
@@ -328,8 +327,8 @@ function plot_fermi_surface(
     end
 end
 
-plot_fermi_surface(data::FermiSurfaceData; kwargs...) =
-    plot_fermi_surface(data.kxs, data.kys, data.kzs, data.energy_volume; kwargs...)
+_plot_fermi_surface(data::FermiSurfaceData; kwargs...) =
+    _plot_fermi_surface(data.kxs, data.kys, data.kzs, data.energy_volume; kwargs...)
 
 function _plot_renormalized_bands(
     Ts::AbstractVector{<:Real},
@@ -404,11 +403,11 @@ function _renormalized_band_title(T::Real, gaps::AbstractMatrix{<:Real}, idx::In
 end
 
 """
-    plot_renormalized_bands(data::RenormalizedBandData; band_limits=(-2.5, 2.5))
+    _plot_renormalized_bands(data::RenormalizedBandData; band_limits=(-2.5, 2.5))
 
-Plot temperature-indexed renormalized band panels from a typed response object.
+Plot temperature-indexed renormalized band panels. Internal function.
 """
-plot_renormalized_bands(data::RenormalizedBandData; kwargs...) =
+_plot_renormalized_bands(data::RenormalizedBandData; kwargs...) =
     _plot_renormalized_bands(
         data.temperatures,
         data.kpath,
@@ -420,8 +419,8 @@ plot_renormalized_bands(data::RenormalizedBandData; kwargs...) =
 
 # Makie Multiple Dispatch Overloads
 
-Makie.plot(data::DispersionSurfaceData; kwargs...) = plot_dispersion_surface(data; kwargs...)
-Makie.plot(data::BandStructureData; kwargs...) = plot_band_structure(data; kwargs...)
-Makie.plot(data::Wannier90BandComparison; kwargs...) = plot_wannier90_tb_band_comparison(data; kwargs...)
-Makie.plot(data::FermiSurfaceData; kwargs...) = plot_fermi_surface(data; kwargs...)
-Makie.plot(data::RenormalizedBandData; kwargs...) = plot_renormalized_bands(data; kwargs...)
+Makie.plot(data::DispersionSurfaceData; kwargs...) = _plot_dispersion_surface(data; kwargs...)
+Makie.plot(data::BandStructureData; kwargs...) = _plot_band_structure(data; kwargs...)
+Makie.plot(data::Wannier90BandComparison; kwargs...) = _plot_wannier90_tb_band_comparison(data; kwargs...)
+Makie.plot(data::FermiSurfaceData; kwargs...) = _plot_fermi_surface(data; kwargs...)
+Makie.plot(data::RenormalizedBandData; kwargs...) = _plot_renormalized_bands(data; kwargs...)

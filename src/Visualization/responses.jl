@@ -40,14 +40,14 @@ function _plot_phase_transition(
 end
 
 """
-    plot_phase_transition(data::PhaseDiagramData; axis_left=(;), axis_right=(;))
+    _plot_phase_transition(data::PhaseDiagramData; axis_left=(;), axis_right=(;))
 
-Plot a phase-diagram response object using its stored axes and observables.
+Plot a phase-diagram response object. Internal function.
 """
-plot_phase_transition(data::PhaseDiagramData; kwargs...) =
+_plot_phase_transition(data::PhaseDiagramData; kwargs...) =
     _plot_phase_transition(data.phis, data.Ts, data.condensation_energy, data.order_parameters; kwargs...)
 
-function plot_landscape(::Val{1}, qs::AbstractVector{<:Real}, landscape_vector::AbstractVector{<:Real}; axis=(;), kwargs...)
+function _plot_landscape(::Val{1}, qs::AbstractVector{<:Real}, landscape_vector::AbstractVector{<:Real}; axis=(;), kwargs...)
     length(qs) == length(landscape_vector) || throw(DimensionMismatch("Coordinate and value vectors must have the same length."))
 
     fig = Figure(size=(800, 500))
@@ -57,10 +57,10 @@ function plot_landscape(::Val{1}, qs::AbstractVector{<:Real}, landscape_vector::
     return fig
 end
 
-plot_landscape(data::LandscapeLineData; kwargs...) =
-    plot_landscape(Val(1), data.qs, data.values; kwargs...)
+_plot_landscape(data::LandscapeLineData; kwargs...) =
+    _plot_landscape(Val(1), data.qs, data.values; kwargs...)
 
-function plot_landscape(::Val{2}, qxs::AbstractVector{<:Real}, qys::AbstractVector{<:Real}, landscape_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
+function _plot_landscape(::Val{2}, qxs::AbstractVector{<:Real}, qys::AbstractVector{<:Real}, landscape_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
     size(landscape_matrix) == (length(qxs), length(qys)) || throw(DimensionMismatch("Landscape matrix shape must match the provided axes."))
 
     fig = Figure(size=(800, 600))
@@ -71,10 +71,10 @@ function plot_landscape(::Val{2}, qxs::AbstractVector{<:Real}, qys::AbstractVect
     return fig
 end
 
-plot_landscape(data::LandscapeSurfaceData; kwargs...) =
-    plot_landscape(Val(2), data.qxs, data.qys, data.landscape_matrix; kwargs...)
+_plot_landscape(data::LandscapeSurfaceData; kwargs...) =
+    _plot_landscape(Val(2), data.qxs, data.qys, data.landscape_matrix; kwargs...)
 
-function plot_spectral_function(qpath::KPath, omegas::AbstractVector{<:Real}, spectral_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
+function _plot_spectral_function(qpath::KPath, omegas::AbstractVector{<:Real}, spectral_matrix::AbstractMatrix{<:Real}; axis=(;), kwargs...)
     size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
     distances = path_distances(qpath)
     node_indices, tick_labels = path_node_metadata(qpath)
@@ -91,10 +91,10 @@ function plot_spectral_function(qpath::KPath, omegas::AbstractVector{<:Real}, sp
     return fig
 end
 
-plot_spectral_function(data::SpectralMapData; kwargs...) =
-    plot_spectral_function(data.qpath, data.omegas, data.spectral_matrix; kwargs...)
+_plot_spectral_function(data::SpectralMapData; kwargs...) =
+    _plot_spectral_function(data.qpath, data.omegas, data.spectral_matrix; kwargs...)
 
-function plot_zeeman_pairing_landscape(
+function _plot_zeeman_pairing_landscape(
     q_vals::AbstractVector{<:Real},
     condensation_energy::AbstractVector{<:Real},
     optimal_gaps::AbstractVector{<:Real};
@@ -130,8 +130,8 @@ function plot_zeeman_pairing_landscape(
     return fig
 end
 
-plot_zeeman_pairing_landscape(data::ZeemanPairingData; kwargs...) =
-    plot_zeeman_pairing_landscape(
+_plot_zeeman_pairing_landscape(data::ZeemanPairingData; kwargs...) =
+    _plot_zeeman_pairing_landscape(
         data.q_vals,
         data.condensation_energy,
         data.optimal_gaps;
@@ -173,11 +173,11 @@ function _plot_collective_modes(
 end
 
 """
-    plot_collective_modes(data::SpectralMapData)
+    _plot_collective_modes(data::SpectralMapData)
 
-Plot a collective-mode spectral map from a typed response object.
+Plot a collective-mode spectral map. Internal function.
 """
-plot_collective_modes(data::SpectralMapData; kwargs...) =
+_plot_collective_modes(data::SpectralMapData; kwargs...) =
     _plot_collective_modes(
         data.qpath,
         data.omegas,
@@ -186,8 +186,8 @@ plot_collective_modes(data::SpectralMapData; kwargs...) =
         kwargs...
     )
 
-Makie.plot(data::LandscapeLineData; kwargs...) = plot_landscape(data; kwargs...)
-Makie.plot(data::LandscapeSurfaceData; kwargs...) = plot_landscape(data; kwargs...)
-Makie.plot(data::PhaseDiagramData; kwargs...) = plot_phase_transition(data; kwargs...)
-Makie.plot(data::SpectralMapData; kwargs...) = plot_collective_modes(data; kwargs...)
-Makie.plot(data::ZeemanPairingData; kwargs...) = plot_zeeman_pairing_landscape(data; kwargs...)
+Makie.plot(data::LandscapeLineData; kwargs...) = _plot_landscape(data; kwargs...)
+Makie.plot(data::LandscapeSurfaceData; kwargs...) = _plot_landscape(data; kwargs...)
+Makie.plot(data::PhaseDiagramData; kwargs...) = _plot_phase_transition(data; kwargs...)
+Makie.plot(data::SpectralMapData; kwargs...) = _plot_collective_modes(data; kwargs...)
+Makie.plot(data::ZeemanPairingData; kwargs...) = _plot_zeeman_pairing_landscape(data; kwargs...)

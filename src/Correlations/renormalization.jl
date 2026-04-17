@@ -69,17 +69,17 @@ normal_state_basis(model::ElectronicDispersion{D}, field::BCSReducedPairing) whe
 normal_state_basis(model::ElectronicDispersion{D}, field::FFLOPairing{D}) where {D} = FFLONormalDispersion{D,typeof(model)}(model, field.q)
 normal_state_basis(model::ElectronicDispersion{D}, field::PairDensityWave{D}) where {D} = PDWNormalDispersion{D,typeof(model)}(model, field.q)
 
-function ε(k::SVector{D,Float64}, model::ParticleHoleNormalDispersion{D}) where {D}
-    Hk = _matrix_data(ε(k, model.bare))
-    Hkq = _matrix_data(ε(k + model.field.q, model.bare))
+function H(k::SVector{D,Float64}, model::ParticleHoleNormalDispersion{D}) where {D}
+    Hk = _matrix_data(H(k, model.bare))
+    Hkq = _matrix_data(H(k + model.field.q, model.bare))
     return _block_diagonal(Hk, Hkq)
 end
 
 # this is not a general construction for spinor superconducting states.
-function ε(k::SVector{D,Float64}, model::NormalNambuDispersion{D}) where {D}
+function H(k::SVector{D,Float64}, model::NormalNambuDispersion{D}) where {D}
     # 动态获取底层模型 (可能是 1x1, 2x2 或更多) 的哈密顿量矩阵
-    Hk_mat = _matrix_data(ε(k, model.bare))
-    H_minus_k_mat = _matrix_data(ε(-k, model.bare))
+    Hk_mat = _matrix_data(H(k, model.bare))
+    H_minus_k_mat = _matrix_data(H(-k, model.bare))
     
     # 根据 Bogoliubov-de Gennes (BdG) 理论
     # Nambu 空间的空穴支哈密顿量必须是 -H(-k)^T
@@ -144,7 +144,7 @@ end
 function vertex_matrix(model::NormalNambuDispersion{D}, k::SVector{D,Float64}, field::BCSReducedPairing) where {D}
     fk = gap_form_factor(k, field)
 
-    bare_block = _matrix_data(ε(k, model.bare))
+    bare_block = _matrix_data(H(k, model.bare))
     return _bcs_nambu_vertex(fk, bare_block)
 end
 
@@ -182,11 +182,11 @@ function _bcs_nambu_vertex(fk::Number, block::AbstractMatrix{TB}) where {TB}
     return Hermitian(matrix)
 end
 
-function ε(k::SVector{D,Float64}, model::MeanFieldDispersion{D,M,F}) where {D,M,F<:AuxiliaryField}
+function H(k::SVector{D,Float64}, model::MeanFieldDispersion{D,M,F}) where {D,M,F<:AuxiliaryField}
     # 1. 提取正常态的本底哈密顿量 H_0 (通过 normal_state_basis 降级回去调用)
     # 这会返回 2x2 或 3x3 的只有对角线的矩阵 (对于超导，还自带了 -e_{-k} 和塞曼场)
     normal_basis_model = normal_state_basis(model.bare_dispersion, model.field)
-    H_0 = ε(k, normal_basis_model)
+    H_0 = H(k, normal_basis_model)
     
     # 2. 提取顶点矩阵 Γ
     Γ = vertex_matrix(normal_basis_model, k, model.field)

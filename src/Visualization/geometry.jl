@@ -200,7 +200,7 @@ function _visualize_lattice_3d(vectors::AbstractMatrix{<:Number}; extent=1, axis
     return fig
 end
 
-function plot_lattice(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwargs...)
+function _plot_lattice(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwargs...)
     primitive = primitive_vectors(vectors)
     D = size(primitive, 1)
     if D == 1
@@ -213,9 +213,8 @@ function plot_lattice(vectors::AbstractMatrix{<:Number}; extent=2, axis=(;), kwa
     throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
 end
 
-plot_lattice(crystal::Crystal{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = plot_lattice(primitive_vectors(crystal); extent=extent, axis=axis, kwargs...)
-plot_lattice(cell::PeriodicCell{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = plot_lattice(primitive_vectors(cell); extent=extent, axis=axis, kwargs...)
-plot_lattice(system::AbstractSystem{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = plot_lattice(primitive_vectors(system); extent=extent, axis=axis, kwargs...)
+_plot_lattice(cell::PeriodicCell{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = _plot_lattice(primitive_vectors(cell); extent=extent, axis=axis, kwargs...)
+_plot_lattice(system::AbstractSystem{D}; extent=D == 1 ? 3 : (D == 2 ? 2 : 1), axis=(;), kwargs...) where {D} = _plot_lattice(primitive_vectors(system); extent=extent, axis=axis, kwargs...)
 
 # ----------------------------------------------------------------------------
 # Reciprocal Space & K-Grid Visualizations
@@ -318,7 +317,7 @@ function _project_onto_plane(v1::SVector{D,Float64}, v2::SVector{D,Float64}) whe
     return projector
 end
 
-function plot_reciprocal_space(vectors::AbstractMatrix{<:Number}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function _plot_reciprocal_space(vectors::AbstractMatrix{<:Number}, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     reciprocal = reciprocal_vectors(vectors)
     D = size(reciprocal, 1)
     if D == 1
@@ -331,10 +330,8 @@ function plot_reciprocal_space(vectors::AbstractMatrix{<:Number}, kgrid::Union{A
     throw(ArgumentError("Only 1D, 2D, and 3D primitive-vector matrices are supported."))
 end
 
-plot_reciprocal_space(crystal::Crystal, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...) =
-    plot_reciprocal_space(primitive_vectors(crystal), kgrid; axis=axis, kwargs...)
 
-function plot_reciprocal_space(cell::PeriodicCell, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
+function _plot_reciprocal_space(cell::PeriodicCell, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...)
     rank = periodic_rank(cell)
     basis = _periodic_reciprocal_basis(cell)
     rank > 0 || throw(ArgumentError("Cannot visualize reciprocal space for a non-periodic cell."))
@@ -352,11 +349,10 @@ function plot_reciprocal_space(cell::PeriodicCell, kgrid::Union{AbstractKGrid,No
     return _visualize_reciprocal_space_3d(basis[1], basis[2], basis[3], kgrid; axis=axis, kwargs...)
 end
 
-plot_reciprocal_space(system::AbstractSystem, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...) =
-    plot_reciprocal_space(cell(system), kgrid; axis=axis, kwargs...)
+_plot_reciprocal_space(system::AbstractSystem, kgrid::Union{AbstractKGrid,Nothing}=nothing; axis=(;), kwargs...) =
+    _plot_reciprocal_space(cell(system), kgrid; axis=axis, kwargs...)
 
 # Makie Multiple Dispatch Overloads
-Makie.plot(crystal::Crystal; kwargs...) = plot_lattice(crystal; kwargs...)
-Makie.plot(cell::PeriodicCell; kwargs...) = plot_lattice(cell; kwargs...)
-Makie.plot(system::AbstractSystem; kwargs...) = plot_lattice(system; kwargs...)
-Makie.plot(kgrid::AbstractKGrid; kwargs...) = plot_reciprocal_space(kgrid.points_matrix, kgrid; kwargs...)
+Makie.plot(cell::PeriodicCell; kwargs...) = _plot_lattice(cell; kwargs...)
+Makie.plot(system::AbstractSystem; kwargs...) = _plot_lattice(system; kwargs...)
+Makie.plot(kgrid::AbstractKGrid; kwargs...) = _plot_reciprocal_space(primitive_vectors(kgrid), kgrid; kwargs...)

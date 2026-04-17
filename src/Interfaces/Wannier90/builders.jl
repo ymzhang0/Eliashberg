@@ -109,9 +109,6 @@ function build_model_from_wannier90(filename::String, cell::AbstractMatrix{<:Num
     end
 end
 
-function build_model_from_wannier90(filename::String, crystal::Crystal, EF::Float64)
-    return build_model_from_wannier90(filename, primitive_vectors(crystal), EF)
-end
 
 function build_model_from_wannier90(filename::String, cell::PeriodicCell, EF::Float64)
     return with_stage_log(

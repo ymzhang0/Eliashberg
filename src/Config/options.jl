@@ -1,7 +1,7 @@
 # src/Config/options.jl
 
 export SystemOptions
-export AbstractGeometryOption, ChainLatticeOption, SquareLatticeOption, HexagonalLatticeOption, CubicLatticeOption, FCCLatticeOption, BCCLatticeOption, QELatticeOption
+export AbstractGeometryOption, ChainLatticeOption, SquareLatticeOption, HexagonalLatticeOption, CubicLatticeOption, FCCLatticeOption, BCCLatticeOption
 export KpointsOptions, PlotOptions
 export AbstractModelOption, FreeElectronOption, TightBindingOption, MultiOrbitalTightBindingOption, KagomeLatticeOption, GrapheneOption, SSHModelOption, EinsteinModelOption, DebyeModelOption, PolaritonModelOption, MonoatomicLatticeModelOption
 export AbstractInteractionOption, ConstantInteractionOption, LocalInteractionOption, YukawaInteractionOption, LimitedConstantInteractionOption, BareCoulombInteractionOption, ScreenedCoulombInteractionOption, CompositeInteractionOption
@@ -72,15 +72,7 @@ end
     a::Float64 = 1.0
 end
 
-@option "QE" struct QELatticeOption <: AbstractGeometryOption
-    ibrav::Int
-    a::Float64
-    celldm2::Union{Float64,Nothing} = nothing
-    celldm3::Union{Float64,Nothing} = nothing
-    celldm4::Union{Float64,Nothing} = nothing
-    celldm5::Union{Float64,Nothing} = nothing
-    celldm6::Union{Float64,Nothing} = nothing
-end
+# QELatticeOption removed.
 
 # ---------------------------------------------------------
 # 3. Model Options (Polymorphic)
@@ -114,12 +106,12 @@ end
     hoppings::Vector{Vector{Float64}}
 end
 
-@option "KagomeLattice" struct KagomeLatticeOption <: AbstractModelOption
+@option "KagomeModel" struct KagomeModelOption <: AbstractModelOption
     t::Float64
     EF::Float64 = 0.0
 end
 
-@option "Graphene" struct GrapheneOption <: AbstractModelOption
+@option "GrapheneModel" struct GrapheneModelOption <: AbstractModelOption
     t::Float64
     EF::Float64 = 0.0
 end
@@ -329,15 +321,14 @@ const GEOMETRY_OPTION_TYPES = Dict{String,DataType}(
     "CubicLattice" => CubicLatticeOption,
     "BCCLattice" => BCCLatticeOption,
     "FCCLattice" => FCCLatticeOption,
-    "QE" => QELatticeOption,
 )
 
 const MODEL_OPTION_TYPES = Dict{String,DataType}(
     "FreeElectron" => FreeElectronOption,
     "TightBinding" => TightBindingOption,
     "MultiOrbitalTightBinding" => MultiOrbitalTightBindingOption,
-    "KagomeLattice" => KagomeLatticeOption,
-    "Graphene" => GrapheneOption,
+    "KagomeModel" => KagomeModelOption,
+    "GrapheneModel" => GrapheneModelOption,
     "SSHModel" => SSHModelOption,
     "EinsteinModel" => EinsteinModelOption,
     "DebyeModel" => DebyeModelOption,

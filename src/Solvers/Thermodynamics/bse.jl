@@ -5,7 +5,7 @@ function renormalized_dispersion(
     k::SVector{D,Float64},
     omega::Float64
 ) where {D}
-    bare_H = ε(k, disp)
+    bare_H = H(k, disp)
     sigma_H = Σ(k, self_energy)
     return Hermitian(bare_H + sigma_H)
 end
@@ -15,7 +15,8 @@ struct BCSKineticAssemblyTask{M}
 end
 
 function (task::BCSKineticAssemblyTask)(sample::GridSample)
-    return real(band_structure(task.dispersion, sample.value).values[1])
+    e_k = ε(sample.value, task.dispersion)
+    return real(e_k isa AbstractVector ? e_k[1] : e_k)
 end
 
 struct BCSPairingAssemblyTask{I,M}

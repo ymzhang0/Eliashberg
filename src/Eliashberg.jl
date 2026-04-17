@@ -6,7 +6,11 @@ using StaticArrays
 using AtomsBase
 using HDF5
 using JLD2
-import AtomsBase: periodicity, PeriodicCell, FastSystem, ChemicalSpecies, mass
+using AtomsIO
+import AtomsBase: periodicity, PeriodicCell, FastSystem, ChemicalSpecies, mass,
+                   periodic_system, isolated_system, atomic_system, Atom,
+                   n_dimensions, position, atomic_symbol, 
+                   atomic_number, species, cell_vectors
 import Brillouin
 using Spglib
 using Unitful
@@ -18,6 +22,8 @@ using SparseArrays
 using Logging
 using ProgressLogging
 using TimerOutputs
+using Makie: Makie
+import Makie: plot
 
 const TO = TimerOutput()
 
@@ -27,6 +33,8 @@ include("Numerics/la.jl")
 
 # 2. Abstract Tier (Topological Order - Only abstract types)
 include("Geometry/types.jl")
+include("Geometry/Lattices.jl")
+include("Geometry/symmetry_points.jl")
 include("Models/types.jl")
 include("Correlations/types.jl")
 include("Numerics/smearings.jl")
@@ -39,9 +47,12 @@ using .Engine: GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLay
 # 3. Data Structure Tier (Concrete structs and constructors)
 # Geometry
 include("Geometry/crystal.jl")
+include("Geometry/predefined_structures.jl")
 
 # Models
 include("Models/dispersions.jl")
+include("Models/predefined_models.jl")
+include("Models/calculator.jl")
 include("Models/interactions.jl")
 
 # Interfaces
@@ -60,7 +71,7 @@ include("Data/factories.jl")
 include("Correlations/self_energies.jl")
 
 # Models methods
-include("Models/evaluators.jl")
+include("Models/Hamiltonian.jl")
 
 # Correlations methods
 # Correlations
@@ -104,21 +115,36 @@ function _call_visualization(func::Symbol, args...; kwargs...)
     return Base.invokelatest(plotter, args...; kwargs...)
 end
 
-plot_dispersion_curves(args...; kwargs...) = _call_visualization(:plot_dispersion_curves, args...; kwargs...)
-plot_dispersion_surface(args...; kwargs...) = _call_visualization(:plot_dispersion_surface, args...; kwargs...)
-plot_band_structure(args...; kwargs...) = _call_visualization(:plot_band_structure, args...; kwargs...)
-plot_wannier90_band_structure(args...; kwargs...) = _call_visualization(:plot_wannier90_band_structure, args...; kwargs...)
-plot_wannier90_tb_band_comparison(args...; kwargs...) = _call_visualization(:plot_wannier90_tb_band_comparison, args...; kwargs...)
-plot_fermi_surface(args...; kwargs...) = _call_visualization(:plot_fermi_surface, args...; kwargs...)
-plot_renormalized_bands(args...; kwargs...) = _call_visualization(:plot_renormalized_bands, args...; kwargs...)
-plot_landscape(args...; kwargs...) = _call_visualization(:plot_landscape, args...; kwargs...)
-plot_spectral_function(args...; kwargs...) = _call_visualization(:plot_spectral_function, args...; kwargs...)
-plot_phase_transition(args...; kwargs...) = _call_visualization(:plot_phase_transition, args...; kwargs...)
-plot_zeeman_pairing_landscape(args...; kwargs...) = _call_visualization(:plot_zeeman_pairing_landscape, args...; kwargs...)
-plot_collective_modes(args...; kwargs...) = _call_visualization(:plot_collective_modes, args...; kwargs...)
-plot_lattice(args...; kwargs...) = _call_visualization(:plot_lattice, args...; kwargs...)
-plot_reciprocal_space(args...; kwargs...) = _call_visualization(:plot_reciprocal_space, args...; kwargs...)
+_plot_dispersion_curves(args...; kwargs...) = _call_visualization(:_plot_dispersion_curves, args...; kwargs...)
+_plot_dispersion_surface(args...; kwargs...) = _call_visualization(:_plot_dispersion_surface, args...; kwargs...)
+_plot_band_structure(args...; kwargs...) = _call_visualization(:_plot_band_structure, args...; kwargs...)
+_plot_wannier90_band_structure(args...; kwargs...) = _call_visualization(:_plot_wannier90_band_structure, args...; kwargs...)
+_plot_wannier90_tb_band_comparison(args...; kwargs...) = _call_visualization(:_plot_wannier90_tb_band_comparison, args...; kwargs...)
+_plot_fermi_surface(args...; kwargs...) = _call_visualization(:_plot_fermi_surface, args...; kwargs...)
+_plot_renormalized_bands(args...; kwargs...) = _call_visualization(:_plot_renormalized_bands, args...; kwargs...)
+_plot_landscape(args...; kwargs...) = _call_visualization(:_plot_landscape, args...; kwargs...)
+_plot_spectral_function(args...; kwargs...) = _call_visualization(:_plot_spectral_function, args...; kwargs...)
+_plot_phase_transition(args...; kwargs...) = _call_visualization(:_plot_phase_transition, args...; kwargs...)
+_plot_zeeman_pairing_landscape(args...; kwargs...) = _call_visualization(:_plot_zeeman_pairing_landscape, args...; kwargs...)
+_plot_collective_modes(args...; kwargs...) = _call_visualization(:_plot_collective_modes, args...; kwargs...)
+_plot_lattice(args...; kwargs...) = _call_visualization(:_plot_lattice, args...; kwargs...)
+_plot_reciprocal_space(args...; kwargs...) = _call_visualization(:_plot_reciprocal_space, args...; kwargs...)
 
+# Define the set of types handled by the visualization module for lazy-loading
+const VisualizationTypes = Union{
+    BandStructureData, DispersionSurfaceData, FermiSurfaceData,
+    LandscapeLineData, LandscapeSurfaceData, PhaseDiagramData,
+    SpectralMapData, ZeemanPairingData, RenormalizedBandData,
+    Wannier90BandComparison, PeriodicCell, AbstractSystem, AbstractKGrid
+}
+
+function Makie.plot(data::VisualizationTypes; kwargs...)
+    return _call_visualization(:plot, data; kwargs...)
+end
+
+function Makie.plot(data::AbstractVector{<:VisualizationTypes}; kwargs...)
+    return _call_visualization(:plot, data; kwargs...)
+end
 # 6. Backward Compatibility and Aliases
 const LindhardSusceptibility = GeneralizedSusceptibility
 
@@ -129,15 +155,19 @@ export Å, a0, Ry, me, e, ε0, h, ħ, kB, c, Ry2J, Ry2eV, Ha2J, Ha2eV, kB2meV, k
 export σ₀, σ₁, σ₂, σ₃, pauli_matrices, γ⁰, γ¹, γ², γ³, gamma_matrices, commutator, anticommutator
 
 # Geometry
-export Crystal, ChainLattice, SquareLattice, HexagonalLattice, CubicLattice, FCCLattice, BCCLattice, AbstractKGrid, KGrid, KPath
-export ibrav, qe_lattice, cubic_p_lattice, cubic_f_lattice, cubic_i_lattice, hexagonal_p_lattice, trigonal_r_lattice, tetragonal_p_lattice, tetragonal_i_lattice
-export orthorhombic_p_lattice, orthorhombic_base_centered_lattice, orthorhombic_face_centered_lattice, orthorhombic_body_centered_lattice, monoclinic_p_lattice, monoclinic_base_centered_lattice, triclinic_lattice
-export scaled_positions, positions, append_atom!, set_scaled_positions!, set_positions!, set_cell!, cartesian_basis, generate_1d_kgrid, generate_2d_kgrid, generate_3d_kgrid, reciprocal_vectors, generate_reciprocal_lattice, generate_kpath
-export build_spglib_cell, bravais_lattice, generate_irreducible_kgrid, periodic_rank
+export ChainLattice, SquareLattice, HexagonalLattice2D, HexagonalLattice, RectangularLattice, CenteredRectangularLattice, ObliqueLattice
+export SimpleCubic, FaceCenteredCubic, BodyCenteredCubic
+export AbstractKGrid, KGrid, KPath
+export periodic_system, isolated_system, atomic_system, Atom
+export periodic_rank, primitive_vectors, bravais_lattice, generate_irreducible_kgrid, reciprocal_lattice, generate_kgrid, generate_kpath
+export path_points, path_branches, path_node_metadata
+export load_system, save_system
+export atomic_chain, square_lattice, diamond, silicon, germanium, zincblende, sic, nacl, graphene, graphite, kagome, ssh_lattice
+export GrapheneModel, KagomeModel, SSHModel
 
 # Models
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction
-export FreeElectron, TightBinding, SpinorDispersion, MultiOrbitalTightBinding, Graphene, KagomeLattice, SSHModel, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
+export FreeElectron, TightBinding, SpinorDispersion, MultiOrbitalTightBinding, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel
 export CoulombInteraction, ElectronPhononInteraction, ScreenedInteraction, CombinedInteraction, CompositeInteraction
 export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, MediatedInteraction
 export ε, ω, V
@@ -150,7 +180,7 @@ export Wannier90BandComparison
 export AuxiliaryField, StaticMeanField, DynamicalFluctuation, DirectChannel, ExchangeChannel, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave, CompositeField
 export MeanFieldDispersion, NormalNambuDispersion, normal_state_basis, gap_form_factor
 export Propagator, PhononPropagator, ElectronPropagator, GorkovPropagator, SelfEnergy, Smearing, Polarization
-export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, band_structure
+export GeneralizedSusceptibility, LindhardSusceptibility, vertex_matrix, H, D, ε, ω, diagonalize
 export RPABoson, CachedBoson, evaluate_boson_propagator, materialize_boson
 export BandStructureData, DispersionSurfaceData, FermiSurfaceData, LandscapeLineData, LandscapeSurfaceData
 export compute_landscape_line_data, compute_landscape_surface_data
@@ -161,13 +191,11 @@ export ApproximationLevel, ExactTrLn, RPA, TO
 export Engine, GridSample, BlockAxisLayout, UniformBlockLayout, VariableBlockLayout, AssemblySpectrum, DenseEigenSolver, SparseEigenSolverHook, bootstrap_engine_workers!, grid_samples, assemble_grid_vector, assemble_grid_matrix, assemble_sparse_grid_matrix, assemble_block_grid_matrix, assemble_sparse_block_grid_matrix, assemble_block_diagonal_matrix, assemble_sparse_block_diagonal_matrix, solve_assembled_eigensystem, integrate_grid, distributed_map_grid
 export SampledHamiltonianAssembly, assemble_sampled_hamiltonian, solve_sampled_hamiltonian
 export evaluate_action, solve_bcs, solve_ground_state, scan_instability_landscape, scan_spectral_function, scan_rpa_spectral_function_hpc
-export compute_dispersion_surface_data, compute_band_data, compute_fermi_surface_volume
+export calculate_bands, calculate_fermi_surface
 export compute_phase_transition_data, compute_renormalized_band_data, compute_zeeman_pairing_data, compute_collective_mode_spectral_data, compute_coexistence_landscape
 
 # Visualization
-export plot_dispersion_curves, plot_dispersion_surface, plot_band_structure, plot_wannier90_band_structure, plot_wannier90_tb_band_comparison, plot_fermi_surface, plot_renormalized_bands
-export plot_landscape, plot_spectral_function, plot_phase_transition, plot_zeeman_pairing_landscape, plot_collective_modes
-export plot_lattice, plot_reciprocal_space, dimensionality
+export plot, dimensionality
 
 # 8. Configuration System
 include("Config/Config.jl")

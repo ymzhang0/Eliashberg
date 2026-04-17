@@ -11,9 +11,6 @@ _extract_D(::Type{<:TightBinding{D}}) where D = D
 _extract_D(::Type{<:MultiOrbitalTightBinding{D}}) where D = D
 _extract_D(::Type{<:RenormalizedDispersion{D}}) where D = D
 _extract_D(::Type{<:MeanFieldDispersion{D}}) where D = D
-_extract_D(::Type{<:KagomeLattice}) = 2
-_extract_D(::Type{<:Graphene}) = 2
-_extract_D(::Type{<:SSHModel}) = 1
 
 default_kgrid(::Val{1}) = KGrid([SVector{1}(k) for k in range(-π, π, length=200)], ones(200) / 200.0)
 

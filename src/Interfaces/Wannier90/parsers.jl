@@ -1,13 +1,6 @@
 const WannierHopping = Tuple{Int, Int, SVector{3, Int}, ComplexF64}
 const WannierPositionElement = Tuple{Int, Int, SVector{3, Int}, SVector{3, ComplexF64}}
 
-function _read_next_nonempty_line(io::IO, filename::AbstractString)
-    while !eof(io)
-        line = readline(io)
-        isempty(strip(line)) || return line
-    end
-    error("Unexpected end of file while reading $filename.")
-end
 
 function _parse_svector3_float(line::AbstractString, filename::AbstractString, context::AbstractString)
     fields = split(line)

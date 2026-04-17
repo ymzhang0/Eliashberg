@@ -9,7 +9,7 @@ struct LocalHamiltonianBlockTask{M}
 end
 
 function (task::LocalHamiltonianBlockTask)(sample::GridSample)
-    return Matrix(ε(sample.value, task.dispersion))
+    return Matrix(H(sample.value, task.dispersion))
 end
 
 """
@@ -88,7 +88,7 @@ function solve_sampled_hamiltonian(
 end
 
 function _sampled_hamiltonian_layout(samples, dispersion::ElectronicDispersion)
-    block_sizes = [size(ε(sample.value, dispersion), 1) for sample in samples]
+    block_sizes = [size(H(sample.value, dispersion), 1) for sample in samples]
     return VariableBlockLayout(block_sizes, block_sizes)
 end
 

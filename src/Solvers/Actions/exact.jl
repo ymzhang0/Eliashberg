@@ -9,7 +9,7 @@ end
 function (kernel::ExactTrLnContributionKernel)(k::SVector)
     tr_ln_contribution = 0.0
 
-    for band_energy in real(band_structure(kernel.dispersion, k).values)
+    for band_energy in real(diagonalize(k, kernel.dispersion).values)
         if band_energy < 0
             tr_ln_contribution += band_energy - kernel.temperature * log1p(exp(band_energy / kernel.temperature))
         else

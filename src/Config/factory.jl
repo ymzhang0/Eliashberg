@@ -37,16 +37,12 @@ end
 # ---------------------------------------------------------
 build_geometry(opt::ChainLatticeOption) = ChainLattice(opt.a)
 build_geometry(opt::SquareLatticeOption) = SquareLattice(opt.a)
-build_geometry(opt::HexagonalLatticeOption) = HexagonalLattice(opt.a)
-build_geometry(opt::CubicLatticeOption) = CubicLattice(opt.a)
-build_geometry(opt::FCCLatticeOption) = FCCLattice(opt.a)
-build_geometry(opt::BCCLatticeOption) = BCCLattice(opt.a)
+build_geometry(opt::HexagonalLatticeOption) = HexagonalLattice2D(opt.a)
+build_geometry(opt::CubicLatticeOption) = SimpleCubic(opt.a)
+build_geometry(opt::FCCLatticeOption) = FaceCenteredCubic(opt.a)
+build_geometry(opt::BCCLatticeOption) = BodyCenteredCubic(opt.a)
 
-function build_geometry(opt::QELatticeOption)
-    # 丝滑！直接用 extract_kwargs，排除位置参数 ibrav 和 a
-    kwargs = extract_kwargs(opt, exclude=(:ibrav, :a))
-    return qe_lattice(opt.ibrav, opt.a; kwargs...)
-end
+# build_geometry(opt::QELatticeOption) removed.
 
 function build_kpoints(opt::KpointsOptions, geometry)
     D = _dim(geometry)
@@ -56,15 +52,7 @@ function build_kpoints(opt::KpointsOptions, geometry)
     sz_array = sz isa Int ? fill(sz, D) : sz
     length(sz_array) == D || throw(DimensionMismatch("kpoints grid length must match lattice dimension $D"))
 
-    # 如果 Eliashberg 导出过 generate_reciprocal_lattice，直接用它最优雅
-    # 否则保持你的分支，但尽量用 Tuple 传参
-    if D == 1
-        return generate_1d_kgrid(sz_array[1])
-    elseif D == 2
-        return generate_2d_kgrid(sz_array[1], sz_array[2])
-    else
-        return generate_3d_kgrid(sz_array[1], sz_array[2], sz_array[3])
-    end
+    return generate_kgrid(geometry, Tuple(sz_array)...)
 end
 
 # ---------------------------------------------------------
@@ -102,9 +90,9 @@ function build_model(opt::MultiOrbitalTightBindingOption, cell)
     return MultiOrbitalTightBinding(cell, opt.num_orbitals, hops, opt.EF)
 end
 
-build_model(opt::KagomeLatticeOption, cell) = KagomeLattice(cell, opt.t, opt.EF)
-build_model(opt::GrapheneOption, cell) = Graphene(cell, opt.t, opt.EF)
-build_model(opt::SSHModelOption, cell) = SSHModel(cell, opt.t1, opt.t2, opt.EF)
+build_model(opt::KagomeModelOption, cell) = KagomeModel(opt.t, opt.EF)
+build_model(opt::GrapheneModelOption, cell) = GrapheneModel(opt.t, opt.EF)
+build_model(opt::SSHModelOption, cell) = SSHModel(opt.t1, opt.t2, opt.EF)
 # ---------------------------------------------------------
 # Interaction Factory
 # ---------------------------------------------------------

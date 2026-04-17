@@ -1,0 +1,39 @@
+============================================================
+🚀 ELIASHBERG PHYSICS ENGINE
+============================================================
+[ Task Configuration ]
+  • Task Type   : Eliashberg.Config.ScanSpectralFunctionOption([[0.0, 0.0], [2.0943951, 0.0], [2.0943951, 2.0943951], [0.0, 0.0]], ["Γ", "X", "M", "Γ"], 100, [0.0, 5.0], 400, 0.01, 0.02)
+  • Output Dir  : examples/plasmon/out
+
+[ Compute Resources ]
+  • Workers     : 31
+  • Threading   : 1 Process / 1 BLAS
+
+[ Physical System ]
+  • Geometry    : PeriodicCell(TT, [1.5, 0.0]Å, [0.0, 1.5]Å
+  • K-Grid      : KGrid (2D, 2500 points)
+  • Model       : TightBinding (2D, 4 hoppings, EF=-0.5)
+  • Interaction : BareCoulombInteraction(cutoff=0.01)
+  • Field       : Direct Channel
+============================================================
+
+┌ Info: ⏳ Provisioning workers and loading runtime on 31 nodes...
+└ @ Main /gpfs/home/acad/ucl-modl/yimzhang/Eliashberg/src/Tools/runner.jl:424
+============================================================
+✅ JOB COMPLETED SUCCESSFULLY
+============================================================
+[ Performance ]
+• Wall Time     : 25.438
+• Workers Used  : 31
+
+[ Outputs & Storage ]
+• Directory     : examples/plasmon/out/plasmon_2d_20260415_232327
+• Data File     : 💾 examples/plasmon/out/plasmon_2d_20260415_232327/plasmon_scan.jld2
+• HDF5 Backup   : 💾 examples/plasmon/out/plasmon_2d_20260415_232327/plasmon_scan.h5
+• Raw Log       : 📄 examples/plasmon/out/plasmon_2d_20260415_232327/runner.log
+
+[ Data Summary ]
+• Julia Live Heap : 56.48 MiB
+• Memory Peak   : 770.0 MiB
+============================================================
+    

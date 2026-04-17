@@ -87,8 +87,8 @@ SusceptibilityReductionKernel(chi::GeneralizedSusceptibility, fluct::DynamicalFl
 function (kernel::SusceptibilityReductionKernel)(k::SVector{D,Float64}) where {D}
     response_sum = 0.0im
 
-    eig_k = band_structure(kernel.chi.model, k)
-    eig_kq = band_structure(kernel.chi.model, k + kernel.fluct.q)
+    eig_k = diagonalize(k, kernel.chi.model)
+    eig_kq = diagonalize(k + kernel.fluct.q, kernel.chi.model)
     vertex = _susceptibility_vertex(kernel.chi.model, kernel.chi.field, k)
 
     for m in eachindex(eig_k.values)
@@ -126,8 +126,8 @@ function susceptibility_spectrum_terms(
     degenerate_numerators = Float64[]
 
     for (k, weight) in zip(chi.grid.points, chi.grid.weights)
-        eig_k = band_structure(chi.model, k)
-        eig_kq = band_structure(chi.model, k + q)
+        eig_k = diagonalize(k, chi.model)
+        eig_kq = diagonalize(k + q, chi.model)
         vertex = _susceptibility_vertex(chi.model, chi.field, k)
         occupations_k = [_fermi_weight(real(energy), chi.T) for energy in eig_k.values]
         occupations_kq = [_fermi_weight(real(energy), chi.T) for energy in eig_kq.values]

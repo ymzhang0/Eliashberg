@@ -3,10 +3,11 @@ module Visualization
 using LinearAlgebra
 using Makie
 using StaticArrays
+using LaTeXStrings
 
 using ..Eliashberg: Dispersion, FreeElectron, TightBinding, MultiOrbitalTightBinding,
-    RenormalizedDispersion, MeanFieldDispersion, KagomeLattice, Graphene, SSHModel,
-    KGrid, KPath, AbstractKGrid, Crystal, PeriodicCell, AbstractSystem,
+    RenormalizedDispersion, MeanFieldDispersion,
+    KGrid, KPath, AbstractKGrid, PeriodicCell, AbstractSystem,
     DispersionSurfaceData, BandStructureData, FermiSurfaceData, LandscapeLineData,
     LandscapeSurfaceData, PhaseDiagramData, SpectralMapData, ZeemanPairingData,
     RenormalizedBandData, Wannier90BandComparison, primitive_vectors, reciprocal_vectors,
@@ -15,6 +16,8 @@ using ..Eliashberg: Dispersion, FreeElectron, TightBinding, MultiOrbitalTightBin
     dimensionality, default_kgrid, path_distances, parse_wannier90_band_dat,
     parse_wannier90_labelinfo, band_data_from_wannier90_bands, PhysicalModel
 using ..Eliashberg: periodic_rank
+
+export plot
 
 include("geometry.jl")
 include("bands.jl")

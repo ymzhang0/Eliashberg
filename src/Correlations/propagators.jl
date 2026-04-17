@@ -16,7 +16,7 @@ struct FreeElectronPropagator{Dim,T<:ElectronicDispersion{Dim}} <: ElectronPropa
 end
 
 function G(k::SVector{Dim,Float64}, omega::Float64, model::FreeElectronPropagator{Dim}) where {Dim}
-    eps_k = real(ε(k, model.dispersion)[1, 1])
+    eps_k = real(H(k, model.dispersion)[1, 1])
     return 1.0 / (omega - (eps_k - model.μ))
 end
 

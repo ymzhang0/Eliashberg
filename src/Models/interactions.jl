@@ -138,8 +138,8 @@ function V(
     dispersion_model::ElectronicDispersion{D}
 ) where {D}
     # Uses band structure energies nearest to Fermi surface
-    Ek = band_structure(dispersion_model, k).values
-    Ekp = band_structure(dispersion_model, kp).values
+    Ek = diagonalize(k, dispersion_model).values
+    Ekp = diagonalize(kp, dispersion_model).values
 
     # Check if any band is within fsthick
     if any(abs.(Ek) .≤ interaction.fsthick) && any(abs.(Ekp) .≤ interaction.fsthick)
@@ -177,8 +177,8 @@ function V(
     interaction::LimitedConstantInteraction{D},
     dispersion_model::ElectronicDispersion{D}
 ) where {D}
-    Ek = band_structure(dispersion_model, k).values
-    Ekp = band_structure(dispersion_model, kp).values
+    Ek = diagonalize(k, dispersion_model).values
+    Ekp = diagonalize(kp, dispersion_model).values
     if any(abs.(Ek) .≤ interaction.ωc) && any(abs.(Ekp) .≤ interaction.ωc)
         return interaction.V0
     else
