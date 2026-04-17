@@ -460,18 +460,7 @@ function submit_job(toml_path::String)
                 end
             end
 
-            hdf5_result = if task_type == "spectral_function"
-                SpectralMapData(
-                    params.task.qpath,
-                    params.task.omegas,
-                    result,
-                    0.0,
-                    nothing,
-                    params.task.T,
-                )
-            else
-                result
-            end
+            hdf5_result = result
 
             !isnothing(paths.jld2_file) && jldsave(paths.jld2_file; result=result, config=config)
             !isnothing(paths.hdf5_file) && write_result_hdf5(paths.hdf5_file, hdf5_result, config, toml_path; time_seconds=time_taken)
