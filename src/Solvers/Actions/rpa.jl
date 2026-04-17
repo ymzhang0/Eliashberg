@@ -259,7 +259,7 @@ function spectral_function(
     return with_stage_log(
         "Scan spectral function along path";
         context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), η=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
-        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+        summarize_result=result -> (result_type=string(typeof(result)), size=size(result.spectral_matrix)),
     ) do
         spectral_matrix = scan_rpa_spectral_function_hpc(
             model,

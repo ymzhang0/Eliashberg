@@ -22,7 +22,7 @@ function band_renormalization(
     return with_stage_log(
         "Compute renormalized band data";
         context=(field=field, model=model, interaction=interaction, kgrid=kgrid, kpath=kpath, approx=approx, n_temperatures=length(Ts), warm_start=warm_start),
-        summarize_result=data -> (n_temperatures=length(data.temperatures), n_bands=size(data.bare_bands, 2)),
+        summarize_result=data -> (n_temperatures=length(data.Ts), n_bands=size(data.bare_bands, 2)),
     ) do
         gaps = _allocate_gap_storage(field, length(Ts))
         fallback_guess = _initial_phi_guess(field, phi_guess)
