@@ -13,7 +13,7 @@ quiet = false
 
 [geometry]
 type = "Predefined"
-name = "atomic_chain"
+name = "square_lattice"
 a = 1.5
 element = "C"
 

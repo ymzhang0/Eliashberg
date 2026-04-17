@@ -354,7 +354,7 @@ end
 
 
 function submit_job(toml_path::String)
-    config = Configurations.from_toml(EliashbergConfig, toml_path)
+    config = Eliashberg.Config.load_config(toml_path)
     timestamp = Dates.format(now(), "yyyymmdd_HHMMSS")
     out_dir = _resolve_job_directory(config.system, timestamp)
     mkpath(out_dir)
