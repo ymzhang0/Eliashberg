@@ -77,7 +77,7 @@ end
 
 Build a `MultiOrbitalTightBinding` model from an `AtomsBase.AbstractSystem` or `PeriodicCell`.
 """
-function MultiOrbitalTightBinding(obj::Union{AbstractSystem,PeriodicCell}, num_orbitals, hoppings, EF)
+function MultiOrbitalTightBinding(obj::AbstractSystem, num_orbitals, hoppings, EF)
     return with_stage_log(
         "Construct MultiOrbitalTightBinding";
         context=(cell=obj, num_orbitals=Int(num_orbitals), EF=Float64(EF)),
@@ -121,7 +121,7 @@ end
 
 # --- Tight-Binding Dispatch System ---
 
-function TightBinding(cell::Union{AbstractSystem,PeriodicCell}, t::Real, EF::Real=0.0)
+function TightBinding(cell::AbstractSystem, t::Real, EF::Real=0.0)
     return _TightBinding(Val(bravais_lattice(cell)), cell, Float64(t), Float64(EF))
 end
 
@@ -173,7 +173,7 @@ end
 
 Build a `TightBinding` model from an `AtomsBase.AbstractSystem` or `PeriodicCell`.
 """
-function TightBinding(obj::Union{AbstractSystem,PeriodicCell}, hoppings, EF)
+function TightBinding(obj::AbstractSystem, hoppings, EF)
     return with_stage_log(
         "Construct TightBinding";
         context=(cell=obj, EF=Float64(EF), n_hoppings=length(hoppings)),
@@ -191,7 +191,7 @@ end
 
 # Redundant matrix and system overloads removed.
 
-TightBinding(cell::Union{AbstractSystem,PeriodicCell}, t::Float64, tp::Float64, EF::Float64) =
+TightBinding(cell::AbstractSystem, t::Float64, tp::Float64, EF::Float64) =
     _TightBinding(Val(:sqP_with_tp), cell, t, tp, EF)
 
 function _TightBinding(::Val{:sqP_with_tp}, cell, t, tp, EF)

@@ -19,6 +19,7 @@ using ..Eliashberg: periodic_rank
 
 export plot
 
+include("plot_helpers.jl")
 include("geometry.jl")
 include("bands.jl")
 include("responses.jl")

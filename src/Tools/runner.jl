@@ -234,46 +234,46 @@ function _resource_summary(config, project::AbstractString)
 end
 
 function _task_run_summary(task_type::AbstractString, params)
-    if task_type == "scan_spectral_function"
+    if task_type == "spectral_function"
         omega_axis = params.task.omegas
         qpath = params.task.qpath
         return (
-            task="scan spectral function",
+            task="spectral function",
             q_path=Eliashberg.qpath,
             omega_range=(minimum(omega_axis), maximum(omega_axis)),
             n_omegas=length(omega_axis),
-            temperature=Float64(params.task.T_val),
-            eta=Float64(params.task.eta),
+            T=Float64(params.task.T),
+            η=Float64(params.task.η),
         )
-    elseif task_type == "compute_phase_transition_data"
+    elseif task_type == "phase_transition"
         return (
-            task="compute phase transition data",
+            task="phase transition data",
             n_phis=length(params.task.phis),
             n_temperatures=length(params.task.Ts),
             approx=string(typeof(params.task.approx)),
         )
-    elseif task_type == "compute_renormalized_band_data"
+    elseif task_type == "band_renormalization"
         return (
-            task="compute renormalized band data",
+            task="band renormalization data",
             k_path=Eliashberg.params.task.kpath,
             n_temperatures=length(params.task.Ts),
             approx=string(typeof(params.task.approx)),
         )
-    elseif task_type == "compute_collective_mode_spectral_data"
+    elseif task_type == "collective_mode_spectral"
         return (
-            task="compute collective mode spectral data",
+            task="collective mode spectral data",
             q_path=Eliashberg.params.task.qpath,
             n_omegas=Int(params.task.n_omegas),
-            temperature=Float64(params.task.T_val),
-            eta=Float64(params.task.eta),
+            T=Float64(params.task.T),
+            η=Float64(params.task.η),
             approx=string(typeof(params.task.approx)),
         )
-    elseif task_type == "compute_zeeman_pairing_data"
+    elseif task_type == "Zeeman_pairing"
         return (
-            task="compute zeeman pairing data",
-            n_q=length(params.task.q_vals),
-            field_strength=Float64(params.task.h_val),
-            temperature=Float64(params.task.T_val),
+            task="zeeman pairing data",
+            n_q=length(params.task.qs),
+            field_strength=Float64(params.task.h),
+            T=Float64(params.task.T),
             approx=string(typeof(params.task.approx)),
         )
     end
@@ -302,23 +302,23 @@ function _activate_plot_backend!()
 end
 
 function _plot_result_payload(task_type::AbstractString, result, params)
-    if task_type == "scan_spectral_function"
+    if task_type == "spectral_function"
         data = SpectralMapData(
             params.task.qpath,
             params.task.omegas,
             result,
             0.0,
             nothing,
-            params.task.T_val,
+            params.task.T,
         )
         return plot_spectral_function(data)
-    elseif task_type == "compute_phase_transition_data"
+    elseif task_type == "phase_transition"
         return plot_phase_transition(result)
-    elseif task_type == "compute_renormalized_band_data"
+    elseif task_type == "band_renormalization"
         return plot_renormalized_bands(result)
-    elseif task_type == "compute_collective_mode_spectral_data"
+    elseif task_type == "collective_mode_spectral"
         return plot_collective_modes(result)
-    elseif task_type == "compute_zeeman_pairing_data"
+    elseif task_type == "Zeeman_pairing"
         return plot_zeeman_pairing_landscape(result)
     end
     throw(ArgumentError("No plotter registered for task type $(task_type)."))
@@ -424,34 +424,34 @@ function submit_job(toml_path::String)
             @info "⏳ Provisioning workers and loading runtime on $(n_requested) nodes..."
 
             time_taken = @elapsed begin
-                if task_type == "scan_spectral_function"
-                    result = scan_spectral_function(
+                if task_type == "spectral_function"
+                    result = spectral_function(
                         params.model, params.interaction, params.field, params.kpoints,
                         params.task.qpath, params.task.omegas;
-                        T=params.task.T_val,
-                        η=params.task.eta,
+                        T=params.task.T,
+                        η=params.task.η,
                         bootstrap_workers=config.system.bootstrap_workers,
                         n_workers=n_requested,
                         project=project,
                         restrict=restrict,
                     )
-                elseif task_type == "compute_phase_transition_data"
-                    result = compute_phase_transition_data(
+                elseif task_type == "phase_transition"
+                    result = phase_transition(
                         params.model, params.interaction, params.field, params.kpoints;
                         params.task...
                     )
-                elseif task_type == "compute_renormalized_band_data"
-                    result = compute_renormalized_band_data(
+                elseif task_type == "band_renormalization"
+                    result = band_renormalization(
                         params.model, params.interaction, params.field, params.kpoints;
                         params.task...
                     )
-                elseif task_type == "compute_collective_mode_spectral_data"
-                    result = compute_collective_mode_spectral_data(
+                elseif task_type == "collective_mode_spectral"
+                    result = collective_mode_spectral(
                         params.model, params.interaction, params.field, params.kpoints;
                         params.task...
                     )
-                elseif task_type == "compute_zeeman_pairing_data"
-                    result = compute_zeeman_pairing_data(
+                elseif task_type == "Zeeman_pairing"
+                    result = zeeman_pairing(
                         params.model, params.interaction, params.kpoints;
                         params.task...
                     )
@@ -460,14 +460,14 @@ function submit_job(toml_path::String)
                 end
             end
 
-            hdf5_result = if task_type == "scan_spectral_function"
+            hdf5_result = if task_type == "spectral_function"
                 SpectralMapData(
                     params.task.qpath,
                     params.task.omegas,
                     result,
                     0.0,
                     nothing,
-                    params.task.T_val,
+                    params.task.T,
                 )
             else
                 result

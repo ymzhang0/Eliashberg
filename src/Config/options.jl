@@ -1,12 +1,13 @@
 # src/Config/options.jl
 
 export SystemOptions
-export AbstractGeometryOption, ChainLatticeOption, SquareLatticeOption, HexagonalLatticeOption, CubicLatticeOption, FCCLatticeOption, BCCLatticeOption
+export AbstractGeometryOption, PredefinedStructureOption, CustomStructureOption
+export AbstractLatticeOption, ChainLatticeOption, SquareLatticeOption, HexagonalLatticeOption, CubicLatticeOption, FCCLatticeOption, BCCLatticeOption
 export KpointsOptions, PlotOptions
 export AbstractModelOption, FreeElectronOption, TightBindingOption, MultiOrbitalTightBindingOption, KagomeLatticeOption, GrapheneOption, SSHModelOption, EinsteinModelOption, DebyeModelOption, PolaritonModelOption, MonoatomicLatticeModelOption
 export AbstractInteractionOption, ConstantInteractionOption, LocalInteractionOption, YukawaInteractionOption, LimitedConstantInteractionOption, BareCoulombInteractionOption, ScreenedCoulombInteractionOption, CompositeInteractionOption
 export AbstractFieldOption, ChargeDensityWaveOption, SpinDensityWaveOption, BCSReducedPairingOption, FFLOPairingOption, PairDensityWaveOption, MomentumDependentPairingOption, DirectChannelOption, ExchangeChannelOption
-export AbstractTaskOption, SolveGroundStateOption, ScanInstabilityLandscapeOption, ScanSpectralFunctionOption, ComputePhaseTransitionDataOption, ComputeRenormalizedBandDataOption, ComputeZeemanPairingDataOption, ComputeCollectiveModeSpectralDataOption
+export AbstractTaskOption, SolveGroundStateOption, ScanInstabilityLandscapeOption, SpectralFunctionOption, PhaseTransitionOption, BandRenormalizationOption, ZeemanPairingOption, CollectiveModeSpectralOption
 export EliashbergConfig, load_config
 
 # ---------------------------------------------------------
@@ -46,30 +47,45 @@ end
     # 未来还可以加 xlim, ylim, show_legend 等
 end
 
+abstract type AbstractLatticeOption end
+
+@option "ChainLattice" struct ChainLatticeOption <: AbstractLatticeOption
+    a::Float64 = 1.0
+end
+
+@option "SquareLattice" struct SquareLatticeOption <: AbstractLatticeOption
+    a::Float64 = 1.0
+end
+
+@option "HexagonalLattice" struct HexagonalLatticeOption <: AbstractLatticeOption
+    a::Float64 = 1.0
+end
+
+@option "CubicLattice" struct CubicLatticeOption <: AbstractLatticeOption
+    a::Float64 = 1.0
+end
+
+@option "BCCLattice" struct BCCLatticeOption <: AbstractLatticeOption
+    a::Float64 = 1.0
+end
+
+@option "FCCLattice" struct FCCLatticeOption <: AbstractLatticeOption
+    a::Float64 = 1.0
+end
+
 abstract type AbstractGeometryOption end
 
-@option "ChainLattice" struct ChainLatticeOption <: AbstractGeometryOption
+@option "Predefined" struct PredefinedStructureOption <: AbstractGeometryOption
+    name::String
     a::Float64 = 1.0
+    c::Union{Float64, Nothing} = nothing
+    element::Union{String, Symbol} = :C
+    element2::Union{String, Symbol, Nothing} = nothing
 end
 
-@option "SquareLattice" struct SquareLatticeOption <: AbstractGeometryOption
-    a::Float64 = 1.0
-end
-
-@option "HexagonalLattice" struct HexagonalLatticeOption <: AbstractGeometryOption
-    a::Float64 = 1.0
-end
-
-@option "CubicLattice" struct CubicLatticeOption <: AbstractGeometryOption
-    a::Float64 = 1.0
-end
-
-@option "BCCLattice" struct BCCLatticeOption <: AbstractGeometryOption
-    a::Float64 = 1.0
-end
-
-@option "FCCLattice" struct FCCLatticeOption <: AbstractGeometryOption
-    a::Float64 = 1.0
+@option "Custom" struct CustomStructureOption <: AbstractGeometryOption
+    lattice::AbstractLatticeOption
+    atoms::Vector{Dict{String, Any}}
 end
 
 # QELatticeOption removed.
@@ -95,7 +111,7 @@ end
     # Convenience scalar hop parameters for simple cells
     t::Union{Float64,Nothing} = nothing
     tp::Union{Float64,Nothing} = nothing
-    use_spinor::Bool = false
+    spinor::Bool = false
 end
 
 @option "MultiOrbitalTightBinding" struct MultiOrbitalTightBindingOption <: AbstractModelOption
@@ -225,63 +241,63 @@ abstract type AbstractTaskOption end
 
 @option "solve_ground_state" struct SolveGroundStateOption <: AbstractTaskOption
     phi_guess::Float64 = 0.1
-    T_val::Float64 = 1e-3
+    temperature::Float64 = 1e-3
     approx::String = "ExactTrLn"
     warm_start::Bool = true
 end
 
 @option "scan_instability_landscape" struct ScanInstabilityLandscapeOption <: AbstractTaskOption
     qgrid_size::Union{Int,Vector{Int}} = 50
-    T_val::Float64 = 0.001
+    temperature::Float64 = 0.001
     eta::Float64 = 0.001
 end
 
-@option "scan_spectral_function" struct ScanSpectralFunctionOption <: AbstractTaskOption
+@option "spectral_function" struct SpectralFunctionOption <: AbstractTaskOption
     qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
     qpath_labels::Union{Vector{String},Nothing} = nothing
     npoints_each_line::Int = 50
     omega_range::Union{Vector{Float64},Nothing} = nothing
     omega_points::Int = 100
-    T_val::Float64 = 0.001
+    temperature::Float64 = 0.001
     eta::Float64 = 0.05
 end
 
-@option "compute_phase_transition_data" struct ComputePhaseTransitionDataOption <: AbstractTaskOption
+@option "phase_transition" struct PhaseTransitionOption <: AbstractTaskOption
     phi_range::Union{Vector{Float64},Nothing} = nothing
     phi_points::Int = 100
-    T_range::Union{Vector{Float64},Nothing} = nothing
-    T_points::Int = 10
+    temperature_range::Union{Vector{Float64},Nothing} = nothing
+    temperature_points::Int = 10
     phi_guess::Float64 = 0.2
     approx::String = "ExactTrLn"
     warm_start::Bool = true
 end
 
-@option "compute_renormalized_band_data" struct ComputeRenormalizedBandDataOption <: AbstractTaskOption
+@option "band_renormalization" struct BandRenormalizationOption <: AbstractTaskOption
     qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
     qpath_labels::Union{Vector{String},Nothing} = nothing
     npoints_each_line::Int = 50
-    T_range::Union{Vector{Float64},Nothing} = nothing
-    T_points::Int = 10
+    temperature_range::Union{Vector{Float64},Nothing} = nothing
+    temperature_points::Int = 10
     phi_guess::Float64 = 0.5
     approx::String = "ExactTrLn"
     warm_start::Bool = true
 end
 
-@option "compute_zeeman_pairing_data" struct ComputeZeemanPairingDataOption <: AbstractTaskOption
-    q_range::Union{Vector{Float64},Nothing} = nothing
-    q_points::Int = 50
-    h_val::Float64 = 0.1
-    T_val::Float64 = 0.01
+@option "Zeeman_pairing" struct ZeemanPairingOption <: AbstractTaskOption
+    qs_range::Union{Vector{Float64},Nothing} = nothing
+    qs_points::Int = 50
+    h::Float64 = 0.1
+    temperature::Float64 = 0.01
     phi_guess::Float64 = 0.4
     approx::String = "ExactTrLn"
     warm_start::Bool = true
 end
 
-@option "compute_collective_mode_spectral_data" struct ComputeCollectiveModeSpectralDataOption <: AbstractTaskOption
+@option "collective_mode_spectral" struct CollectiveModeSpectralOption <: AbstractTaskOption
     qpath_points::Union{Vector{Vector{Float64}},Nothing} = nothing
     qpath_labels::Union{Vector{String},Nothing} = nothing
     npoints_each_line::Int = 50
-    T_val::Float64 = 0.01
+    temperature::Float64 = 0.01
     omega_max_factor::Float64 = 5.0
     n_omegas::Int = 100
     eta::Float64 = 0.02
@@ -303,6 +319,23 @@ end
     plot::PlotOptions = PlotOptions()
 end
 
+function _map_thermal_keys!(d::AbstractDict)
+    # Map T -> temperature and T_range -> temperature_range recursively in the task section
+    if haskey(d, "task")
+        t = d["task"]
+        if haskey(t, "T")
+            t["temperature"] = pop!(t, "T")
+        end
+        if haskey(t, "T_range")
+            t["temperature_range"] = pop!(t, "T_range")
+        end
+        if haskey(t, "T_points")
+            t["temperature_points"] = pop!(t, "T_points")
+        end
+    end
+    return d
+end
+
 """
     load_config(path::AbstractString)
 
@@ -310,11 +343,18 @@ Reads a TOML configuration file, parses it into an `EliashbergConfig`,
 and performs cross-field validation.
 """
 function load_config(path::AbstractString)::EliashbergConfig
-    config = from_toml(EliashbergConfig, path)
+    d = TOML.parsefile(path)
+    _map_thermal_keys!(d)
+    config = from_dict(EliashbergConfig, d)
     return config
 end
 
 const GEOMETRY_OPTION_TYPES = Dict{String,DataType}(
+    "Predefined" => PredefinedStructureOption,
+    "Custom" => CustomStructureOption,
+)
+
+const LATTICE_OPTION_TYPES = Dict{String,DataType}(
     "ChainLattice" => ChainLatticeOption,
     "SquareLattice" => SquareLatticeOption,
     "HexagonalLattice" => HexagonalLatticeOption,
@@ -361,11 +401,11 @@ const FIELD_OPTION_TYPES = Dict{String,DataType}(
 const TASK_OPTION_TYPES = Dict{String,DataType}(
     "solve_ground_state" => SolveGroundStateOption,
     "scan_instability_landscape" => ScanInstabilityLandscapeOption,
-    "scan_spectral_function" => ScanSpectralFunctionOption,
-    "compute_phase_transition_data" => ComputePhaseTransitionDataOption,
-    "compute_renormalized_band_data" => ComputeRenormalizedBandDataOption,
-    "compute_zeeman_pairing_data" => ComputeZeemanPairingDataOption,
-    "compute_collective_mode_spectral_data" => ComputeCollectiveModeSpectralDataOption,
+    "spectral_function" => SpectralFunctionOption,
+    "phase_transition" => PhaseTransitionOption,
+    "band_renormalization" => BandRenormalizationOption,
+    "Zeeman_pairing" => ZeemanPairingOption,
+    "collective_mode_spectral" => CollectiveModeSpectralOption,
 )
 
 function _parse_polymorphic_option(
@@ -392,6 +432,12 @@ Configurations.from_dict(
     ::Type{AbstractGeometryOption},
     x::AbstractDict{String,<:Any},
 ) where {OptionType} = _parse_polymorphic_option(AbstractGeometryOption, x, GEOMETRY_OPTION_TYPES)
+
+Configurations.from_dict(
+    ::Type{OptionType},
+    ::Type{AbstractLatticeOption},
+    x::AbstractDict{String,<:Any},
+) where {OptionType} = _parse_polymorphic_option(AbstractLatticeOption, x, LATTICE_OPTION_TYPES)
 
 Configurations.from_dict(
     ::Type{OptionType},

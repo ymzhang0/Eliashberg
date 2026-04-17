@@ -118,7 +118,7 @@ function scan_instability_landscape(
 ) where {D}
     return with_stage_log(
         "Scan instability landscape";
-        context=(model=model, field=field, kgrid=kgrid, qgrid=qgrid, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, field=field, kgrid=kgrid, qgrid=qgrid, T=Float64(T), η=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
@@ -172,7 +172,7 @@ function scan_rpa_spectral_function_hpc(
 ) where {D}
     return with_stage_log(
         "Scan RPA spectral function";
-        context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qaxis=qaxis, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qaxis=qaxis, omegas=omegas, T=Float64(T), η=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
@@ -205,7 +205,7 @@ function scan_rpa_spectral_function_hpc(
 ) where {D}
     return with_stage_log(
         "Scan spectral function";
-        context=(model=model, field=field, kgrid=kgrid, qaxis=qaxis, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, field=field, kgrid=kgrid, qaxis=qaxis, omegas=omegas, T=Float64(T), η=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
         chi_functor = GeneralizedSusceptibility(model, kgrid, field, T, η)
@@ -236,13 +236,13 @@ function _stack_spectral_rows(rows::AbstractVector{<:AbstractVector{<:Real}}, n_
 end
 
 """
-    scan_spectral_function(model::PhysicalModel, kgrid::AbstractKGrid{D}, qpath::KPath{D}, omegas::AbstractVector{Float64}; T=0.001, η=0.05) where {D}
+    spectral_function(model::PhysicalModel, kgrid::AbstractKGrid{D}, qpath::KPath{D}, omegas::AbstractVector{Float64}; T=0.001, η=0.05) where {D}
 
 Map a two-dimensional parameter space over `(q, ω)` and reduce each point over
 the internal grid with `GeneralizedSusceptibility`. Set
 `bootstrap_workers=true` to provision distributed map workers automatically.
 """
-function scan_spectral_function(
+function spectral_function(
     model::PhysicalModel,
     interaction::Interaction,
     field::AuxiliaryField,
@@ -258,10 +258,10 @@ function scan_spectral_function(
 ) where {D}
     return with_stage_log(
         "Scan spectral function along path";
-        context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        context=(model=model, interaction=interaction, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), η=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
         summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
     ) do
-        @timeit TO "Spectral Function Scan" return scan_rpa_spectral_function_hpc(
+        spectral_matrix = scan_rpa_spectral_function_hpc(
             model,
             interaction,
             field,
@@ -275,10 +275,18 @@ function scan_spectral_function(
             project=project,
             restrict=restrict
         )
+        return SpectralMapData(
+            qpath=qpath,
+            omegas=omegas,
+            spectral_matrix=spectral_matrix,
+            gap=0.0,
+            pair_breaking_edge=nothing,
+            T=Float64(T)
+        )
     end
 end
 
-function scan_spectral_function(
+function spectral_function(
     model::PhysicalModel,
     kgrid::AbstractKGrid{D},
     qpath::KPath{D},
@@ -293,10 +301,10 @@ function scan_spectral_function(
 ) where {D}
     return with_stage_log(
         "Scan spectral function along path";
-        context=(model=model, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), eta=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
-        summarize_result=result -> (result_type=string(typeof(result)), size=size(result)),
+        context=(model=model, field=field, kgrid=kgrid, qpath=qpath, omegas=omegas, T=Float64(T), η=Float64(η), bootstrap_workers=bootstrap_workers, requested_workers=Int(n_workers)),
+        summarize_result=result -> (n_q=length(path_points(result.qpath)), n_omegas=length(result.omegas)),
     ) do
-        return scan_rpa_spectral_function_hpc(
+        spectral_matrix = scan_rpa_spectral_function_hpc(
             model,
             kgrid,
             path_points(qpath),
@@ -308,6 +316,14 @@ function scan_spectral_function(
             n_workers=n_workers,
             project=project,
             restrict=restrict
+        )
+        return SpectralMapData(
+            qpath=qpath,
+            omegas=omegas,
+            spectral_matrix=spectral_matrix,
+            gap=0.0,
+            pair_breaking_edge=nothing,
+            T=Float64(T)
         )
     end
 end
@@ -322,21 +338,21 @@ function _point_from_coordinates(::Val{D}, coords::Vararg{<:Real,D}) where {D}
 end
 
 """
-    compute_collective_mode_spectral_data(T_val, field, model, interaction, kgrid, qpath; omega_max_factor=5.0, n_omegas=100, eta=0.02, approx=ExactTrLn(), phi_guess=0.4, kwargs...)
+    collective_mode_spectral(model, interaction, field, kgrid; qpath, T, omega_max_factor=5.0, n_omegas=100, η=0.02, approx=ExactTrLn(), phi_guess=0.4, kwargs...)
 
 Compute the dynamical spectral map of a mean-field state and return only pure
 array data for downstream visualization.
 """
-function compute_collective_mode_spectral_data(
+function collective_mode_spectral(
     model::ElectronicDispersion,
     interaction::Interaction,
     field::AuxiliaryField,
     kgrid::AbstractKGrid;
     qpath::KPath,
-    T_val::Real,
+    T::Real,
     omega_max_factor::Real=5.0,
     n_omegas::Integer=100,
-    eta::Real=0.02,
+    η::Real=0.02,
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess::Real=0.4,
     bootstrap_workers::Bool=false,
@@ -346,10 +362,10 @@ function compute_collective_mode_spectral_data(
 )
     return with_stage_log(
         "Compute collective mode spectral data";
-        context=(field=field, model=model, interaction=interaction, kgrid=kgrid, qpath=qpath, T=Float64(T_val), eta=Float64(eta), n_omegas=Int(n_omegas), approx=approx),
+        context=(field=field, model=model, interaction=interaction, kgrid=kgrid, qpath=qpath, T=Float64(T), η=Float64(η), n_omegas=Int(n_omegas), approx=approx),
         summarize_result=data -> (n_q=length(path_points(data.qpath)), n_omegas=length(data.omegas), gap=data.gap),
     ) do
-        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=Float64(phi_guess), T=T_val, log_level=Logging.Debug)
+        phi_gs = solve_ground_state(field, model, interaction, kgrid, approx; phi_guess=Float64(phi_guess), T=T, log_level=Logging.Debug)
         phi_gs = phi_gs < 1e-4 ? 0.0 : phi_gs
 
         bdg_dispersion = MeanFieldDispersion(model, field, phi_gs)
@@ -362,8 +378,8 @@ function compute_collective_mode_spectral_data(
             kgrid,
             path_points(qpath),
             omegas;
-            T=T_val,
-            η=eta,
+            T=T,
+            η=η,
             bootstrap_workers=bootstrap_workers,
             n_workers=n_workers,
             project=project,
@@ -377,13 +393,13 @@ function compute_collective_mode_spectral_data(
             spectral_matrix=spectral_matrix,
             gap=phi_gs,
             pair_breaking_edge=pair_breaking_edge,
-            temperature=Float64(T_val)
+            T=Float64(T)
         )
     end
 end
 
-function compute_collective_mode_spectral_data(
-    T_val::Real,
+function collective_mode_spectral(
+    T::Real,
     field::AuxiliaryField,
     model::ElectronicDispersion,
     interaction::Interaction,
@@ -391,13 +407,13 @@ function compute_collective_mode_spectral_data(
     qpath::KPath;
     kwargs...
 )
-    return compute_collective_mode_spectral_data(
+    return collective_mode_spectral(
         model,
         interaction,
         field,
         kgrid;
         qpath=qpath,
-        T_val=T_val,
+        T=T,
         kwargs...,
     )
 end

@@ -1,5 +1,11 @@
 
-function compute_phase_transition_data(
+"""
+    phase_transition(model, interaction, field, kgrid; phis, Ts, approx=ExactTrLn(), phi_guess=0.2, warm_start=true)
+
+Compute the effective action landscape and order parameter evolution across a range 
+of phis and temperatures. Returns a PhaseDiagramData object.
+"""
+function phase_transition(
     model::ElectronicDispersion,
     interaction::Interaction,
     field::AuxiliaryField,
@@ -53,7 +59,7 @@ function compute_phase_transition_data(
     end
 end
 
-function compute_phase_transition_data(
+function phase_transition(
     phis::AbstractVector{<:Real},
     Ts::AbstractVector{<:Real},
     field::AuxiliaryField,
@@ -62,7 +68,7 @@ function compute_phase_transition_data(
     kgrid::AbstractKGrid;
     kwargs...
 )
-    return compute_phase_transition_data(
+    return phase_transition(
         model,
         interaction,
         field,
@@ -73,7 +79,7 @@ function compute_phase_transition_data(
     )
 end
 
-function compute_phase_transition_data(
+function phase_transition(
     model::ElectronicDispersion,
     interaction::Interaction,
     field::CompositeField,
@@ -83,10 +89,10 @@ function compute_phase_transition_data(
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess=0.2
 )
-    throw(ArgumentError("compute_phase_transition_data supports a one-dimensional order-parameter scan. Use compute_coexistence_landscape for CompositeField scans."))
+    throw(ArgumentError("phase_transition supports a one-dimensional order-parameter scan. Use compute_coexistence_landscape for CompositeField scans."))
 end
 
-function compute_phase_transition_data(
+function phase_transition(
     phis::AbstractVector{<:Real},
     Ts::AbstractVector{<:Real},
     field::CompositeField,
@@ -95,7 +101,7 @@ function compute_phase_transition_data(
     kgrid::AbstractKGrid;
     kwargs...
 )
-    return compute_phase_transition_data(
+    return phase_transition(
         model,
         interaction,
         field,
@@ -161,39 +167,39 @@ function compute_coexistence_landscape(
 end
 
 """
-    compute_zeeman_pairing_data(T_val, h_val, q_vals, model, interaction, kgrid; approx=ExactTrLn(), phi_guess=0.4)
+    Zeeman_pairing(model, interaction, kgrid; T, h, qs, approx=ExactTrLn(), phi_guess=0.4)
 
 Map a one-dimensional external parameter axis to optimized order parameters and
 condensation energies for FFLO-style scans.
 """
-function compute_zeeman_pairing_data(
+function Zeeman_pairing(
     model::ElectronicDispersion,
     interaction::Interaction,
     kgrid::AbstractKGrid;
-    T_val::Real,
-    h_val::Real,
-    q_vals::AbstractVector{<:Real},
+    T::Real,
+    h::Real,
+    qs::AbstractVector{<:Real},
     approx::ApproximationLevel=ExactTrLn(),
     phi_guess::Real=0.4,
     warm_start::Bool=true
 )
     return with_stage_log(
         "Compute Zeeman pairing data";
-        context=(model=model, interaction=interaction, kgrid=kgrid, T=Float64(T_val), h=Float64(h_val), n_q=length(q_vals), approx=approx, warm_start=warm_start),
-        summarize_result=data -> (n_q=length(data.q_vals), optimal_q=data.optimal_q, minimum_index=data.minimum_index),
+        context=(model=model, interaction=interaction, kgrid=kgrid, T=Float64(T), h=Float64(h), n_q=length(qs), approx=approx, warm_start=warm_start),
+        summarize_result=data -> (n_q=length(data.qs), optimal_q=data.optimal_q, minimum_index=data.minimum_index),
     ) do
         dim = length(first(kgrid.points))
-        minimal_energy = zeros(Float64, length(q_vals))
-        optimal_gaps = zeros(Float64, length(q_vals))
+        minimal_energy = zeros(Float64, length(qs))
+        optimal_gaps = zeros(Float64, length(qs))
         fallback_guess = _initial_phi_guess(BCSReducedPairing(), phi_guess)
         _scan_parameter_axis(
-            q_vals;
+            qs;
             warm_start=warm_start,
             initial_state=fallback_guess,
             progress_name="Scanning Zeeman Pairing",
         ) do idx, q, current_guess
             q_vector = SVector{dim,Float64}(ntuple(i -> i == 1 ? Float64(q) : 0.0, dim))
-            fflo_field = FFLOPairing(q_vector, h_val)
+            fflo_field = FFLOPairing(q_vector, h)
             phi_gs = _solve_regularized_ground_state(
                 fflo_field,
                 model,
@@ -201,26 +207,27 @@ function compute_zeeman_pairing_data(
                 kgrid,
                 approx;
                 phi_guess=current_guess,
-                T=T_val,
+                T=T,
                 log_level=Logging.Debug,
             )
 
             optimal_gaps[idx] = phi_gs
-            minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T_val)
+            minimal_energy[idx] = evaluate_action(phi_gs, fflo_field, model, interaction, kgrid, approx; T=T)
             return _next_phi_guess(phi_gs, fallback_guess)
         end
 
         zero_q = zero(SVector{dim,Float64})
-        normal_energy = evaluate_action(0.0, FFLOPairing(zero_q, h_val), model, interaction, kgrid, approx; T=T_val)
+        normal_energy = evaluate_action(0.0, FFLOPairing(zero_q, h), model, interaction, kgrid, approx; T=T)
         condensation_energy = minimal_energy .- normal_energy
         minimum_index = argmin(condensation_energy)
 
         return ZeemanPairingData(
-            q_vals,
+            qs,
             condensation_energy,
             optimal_gaps,
-            q_vals[minimum_index],
+            qs[minimum_index],
             minimum_index
         )
     end
 end
+

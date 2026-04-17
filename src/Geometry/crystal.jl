@@ -54,7 +54,7 @@ function _process_atoms(atoms::AbstractVector, D::Int, length_unit, fractional::
     if first(atoms) isa Pair
         # Use Pair instead of Tuple, as AtomsBase.parse_fractional expects Pair or Atom
         return [
-            a.first => (fractional ? SVector{D}(Float64.(a.second)) : SVector{D}(Float64.(a.second)) .* length_unit)
+            Symbol(a.first) => (fractional ? SVector{D}(Float64.(a.second)) : SVector{D}(Float64.(a.second)) .* length_unit)
             for a in atoms
         ]
     end

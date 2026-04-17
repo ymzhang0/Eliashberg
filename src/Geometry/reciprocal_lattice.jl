@@ -165,6 +165,52 @@ function generate_kpath(l::AbstractBravaisLattice{1}; n_pts_per_segment=50)
     throw(ArgumentError("No symmetry path defined for lattice $(typeof(l)). Please define it in `src/Geometry/symmetry_points.jl`."))
 end
 
+"""
+    symmetry_path(system::AbstractSystem)
+
+Return the `SymmetryPath` for a given atomic system by identifying its Bravais lattice.
+For 3D systems, this uses Spglib and Brillouin.jl.
+"""
+function symmetry_path(s::AbstractSystem)
+    D = AtomsBase.n_dimensions(s)
+    if D == 3
+        vectors = primitive_vectors(s)
+        dataset = Spglib.get_dataset(Spglib.SpglibCell(Matrix{Float64}(vectors), [[0.0, 0.0, 0.0]], [1]))
+        kp = Brillouin.irrfbz_path(dataset.spacegroup_number, [SVector{3}(vectors[:, i]) for i in 1:3])
+        points = Dict(String(k) => v for (k, v) in kp.points)
+        # Use only the first branch for the "default" path. 
+        # Multi-branch paths are handled by Brillouin.interpolate directly.
+        path = [String(k) for k in kp.paths[1]] 
+        return SymmetryPath{3}(points, path)
+    end
+
+    # 1D/2D Identification
+    vectors = primitive_vectors(s)
+    type = bravais_lattice(s)
+
+    lattice = if D == 1 && type == :line
+        ChainLattice(norm(vectors[:, 1]))
+    elseif D == 2
+        if type == :sqP
+            SquareLattice(norm(vectors[:, 1]))
+        elseif type == :hP
+            HexagonalLattice2D(norm(vectors[:, 1]))
+        elseif type == :rP
+            RectangularLattice(norm(vectors[:, 1]), norm(vectors[:, 2]))
+        elseif type == :obP
+            v1, v2 = vectors[:, 1], vectors[:, 2]
+            gamma = acos(clamp(dot(v1, v2) / (norm(v1) * norm(v2)), -1.0, 1.0))
+            ObliqueLattice(norm(v1), norm(v2), gamma)
+        else
+            nothing
+        end
+    else
+        nothing
+    end
+
+    return isnothing(lattice) ? nothing : symmetry_path(lattice)
+end
+
 function generate_kpath(l::AbstractBravaisLattice{2}; n_pts_per_segment=50)
     data = symmetry_path(l)
     if !isnothing(data)

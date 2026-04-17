@@ -112,22 +112,22 @@ Base.@kwdef struct RenormalizedBandData{D,G<:AbstractArray{Float64}}
     bare_bands::Matrix{Float64}
     renormalized_bands::Array{Float64,3}
     gaps::G
-    temperatures::Vector{Float64}
+    Ts::Vector{Float64}
 
     function RenormalizedBandData{D,G}(
         kpath::KPath{D},
         bare_bands::Matrix{Float64},
         renormalized_bands::Array{Float64,3},
         gaps::G,
-        temperatures::Vector{Float64}
+        Ts::Vector{Float64}
     ) where {D,G<:AbstractArray{Float64}}
         n_path = length(kpath)
-        n_temperatures = length(temperatures)
+        n_temperatures = length(Ts)
         size(bare_bands, 1) == n_path || throw(DimensionMismatch("Bare-band matrix row count must match the number of k-path samples."))
         size(renormalized_bands, 1) == n_path || throw(DimensionMismatch("Renormalized-band tensor first dimension must match the number of k-path samples."))
         size(renormalized_bands, 3) == n_temperatures || throw(DimensionMismatch("Renormalized-band tensor third dimension must match the temperature axis length."))
         _validate_gap_storage(gaps, n_temperatures)
-        return new{D,G}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
+        return new{D,G}(kpath, bare_bands, renormalized_bands, gaps, Ts)
     end
 end
 RenormalizedBandData(
@@ -135,8 +135,8 @@ RenormalizedBandData(
     bare_bands::Matrix{Float64},
     renormalized_bands::Array{Float64,3},
     gaps::G,
-    temperatures::Vector{Float64}
-) where {D,G<:AbstractArray{Float64}} = RenormalizedBandData{D,G}(kpath, bare_bands, renormalized_bands, gaps, temperatures)
+    Ts::Vector{Float64}
+) where {D,G<:AbstractArray{Float64}} = RenormalizedBandData{D,G}(kpath, bare_bands, renormalized_bands, gaps, Ts)
 
 Base.@kwdef struct SpectralMapData{D}
     qpath::KPath{D}
@@ -144,7 +144,7 @@ Base.@kwdef struct SpectralMapData{D}
     spectral_matrix::Matrix{Float64}
     gap::Float64
     pair_breaking_edge::Union{Nothing,Float64}
-    temperature::Float64
+    T::Float64
 
     function SpectralMapData{D}(
         qpath::KPath{D},
@@ -152,10 +152,10 @@ Base.@kwdef struct SpectralMapData{D}
         spectral_matrix::Matrix{Float64},
         gap::Float64,
         pair_breaking_edge::Union{Nothing,Float64},
-        temperature::Float64
+        T::Float64
     ) where {D}
         size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
-        return new{D}(qpath, omegas, spectral_matrix, gap, pair_breaking_edge, temperature)
+        return new{D}(qpath, omegas, spectral_matrix, gap, pair_breaking_edge, T)
     end
 end
 SpectralMapData(
@@ -164,27 +164,27 @@ SpectralMapData(
     spectral_matrix::Matrix{Float64},
     gap::Float64,
     pair_breaking_edge::Union{Nothing,Float64},
-    temperature::Float64
-) where {D} = SpectralMapData{D}(qpath, omegas, spectral_matrix, gap, pair_breaking_edge, temperature)
+    T::Float64
+) where {D} = SpectralMapData{D}(qpath, omegas, spectral_matrix, gap, pair_breaking_edge, T)
 
 Base.@kwdef struct ZeemanPairingData
-    q_vals::Vector{Float64}
+    qs::Vector{Float64}
     condensation_energy::Vector{Float64}
     optimal_gaps::Vector{Float64}
     optimal_q::Float64
     minimum_index::Int
 
     function ZeemanPairingData(
-        q_vals::AbstractVector{<:Real},
+        qs::AbstractVector{<:Real},
         condensation_energy::AbstractVector{<:Real},
         optimal_gaps::AbstractVector{<:Real},
         optimal_q::Real,
         minimum_index::Integer
     )
-        length(q_vals) == length(condensation_energy) == length(optimal_gaps) || throw(DimensionMismatch("All FFLO data vectors must have the same length."))
-        1 <= minimum_index <= length(q_vals) || throw(BoundsError(q_vals, minimum_index))
+        length(qs) == length(condensation_energy) == length(optimal_gaps) || throw(DimensionMismatch("All FFLO data vectors must have the same length."))
+        1 <= minimum_index <= length(qs) || throw(BoundsError(qs, minimum_index))
         return new(
-            collect(Float64.(q_vals)),
+            collect(Float64.(qs)),
             collect(Float64.(condensation_energy)),
             collect(Float64.(optimal_gaps)),
             Float64(optimal_q),

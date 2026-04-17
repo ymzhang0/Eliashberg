@@ -3,12 +3,12 @@ _allocate_gap_storage(::AuxiliaryField, n_temperatures::Int) = zeros(Float64, n_
 _allocate_gap_storage(field::CompositeField, n_temperatures::Int) = zeros(Float64, length(field), n_temperatures)
 
 """
-    compute_renormalized_band_data(Ts, field, model, interaction, kgrid, kpath; approx=ExactTrLn(), phi_guess=0.5)
+    band_renormalization(Ts, field, model, interaction, kgrid, kpath; approx=ExactTrLn(), phi_guess=0.5)
 
 Compute the mean-field gap and the corresponding renormalized bands for each
 temperature sample along a path in parameter space.
 """
-function compute_renormalized_band_data(
+function band_renormalization(
     model::ElectronicDispersion,
     interaction::Interaction,
     field::AuxiliaryField,
@@ -58,12 +58,12 @@ function compute_renormalized_band_data(
             bare_bands=Float64.(bare_bands),
             renormalized_bands=Float64.(renormalized_bands),
             gaps=gaps,
-            temperatures=Float64.(Ts)
+            Ts=Float64.(Ts)
         )
     end
 end
 
-function compute_renormalized_band_data(
+function band_renormalization(
     Ts::AbstractVector{<:Real},
     field::AuxiliaryField,
     model::ElectronicDispersion,
@@ -72,7 +72,7 @@ function compute_renormalized_band_data(
     kpath::KPath;
     kwargs...
 )
-    return compute_renormalized_band_data(
+    return band_renormalization(
         model,
         interaction,
         field,
@@ -83,7 +83,7 @@ function compute_renormalized_band_data(
     )
 end
 
-function compute_renormalized_band_data(
+function band_renormalization(
     Ts::AbstractVector{<:Real},
     field::CompositeField,
     model::ElectronicDispersion,
@@ -92,7 +92,7 @@ function compute_renormalized_band_data(
     kpath::KPath;
     kwargs...
 )
-    return compute_renormalized_band_data(
+    return band_renormalization(
         model,
         interaction,
         field,

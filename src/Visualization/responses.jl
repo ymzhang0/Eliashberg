@@ -95,7 +95,7 @@ _plot_spectral_function(data::SpectralMapData; kwargs...) =
     _plot_spectral_function(data.qpath, data.omegas, data.spectral_matrix; kwargs...)
 
 function _plot_zeeman_pairing_landscape(
-    q_vals::AbstractVector{<:Real},
+    qs::AbstractVector{<:Real},
     condensation_energy::AbstractVector{<:Real},
     optimal_gaps::AbstractVector{<:Real};
     minimum_index::Union{Nothing,Integer}=nothing,
@@ -113,9 +113,9 @@ function _plot_zeeman_pairing_landscape(
         axis_left...
     )
 
-    lines!(ax1, q_vals, condensation_energy, color=:royalblue, linewidth=3)
+    lines!(ax1, qs, condensation_energy, color=:royalblue, linewidth=3)
     hlines!(ax1, [0.0], color=:gray, linestyle=:dash)
-    scatter!(ax1, [q_vals[highlighted_index]], [condensation_energy[highlighted_index]], color=:crimson, markersize=12, label="Global Minimum")
+    scatter!(ax1, [qs[highlighted_index]], [condensation_energy[highlighted_index]], color=:crimson, markersize=12, label="Global Minimum")
     axislegend(ax1, position=:lt)
 
     ax2 = Axis(fig[1, 2],
@@ -125,14 +125,14 @@ function _plot_zeeman_pairing_landscape(
         axis_right...
     )
 
-    lines!(ax2, q_vals, optimal_gaps, color=:crimson, linewidth=3)
-    scatter!(ax2, [q_vals[highlighted_index]], [optimal_gaps[highlighted_index]], color=:royalblue, markersize=12)
+    lines!(ax2, qs, optimal_gaps, color=:crimson, linewidth=3)
+    scatter!(ax2, [qs[highlighted_index]], [optimal_gaps[highlighted_index]], color=:royalblue, markersize=12)
     return fig
 end
 
 _plot_zeeman_pairing_landscape(data::ZeemanPairingData; kwargs...) =
     _plot_zeeman_pairing_landscape(
-        data.q_vals,
+        data.qs,
         data.condensation_energy,
         data.optimal_gaps;
         minimum_index=data.minimum_index,
@@ -148,27 +148,36 @@ function _plot_collective_modes(
     colormap=:magma
 )
     size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
+    
     distances = path_distances(qpath)
     node_indices, node_labels = path_node_metadata(qpath)
-    tick_positions = distances[node_indices]
+    branch_ranges = path_branch_ranges(qpath)
 
-    fig = Figure(size=(800, 500), fontsize=16)
-    ax = Axis(fig[1, 1],
-        title=L"Superconducting Excitation Spectrum $\mathrm{Im}\chi(q, \omega)$",
-        xlabel="Momentum Transfer q",
+    fig = Figure(size=(850, 550), fontsize=16)
+    branch_grid = fig[1, 1] = GridLayout()
+    
+    branch_axes = _band_path_axes!(
+        branch_grid,
+        distances,
+        node_indices,
+        node_labels,
+        branch_ranges;
         ylabel=L"Frequency $\omega$",
-        xticks=(tick_positions, node_labels),
-        axis...
+        title=L"Superconducting Excitation Spectrum $\mathrm{Im}\chi(q, \omega)$",
+        axis=axis
     )
 
-    hm = heatmap!(ax, distances, omegas, spectral_matrix, colormap=colormap)
-    Colorbar(fig[1, 2], hm, label=L"Spectral Weight $\mathrm{Im}\chi$")
-
-    if !isnothing(pair_breaking_edge)
-        hlines!(ax, [pair_breaking_edge], color=:cyan, linestyle=:dash, linewidth=2, label=L"Pair-breaking edge $2\Delta_0$")
-        axislegend(ax, position=:lt)
+    local hm # Capture one heatmap for the Colorbar reference
+    for (branch_idx, range) in enumerate(branch_ranges)
+        ax = branch_axes[branch_idx]
+        hm = heatmap!(ax, distances[range], omegas, spectral_matrix[range, :], colormap=colormap)
+        
+        if !isnothing(pair_breaking_edge)
+            hlines!(ax, [pair_breaking_edge], color=:white, linestyle=:dot, linewidth=2.5)
+        end
     end
 
+    Colorbar(fig[1, 2], hm, label=L"Spectral Weight $\mathrm{Im}\chi$")
     return fig
 end
 

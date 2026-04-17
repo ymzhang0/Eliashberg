@@ -112,7 +112,7 @@ end
 
 function _write_phase_diagram(group, data::PhaseDiagramData)
     group["phis"] = data.phis
-    group["temperatures"] = data.Ts
+    group["Ts"] = data.Ts
     group["free_energy"] = data.free_energy
     group["condensation_energy"] = data.condensation_energy
     group["order_parameters"] = data.order_parameters
@@ -123,7 +123,7 @@ function _write_renormalized_bands(group, data::RenormalizedBandData)
     group["bare_bands"] = data.bare_bands
     group["renormalized_bands"] = data.renormalized_bands
     group["gaps"] = collect(data.gaps)
-    group["temperatures"] = data.temperatures
+    group["Ts"] = data.Ts
 end
 
 function _write_spectral_map(group, data::SpectralMapData)
@@ -131,14 +131,14 @@ function _write_spectral_map(group, data::SpectralMapData)
     group["omegas"] = data.omegas
     group["spectral_matrix"] = data.spectral_matrix
     attributes(group)["gap"] = data.gap
-    attributes(group)["temperature"] = data.temperature
+    attributes(group)["T"] = data.T
     if !isnothing(data.pair_breaking_edge)
         attributes(group)["pair_breaking_edge"] = data.pair_breaking_edge
     end
 end
 
 function _write_zeeman_pairing(group, data::ZeemanPairingData)
-    group["q_vals"] = data.q_vals
+    group["qs"] = data.qs
     group["condensation_energy"] = data.condensation_energy
     group["optimal_gaps"] = data.optimal_gaps
     attributes(group)["optimal_q"] = data.optimal_q
@@ -270,7 +270,7 @@ end
 
 _read_phase_diagram(group) = PhaseDiagramData(
     read(group["phis"]),
-    read(group["temperatures"]),
+    read(group["Ts"]),
     read(group["free_energy"]),
     read(group["condensation_energy"]),
     read(group["order_parameters"])
@@ -281,7 +281,7 @@ _read_renormalized_bands(group) = RenormalizedBandData(
     read(group["bare_bands"]),
     read(group["renormalized_bands"]),
     read(group["gaps"]),
-    read(group["temperatures"])
+    read(group["Ts"])
 )
 
 function _read_spectral_map(group)
@@ -292,12 +292,12 @@ function _read_spectral_map(group)
         read(group["spectral_matrix"]),
         Float64(_read_hdf5_attr(group, "gap", 0.0)),
         pair_breaking_edge === nothing ? nothing : Float64(pair_breaking_edge),
-        Float64(_read_hdf5_attr(group, "temperature", 0.0))
+        Float64(_read_hdf5_attr(group, "T", 0.0))
     )
 end
 
 _read_zeeman_pairing(group) = ZeemanPairingData(
-    read(group["q_vals"]),
+    read(group["qs"]),
     read(group["condensation_energy"]),
     read(group["optimal_gaps"]),
     Float64(_read_hdf5_attr(group, "optimal_q", 0.0)),

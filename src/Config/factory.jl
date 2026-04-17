@@ -23,24 +23,93 @@ _svec(D::Int, v::AbstractVector) = SVector{D,eltype(v)}(v)
 _svec(D::Int, v::Tuple) = SVector{D,eltype(v)}(v)
 
 function _build_configured_kpath(
-    points::AbstractVector{<:AbstractVector},
-    labels::AbstractVector{<:AbstractString},
+    geometry::AbstractSystem,
+    points::Union{AbstractVector{<:AbstractVector},Nothing},
+    labels::Union{AbstractVector{<:AbstractString},Nothing},
     npoints_each_line::Integer,
 )
+    # Case 1: Neither provided -> Automatic from geometry
+    if isnothing(points) && isnothing(labels)
+        return generate_kpath(geometry; n_pts_per_segment=Int(npoints_each_line))
+    end
+
+    # Case 2: Only labels provided -> Look up from symmetry_path
+    if isnothing(points)
+        D = AtomsBase.n_dimensions(geometry)
+        spath = symmetry_path(geometry)
+        isnothing(spath) && throw(ArgumentError("No symmetry path metadata defined for this geometry. Please provide `qpath_points` explicitly."))
+
+        # Check if all labels exist
+        for l in labels
+            haskey(spath.points, String(l)) || throw(ArgumentError("Symmetry point '$l' not found for this lattice. Available: $(keys(spath.points))"))
+        end
+
+        B = reciprocal_lattice(geometry)
+        nodes = [B * spath.points[String(l)] for l in labels]
+        return generate_kpath(nodes, collect(String.(labels)); n_pts_per_segment=Int(npoints_each_line))
+    end
+
+    # Case 3: Points (and optional labels) provided
     D = length(points[1])
     nodes = [_svec(D, pt) for pt in points]
-    return generate_kpath(nodes, collect(String.(labels)); n_pts_per_segment=Int(npoints_each_line))
+    final_labels = isnothing(labels) ? ["pt$i" for i in 1:length(nodes)] : collect(String.(labels))
+    return generate_kpath(nodes, final_labels; n_pts_per_segment=Int(npoints_each_line))
 end
 
 # ---------------------------------------------------------
 # Geometry Factory
 # ---------------------------------------------------------
-build_geometry(opt::ChainLatticeOption) = ChainLattice(opt.a)
-build_geometry(opt::SquareLatticeOption) = SquareLattice(opt.a)
-build_geometry(opt::HexagonalLatticeOption) = HexagonalLattice2D(opt.a)
-build_geometry(opt::CubicLatticeOption) = SimpleCubic(opt.a)
-build_geometry(opt::FCCLatticeOption) = FaceCenteredCubic(opt.a)
-build_geometry(opt::BCCLatticeOption) = BodyCenteredCubic(opt.a)
+# --- Internal Lattice Builders ---
+
+build_lattice(opt::ChainLatticeOption) = ChainLattice(opt.a)
+build_lattice(opt::SquareLatticeOption) = SquareLattice(opt.a)
+build_lattice(opt::HexagonalLatticeOption) = HexagonalLattice2D(opt.a)
+build_lattice(opt::CubicLatticeOption) = SimpleCubic(opt.a)
+build_lattice(opt::FCCLatticeOption) = FaceCenteredCubic(opt.a)
+build_lattice(opt::BCCLatticeOption) = BodyCenteredCubic(opt.a)
+
+# --- Top-level Geometry Builders (Always returning AbstractSystem) ---
+
+function build_geometry(opt::PredefinedStructureOption)
+    name = opt.name
+    if name == "atomic_chain"
+        return atomic_chain(opt.a, opt.element)
+    elseif name == "square_lattice"
+        return square_lattice(opt.a, opt.element)
+    elseif name == "diamond"
+        return diamond(opt.element, opt.a)
+    elseif name == "silicon"
+        return silicon(opt.a)
+    elseif name == "germanium"
+        return germanium(opt.a)
+    elseif name == "zincblende"
+        return zincblende(opt.element, opt.element2, opt.a)
+    elseif name == "sic"
+        return sic(opt.a)
+    elseif name == "nacl"
+        return nacl(opt.a)
+    elseif name == "graphene"
+        return graphene(opt.a)
+    elseif name == "graphite"
+        return graphite(opt.a, opt.c)
+    elseif name == "kagome"
+        return kagome(opt.a)
+    elseif name == "ssh_lattice"
+        return ssh_lattice(opt.a)
+    else
+        throw(ArgumentError("Unknown predefined structure name: $name"))
+    end
+end
+
+function build_geometry(opt::CustomStructureOption)
+    lattice = build_lattice(opt.lattice)
+    # Process atoms: TOML provides Vector of Dicts [ {element="C", position=[x,y]}, ... ]
+    processed_atoms = [
+        Symbol(a["element"]) => _svec(_dim(lattice), a["position"])
+        for a in opt.atoms
+    ]
+    return periodic_system(processed_atoms, lattice; fractional=true)
+end
 
 # build_geometry(opt::QELatticeOption) removed.
 
@@ -142,30 +211,25 @@ function validate_task_config(task::AbstractTaskOption)
     # Default fallback: do nothing, meaning valid
 end
 
-function validate_task_config(task::ScanSpectralFunctionOption)
-    isnothing(task.qpath_points) && throw(ArgumentError("Task 'scan_spectral_function' requires `qpath_points` in TOML."))
-    isnothing(task.qpath_labels) && throw(ArgumentError("Task 'scan_spectral_function' requires `qpath_labels` in TOML."))
-    isnothing(task.omega_range) && throw(ArgumentError("Task 'scan_spectral_function' requires `omega_range` in TOML."))
+function validate_task_config(task::SpectralFunctionOption)
+    isnothing(task.omega_range) && throw(ArgumentError("Task 'spectral_function' requires `omega_range` in TOML."))
 end
 
-function validate_task_config(task::ComputePhaseTransitionDataOption)
-    isnothing(task.phi_range) && throw(ArgumentError("Task 'compute_phase_transition_data' requires `phi_range` in TOML."))
-    isnothing(task.T_range) && throw(ArgumentError("Task 'compute_phase_transition_data' requires `T_range` in TOML."))
+function validate_task_config(task::PhaseTransitionOption)
+    isnothing(task.phi_range) && throw(ArgumentError("Task 'phase_transition' requires `phi_range` in TOML."))
+    isnothing(task.T_range) && throw(ArgumentError("Task 'phase_transition' requires `T_range` in TOML."))
 end
 
-function validate_task_config(task::ComputeRenormalizedBandDataOption)
-    isnothing(task.qpath_points) && throw(ArgumentError("Task 'compute_renormalized_band_data' requires `qpath_points` in TOML."))
-    isnothing(task.qpath_labels) && throw(ArgumentError("Task 'compute_renormalized_band_data' requires `qpath_labels` in TOML."))
-    isnothing(task.T_range) && throw(ArgumentError("Task 'compute_renormalized_band_data' requires `T_range` in TOML."))
+function validate_task_config(task::BandRenormalizationOption)
+    isnothing(task.T_range) && throw(ArgumentError("Task 'band_renormalization' requires `T_range` in TOML."))
 end
 
-function validate_task_config(task::ComputeZeemanPairingDataOption)
-    isnothing(task.q_range) && throw(ArgumentError("Task 'compute_zeeman_pairing_data' requires `q_range` in TOML."))
+function validate_task_config(task::ZeemanPairingOption)
+    isnothing(task.qs_range) && throw(ArgumentError("Task 'Zeeman_pairing' requires `qs_range` in TOML."))
 end
 
-function validate_task_config(task::ComputeCollectiveModeSpectralDataOption)
-    isnothing(task.qpath_points) && throw(ArgumentError("Task 'compute_collective_mode_spectral_data' requires `qpath_points` in TOML."))
-    isnothing(task.qpath_labels) && throw(ArgumentError("Task 'compute_collective_mode_spectral_data' requires `qpath_labels` in TOML."))
+function validate_task_config(task::CollectiveModeSpectralOption)
+    # Automatic path generation supported
 end
 
 # ---------------------------------------------------------
@@ -179,57 +243,53 @@ _parse_approx(name::String) = name == "ExactTrLn" ? ExactTrLn() : name == "RPA" 
 Transforms configuration structs into ready-to-use keyword arguments / unpacked arrays 
 expected by the solver engines.
 """
-function build_task(task::AbstractTaskOption)
+function build_task(task::AbstractTaskOption, geometry=nothing)
     # Default fallback: just extract clean kwargs
     return extract_kwargs(task, exclude=(:type,))
 end
 
-function build_task(task::SolveGroundStateOption)
+function build_task(task::SolveGroundStateOption, geometry=nothing)
     approx = _parse_approx(task.approx)
-    return (; phi_guess=task.phi_guess, T=task.T_val, approx, warm_start=task.warm_start)
+    return (; phi_guess=task.phi_guess, T=task.temperature, approx, warm_start=task.warm_start)
 end
 
-function build_task(task::ComputePhaseTransitionDataOption)
+function build_task(task::PhaseTransitionOption, geometry=nothing)
     phis = collect(range(task.phi_range[1], task.phi_range[2], length=task.phi_points))
-    Ts = collect(range(task.T_range[1], task.T_range[2], length=task.T_points))
+    Ts = collect(range(task.temperature_range[1], task.temperature_range[2], length=task.temperature_points))
     approx = _parse_approx(task.approx)
     return (; phis, Ts, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
 end
 
-function build_task(task::ComputeRenormalizedBandDataOption)
-    Ts = collect(range(task.T_range[1], task.T_range[2], length=task.T_points))
+function build_task(task::BandRenormalizationOption, geometry)
+    Ts = collect(range(task.temperature_range[1], task.temperature_range[2], length=task.temperature_points))
     approx = _parse_approx(task.approx)
-    if !isnothing(task.qpath_points)
-        kpath = _build_configured_kpath(task.qpath_points, task.qpath_labels, task.npoints_each_line)
-        return (; Ts, kpath, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
-    end
-    return (; Ts, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
+
+    # Path is optional in options, but if we have labels or points or nothing (automatic), we build it.
+    kpath = _build_configured_kpath(geometry, task.qpath_points, task.qpath_labels, task.npoints_each_line)
+    return (; Ts, kpath, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
 end
 
-function build_task(task::ScanSpectralFunctionOption)
+function build_task(task::SpectralFunctionOption, geometry)
     omegas = collect(range(task.omega_range[1], task.omega_range[2], length=task.omega_points))
-    if !isnothing(task.qpath_points)
-        qpath = _build_configured_kpath(task.qpath_points, task.qpath_labels, task.npoints_each_line)
-        return (; qpath, omegas, T_val=task.T_val, eta=task.eta)
-    end
-    return (; omegas, T_val=task.T_val, eta=task.eta)
+    qpath = _build_configured_kpath(geometry, task.qpath_points, task.qpath_labels, task.npoints_each_line)
+    return (; qpath, omegas, T=task.temperature, η=task.eta)
 end
 
-function build_task(task::ComputeZeemanPairingDataOption)
-    q_vals = collect(range(task.q_range[1], task.q_range[2], length=task.q_points))
+function build_task(task::ZeemanPairingOption, geometry=nothing)
+    qs = collect(range(task.qs_range[1], task.qs_range[2], length=task.qs_points))
     approx = _parse_approx(task.approx)
-    return (; q_vals, h_val=task.h_val, T_val=task.T_val, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
+    return (; qs, h=task.h, T=task.temperature, phi_guess=task.phi_guess, approx, warm_start=task.warm_start)
 end
 
-function build_task(task::ComputeCollectiveModeSpectralDataOption)
+function build_task(task::CollectiveModeSpectralOption, geometry)
     approx = _parse_approx(task.approx)
-    qpath = _build_configured_kpath(task.qpath_points, task.qpath_labels, task.npoints_each_line)
+    qpath = _build_configured_kpath(geometry, task.qpath_points, task.qpath_labels, task.npoints_each_line)
     return (;
         qpath,
-        T_val=task.T_val,
+        T=task.temperature,
         omega_max_factor=task.omega_max_factor,
         n_omegas=task.n_omegas,
-        eta=task.eta,
+        η=task.eta,
         phi_guess=task.phi_guess,
         approx,
     )
@@ -254,7 +314,7 @@ function build_from_config(config::EliashbergConfig)
 
     # 2. Model
     raw_model = build_model(config.model, geometry)
-    model = (config.model isa TightBindingOption && config.model.use_spinor) ? SpinorDispersion(raw_model) : raw_model
+    model = (config.model isa TightBindingOption && config.model.spinor) ? SpinorDispersion(raw_model) : raw_model
 
     # 3. Interaction
     interaction = build_interaction(config.interaction, model)
@@ -268,7 +328,7 @@ function build_from_config(config::EliashbergConfig)
 
     # 5. Extract Clean Kwargs
     system_kwargs = extract_kwargs(config.system)
-    task_kwargs = build_task(config.task)
+    task_kwargs = build_task(config.task, geometry)
     plot_kwargs = extract_kwargs(config.plot, exclude=(:enable, :save_path))
 
     return (; system=system_kwargs, geometry, kpoints, model, interaction, field, task=task_kwargs, plot=(enable=config.plot.enable, path=config.plot.save_path, kwargs=plot_kwargs))

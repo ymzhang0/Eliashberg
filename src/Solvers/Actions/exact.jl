@@ -241,7 +241,7 @@ end
 
 
 """
-    compute_phase_transition_data(phis, Ts, field, model, interaction, kgrid; approx=ExactTrLn(), phi_guess=0.2)
+    phase_transition(phis, Ts, field, model, interaction, kgrid; approx=ExactTrLn(), phi_guess=0.2)
 
 Map temperature samples to free-energy curves and reduce each point through the
 effective-action solver. Returns pure arrays suitable for plotting.

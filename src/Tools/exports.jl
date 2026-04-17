@@ -4,11 +4,11 @@ using Eliashberg.Config: Configurations
 
 task_type_name(::Eliashberg.Config.SolveGroundStateOption) = "solve_ground_state"
 task_type_name(::Eliashberg.Config.ScanInstabilityLandscapeOption) = "scan_instability_landscape"
-task_type_name(::Eliashberg.Config.ScanSpectralFunctionOption) = "scan_spectral_function"
-task_type_name(::Eliashberg.Config.ComputePhaseTransitionDataOption) = "compute_phase_transition_data"
-task_type_name(::Eliashberg.Config.ComputeRenormalizedBandDataOption) = "compute_renormalized_band_data"
-task_type_name(::Eliashberg.Config.ComputeZeemanPairingDataOption) = "compute_zeeman_pairing_data"
-task_type_name(::Eliashberg.Config.ComputeCollectiveModeSpectralDataOption) = "compute_collective_mode_spectral_data"
+task_type_name(::Eliashberg.Config.SpectralFunctionOption) = "spectral_function"
+task_type_name(::Eliashberg.Config.PhaseTransitionOption) = "phase_transition"
+task_type_name(::Eliashberg.Config.BandRenormalizationOption) = "band_renormalization"
+task_type_name(::Eliashberg.Config.ZeemanPairingOption) = "Zeeman_pairing"
+task_type_name(::Eliashberg.Config.CollectiveModeSpectralOption) = "collective_mode_spectral"
 task_type_name(task) = string(typeof(task))
 
 function _points_matrix(points)
@@ -48,7 +48,7 @@ end
 
 function _write_phase_diagram(group, result::PhaseDiagramData)
     group["phis"] = result.phis
-    group["temperatures"] = result.Ts
+    group["Ts"] = result.Ts
     group["free_energy"] = result.free_energy
     group["condensation_energy"] = result.condensation_energy
     group["order_parameters"] = result.order_parameters
@@ -59,7 +59,7 @@ function _write_renormalized_bands(group, result::RenormalizedBandData)
     _write_kpath(group, "kpath", result.kpath)
     group["bare_bands"] = result.bare_bands
     group["renormalized_bands"] = result.renormalized_bands
-    group["temperatures"] = result.temperatures
+    group["Ts"] = result.Ts
     group["gaps"] = result.gaps
     return group
 end
@@ -69,7 +69,7 @@ function _write_spectral_map(group, result::SpectralMapData)
     group["omegas"] = result.omegas
     group["spectral_matrix"] = result.spectral_matrix
     attrs(group)["gap"] = result.gap
-    attrs(group)["temperature"] = result.temperature
+    attrs(group)["T"] = result.T
     if !isnothing(result.pair_breaking_edge)
         attrs(group)["pair_breaking_edge"] = result.pair_breaking_edge
     end
@@ -77,7 +77,7 @@ function _write_spectral_map(group, result::SpectralMapData)
 end
 
 function _write_zeeman_pairing(group, result::ZeemanPairingData)
-    group["q_vals"] = result.q_vals
+    group["qs"] = result.qs
     group["condensation_energy"] = result.condensation_energy
     group["optimal_gaps"] = result.optimal_gaps
     attrs(group)["optimal_q"] = result.optimal_q
