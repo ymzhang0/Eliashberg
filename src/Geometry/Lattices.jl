@@ -248,16 +248,16 @@ end
 
 function primitive_cell(lattice::FaceCenteredCubic)
     a = lattice.a
-    return @SMatrix [-a/2 0.0 a/2;
-        0.0 a/2 a/2;
-        a/2 a/2 0.0]
+    return @SMatrix [0.0 a/2 a/2;
+                     a/2 0.0 a/2;
+                     a/2 a/2 0.0]
 end
 
 function primitive_cell(lattice::BodyCenteredCubic)
     a = lattice.a
-    return @SMatrix [a/2 -a/2 -a/2;
-        a/2 a/2 -a/2;
-        a/2 a/2 a/2]
+    return @SMatrix [-a/2 a/2 a/2;
+        a/2 -a/2 a/2;
+        a/2 a/2 -a/2]
 end
 
 function primitive_cell(lattice::SimpleTetragonal)
@@ -269,9 +269,11 @@ end
 
 function primitive_cell(lattice::BodyCenteredTetragonal)
     a, c = lattice.a, lattice.c
-    return @SMatrix [a/2 a/2 -a/2;
+    return @SMatrix [
+        a/2 a/2 -a/2;
         -a/2 a/2 -a/2;
-        c/2 c/2 c/2]
+        c/2 c/2 c/2
+    ]
 end
 
 function primitive_cell(lattice::SimpleOrthorhombic)
@@ -283,23 +285,28 @@ end
 
 function primitive_cell(lattice::BaseCenteredOrthorhombic)
     a, b, c = lattice.a, lattice.b, lattice.c
-    return @SMatrix [a/2 a/2 0.0;
-        -b/2 b/2 0.0;
-        0.0 0.0 c]
+    return @SMatrix [
+        a/2 -a/2 0.0;
+        b/2 b/2 0.0;
+        0.0 0.0 c
+    ]
 end
 
 function primitive_cell(lattice::FaceCenteredOrthorhombic)
     a, b, c = lattice.a, lattice.b, lattice.c
-    return @SMatrix [a/2 0.0 c/2;
-        a/2 b/2 0.0;
-        0.0 b/2 c/2]
+    return @SMatrix [
+        a/2 a/2 0.0;
+        0.0 b/2 b/2;
+        c/2 0.0 c/2]
 end
 
 function primitive_cell(lattice::BodyCenteredOrthorhombic)
     a, b, c = lattice.a, lattice.b, lattice.c
-    return @SMatrix [a/2 -a/2 -a/2;
+    return @SMatrix [
+        a/2 -a/2 -a/2;
         b/2 b/2 -b/2;
-        c/2 c/2 c/2]
+        c/2 c/2 c/2
+    ]
 end
 
 function primitive_cell(lattice::RhombohedralLattice)

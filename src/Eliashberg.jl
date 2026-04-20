@@ -8,9 +8,9 @@ using HDF5
 using JLD2
 using AtomsIO
 import AtomsBase: periodicity, PeriodicCell, FastSystem, ChemicalSpecies, mass,
-                   periodic_system, isolated_system, atomic_system, Atom,
-                   n_dimensions, position, atomic_symbol, 
-                   atomic_number, species, cell_vectors
+    periodic_system, isolated_system, atomic_system, Atom,
+    n_dimensions, position, atomic_symbol,
+    atomic_number, species, cell_vectors
 import Brillouin
 using Spglib
 using Unitful
@@ -132,10 +132,10 @@ _plot_reciprocal_space(args...; kwargs...) = _call_visualization(:_plot_reciproc
 
 # Define the set of types handled by the visualization module for lazy-loading
 const VisualizationTypes = Union{
-    BandStructureData, DispersionSurfaceData, FermiSurfaceData,
-    LandscapeLineData, LandscapeSurfaceData, PhaseDiagramData,
-    SpectralMapData, ZeemanPairingData, RenormalizedBandData,
-    Wannier90BandComparison, PeriodicCell, AbstractSystem, AbstractKGrid
+    BandStructureData,DispersionSurfaceData,FermiSurfaceData,
+    LandscapeLineData,LandscapeSurfaceData,PhaseDiagramData,
+    SpectralMapData,ZeemanPairingData,RenormalizedBandData,
+    Wannier90BandComparison,PeriodicCell,AbstractSystem,AbstractKGrid
 }
 
 function Makie.plot(data::VisualizationTypes; kwargs...)
@@ -162,8 +162,10 @@ export periodic_system, isolated_system, atomic_system, Atom
 export periodic_rank, primitive_vectors, bravais_lattice, generate_irreducible_kgrid, reciprocal_lattice, generate_kgrid, generate_kpath
 export path_points, path_branches, path_node_metadata, symmetry_path
 export load_system, save_system
-export atomic_chain, square_lattice, diamond, silicon, germanium, zincblende, sic, nacl, graphene, graphite, kagome, ssh_lattice
+export atomic_chain, square_lattice, cF, cI, cF8, aluminium, copper, iron, niobium, vanadium, diamond, silicon, germanium, zincblende, sic, nacl, graphene, graphite, kagome, ssh_lattice
+export PREDEFINED_STRUCTURE_REGISTRY, register_structure!
 export GrapheneModel, KagomeModel, SSHModel
+
 
 # Models
 export PhysicalModel, Dispersion, ElectronicDispersion, PhononDispersion, Interaction

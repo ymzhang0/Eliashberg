@@ -145,7 +145,8 @@ function _plot_collective_modes(
     spectral_matrix::AbstractMatrix{<:Real};
     pair_breaking_edge::Union{Nothing,Real}=nothing,
     axis=(;),
-    colormap=:magma
+    colormap=:magma,
+    kwargs...
 )
     size(spectral_matrix) == (length(qpath), length(omegas)) || throw(DimensionMismatch("Spectral matrix shape must be (length(qpath), length(omegas))."))
     
@@ -170,7 +171,7 @@ function _plot_collective_modes(
     local hm # Capture one heatmap for the Colorbar reference
     for (branch_idx, range) in enumerate(branch_ranges)
         ax = branch_axes[branch_idx]
-        hm = heatmap!(ax, distances[range], omegas, spectral_matrix[range, :], colormap=colormap)
+        hm = heatmap!(ax, distances[range], omegas, spectral_matrix[range, :]; colormap=colormap, kwargs...)
         
         if !isnothing(pair_breaking_edge)
             hlines!(ax, [pair_breaking_edge], color=:white, linestyle=:dot, linewidth=2.5)

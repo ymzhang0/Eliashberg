@@ -1,33 +1,75 @@
-# src/IO/IO.jl
+# Union of all Eliashberg-specific result types defined in src/Data/types.jl
+const EliashbergResult = Union{
+    BandStructureData,DispersionSurfaceData,FermiSurfaceData,
+    LandscapeLineData,LandscapeSurfaceData,PhaseDiagramData,
+    RenormalizedBandData,SpectralMapData,ZeemanPairingData,
+    CoexistenceLandscapeData,Wannier90BandComparison
+}
+
+"""
+    save(path::AbstractString, system::AbstractSystem; kwargs...)
+
+Save an atomic system to a file (e.g., .cif, .xyz) using AtomsIO.
+"""
+function save(path::AbstractString, system::AbstractSystem; kwargs...)
+    return save_system(path, system; kwargs...)
+end
+
+"""
+    save(path::AbstractString, data::EliashbergResult; kwargs...)
+
+Save Eliashberg result data to a file. Defaults to HDF5 (.h5) but supports JLD2 if specified by extension.
+"""
+function save(path::AbstractString, data::EliashbergResult; kwargs...)
+    ext = lowercase(splitext(path)[2])
+    if ext == ".jld2"
+        return _save_jld2(path, data; kwargs...)
+    else
+        return _save_hdf5(path, data; kwargs...)
+    end
+end
 
 """
     save(path::AbstractString, data; kwargs...)
 
-Save an Eliashberg result object to a file. Supports `.h5`, `.hdf5`, and `.jld2`.
+Catch-all for unsupported types.
 """
 function save(path::AbstractString, data; kwargs...)
-    ext = lowercase(splitext(path)[2])
-    if ext in (".h5", ".hdf5")
-        return _save_hdf5(path, data; kwargs...)
-    elseif ext == ".jld2"
-        return _save_jld2(path, data; kwargs...)
-    end
-    throw(ArgumentError("Unsupported file extension $(repr(ext)). Use .h5, .hdf5, or .jld2."))
+    throw(ArgumentError("Eliashberg `save` can only handle `AbstractSystem` or `EliashbergResult` objects. Received: $(typeof(data))"))
 end
 
 """
     load(path::AbstractString)
 
-Load an Eliashberg result object from a file. Supports `.h5`, `.hdf5`, and `.jld2`.
+Load either an atomic system or an Eliashberg result structure from a file, auto-detecting the backend by extension.
 """
-function load(path::AbstractString)
+function load(path::AbstractString; kwargs...)
     ext = lowercase(splitext(path)[2])
+
+    # 1. Result backends
     if ext in (".h5", ".hdf5")
         return _load_hdf5(path)
     elseif ext in (".jld2", ".jld")
         return _load_jld2(path)
     end
-    throw(ArgumentError("Unsupported file extension $(repr(ext)). Use .h5, .hdf5, or .jld2."))
+
+    # 2. Atomic system backend
+    struct_exts = (".cif", ".xyz", ".extxyz", ".json")
+    if ext in struct_exts
+        return load_system(path; kwargs...)
+    end
+
+    throw(ArgumentError("Unsupported file extension $(repr(ext)) for loading. No associated backend found."))
+end
+
+# --- System IO Wrappers ---
+
+function save_system(path::AbstractString, system::AbstractSystem; kwargs...)
+    return AtomsIO.save_system(path, system; kwargs...)
+end
+
+function load_system(path::AbstractString; kwargs...)
+    return AtomsIO.load_system(path; kwargs...)
 end
 
 # --- JLD2 Backend ---
@@ -79,7 +121,7 @@ _write_hdf5_data(group, data::Wannier90BandComparison) = _write_wannier90_compar
 function _write_kpath(group, name::AbstractString, kpath::KPath{D}) where {D}
     path_group = create_group(group, name)
     attributes(path_group)["dimension"] = D
-    
+
     # Flatten branches into a single matrix for storage
     all_points = vcat(kpath.branches...)
     points_matrix = zeros(length(all_points), D)
@@ -87,14 +129,14 @@ function _write_kpath(group, name::AbstractString, kpath::KPath{D}) where {D}
         points_matrix[i, :] .= p
     end
     path_group["points"] = points_matrix
-    
+
     # Branch metadata
     branch_lengths = length.(kpath.branches)
     branch_stop = cumsum(branch_lengths)
     branch_start = [1; branch_stop[1:end-1] .+ 1]
     path_group["branch_start"] = branch_start
     path_group["branch_stop"] = branch_stop
-    
+
     # Node names and indices
     node_indices = Int[]
     node_labels = String[]
@@ -187,14 +229,14 @@ function _write_wannier90_comparison(group, data::Wannier90BandComparison)
     _write_hdf5_data(create_group(group, "reference"), data.reference)
     _write_hdf5_data(create_group(group, "model"), data.model)
     _write_hdf5_data(create_group(group, "shifted_model"), data.shifted_model)
-    
+
     # K-points as matrix
     kpts = zeros(length(data.kpoints_fractional), 3)
     for (i, p) in enumerate(data.kpoints_fractional)
         kpts[i, :] .= p
     end
     group["kpoints_fractional"] = kpts
-    
+
     group["difference"] = data.difference
     attributes(group)["energy_shift"] = data.energy_shift
     attributes(group)["rms_error"] = data.rms_error
@@ -227,7 +269,7 @@ function _read_hdf5_data(group, res_type::AbstractString)
     elseif occursin("Wannier90BandComparison", res_type)
         return _read_wannier90_comparison(group)
     end
-    
+
     throw(ArgumentError("Unrecognized result type in HDF5 file: $res_type"))
 end
 
@@ -240,30 +282,30 @@ function _read_kpath(group, name::AbstractString)
     path_group = group[name]
     points_matrix = read(path_group["points"])
     D = Int(_read_hdf5_attr(path_group, "dimension", size(points_matrix, 2)))
-    
+
     all_points = [SVector{D,Float64}(points_matrix[idx, :]) for idx in axes(points_matrix, 1)]
-    
+
     branch_start = read(path_group["branch_start"])
     branch_stop = read(path_group["branch_stop"])
-    
+
     node_indices = read(path_group["node_indices"])
     node_labels = String.(read(path_group["node_labels"]))
-    
+
     branches = Vector{Vector{SVector{D,Float64}}}()
     labels = Vector{Dict{Int,Symbol}}()
-    
+
     for (start_idx, stop_idx) in zip(branch_start, branch_stop)
         push!(branches, all_points[start_idx:stop_idx])
-        
+
         local_labels = Dict{Int,Symbol}()
         for (ni, nl) in zip(node_indices, node_labels)
             if start_idx <= ni <= stop_idx
-                local_labels[ni - start_idx + 1] = Symbol(nl)
+                local_labels[ni-start_idx+1] = Symbol(nl)
             end
         end
         push!(labels, local_labels)
     end
-    
+
     cartesian_basis = [SVector{D,Float64}(ntuple(i -> i == axis ? 1.0 : 0.0, D)) for axis in 1:D]
     return KPath{D}(branches, labels, cartesian_basis, Ref(Brillouin.CARTESIAN))
 end
@@ -346,10 +388,10 @@ function _read_wannier90_comparison(group)
     ref = _read_hdf5_data(group["reference"], "BandStructureData")
     model = _read_hdf5_data(group["model"], "BandStructureData")
     shifted = _read_hdf5_data(group["shifted_model"], "BandStructureData")
-    
+
     kpts_matrix = read(group["kpoints_fractional"])
     kpts = [SVector{3,Float64}(kpts_matrix[i, :]) for i in axes(kpts_matrix, 1)]
-    
+
     return Wannier90BandComparison(
         ref, model, shifted, kpts,
         Float64(_read_hdf5_attr(group, "energy_shift", 0.0)),

@@ -1,0 +1,21 @@
+ &control
+    calculation='scf'
+    restart_mode='from_scratch',
+    pseudo_dir = '/scratch/project_465002489/yiming/nc-sr-05_pbe_standard_upf',
+    outdir='./'
+    prefix='Nb'
+ /
+ &system
+    ibrav = 3, A =3.3005, nat= 1, ntyp= 1,
+    ecutwfc =100.0, ecutrho=400.0
+    occupations='smearing', smearing='cold', degauss=0.02
+ /
+ &electrons
+    conv_thr = 1.0e-8
+ /
+ATOMIC_SPECIES
+ Nb 92.90638 Nb.upf
+ATOMIC_POSITIONS
+ Nb 0.0 0.0 0.0
+K_POINTS (automatic)
+16 16 16 0 0 0

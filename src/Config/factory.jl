@@ -72,34 +72,14 @@ build_lattice(opt::BCCLatticeOption) = BodyCenteredCubic(opt.a)
 
 function build_geometry(opt::PredefinedStructureOption)
     name = opt.name
-    if name == "atomic_chain"
-        return atomic_chain(opt.a, opt.element)
-    elseif name == "square_lattice"
-        return square_lattice(opt.a, opt.element)
-    elseif name == "diamond"
-        return diamond(opt.element, opt.a)
-    elseif name == "silicon"
-        return silicon(opt.a)
-    elseif name == "germanium"
-        return germanium(opt.a)
-    elseif name == "zincblende"
-        return zincblende(opt.element, opt.element2, opt.a)
-    elseif name == "sic"
-        return sic(opt.a)
-    elseif name == "nacl"
-        return nacl(opt.a)
-    elseif name == "graphene"
-        return graphene(opt.a)
-    elseif name == "graphite"
-        return graphite(opt.a, opt.c)
-    elseif name == "kagome"
-        return kagome(opt.a)
-    elseif name == "ssh_lattice"
-        return ssh_lattice(opt.a)
+    if haskey(PREDEFINED_STRUCTURE_REGISTRY, name)
+        return PREDEFINED_STRUCTURE_REGISTRY[name](opt)
     else
-        throw(ArgumentError("Unknown predefined structure name: $name"))
+        available = join(sort(collect(keys(PREDEFINED_STRUCTURE_REGISTRY))), ", ")
+        throw(ArgumentError("Unknown predefined structure name: $name. Available: $available"))
     end
 end
+
 
 function build_geometry(opt::CustomStructureOption)
     lattice = build_lattice(opt.lattice)
