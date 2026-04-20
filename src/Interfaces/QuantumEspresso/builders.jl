@@ -50,34 +50,3 @@ function kpath_from_quantum_espresso_bands(
 
     return KPath{D}([path_points], [labels], basis, Ref(Brillouin.CARTESIAN))
 end
-
-"""
-    band_data_from_quantum_espresso_bands(
-        bands_filename::String;
-        cell=nothing,
-        cell_filename=nothing,
-        coordinates=:fractional,
-        node_labels=nothing,
-    )
-
-Parse a Quantum ESPRESSO `bands.x` output file and wrap it as
-`BandStructureData` for direct plotting with `plot_band_structure`.
-"""
-function band_data_from_quantum_espresso_bands(
-    bands_filename::String;
-    cell=nothing,
-    cell_filename::Union{Nothing, AbstractString}=nothing,
-    coordinates::Symbol=:fractional,
-    node_labels::Union{Nothing, AbstractVector{<:AbstractString}}=nothing,
-)
-    parsed = parse_quantum_espresso_bands(bands_filename)
-    resolved_cell = cell_filename === nothing ? cell : parse_quantum_espresso_cell(String(cell_filename))
-    kpath = kpath_from_quantum_espresso_bands(
-        parsed.kpoints;
-        cell=resolved_cell,
-        coordinates=coordinates,
-        node_labels=node_labels,
-    )
-
-    return BandStructureData(kpath, parsed.bands, parsed.num_bands)
-end

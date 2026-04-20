@@ -80,41 +80,75 @@ function _parse_qe_band_block(io::IO, filename::AbstractString, num_bands::Int)
 end
 
 """
-    parse_quantum_espresso_bands(filename::String)
+    parse_quantum_espresso_bands(dir::String, prefix::String, bands_file::String = "$prefix.bands.dat")
 
-Parse a Quantum ESPRESSO `bands.x` output file such as `*.bands.dat` and return
-a `NamedTuple` with the k-point coordinates and band energies. The returned
-`bands` matrix has shape `(num_kpoints, num_bands)`.
+Parse a Quantum ESPRESSO `bands.x` output file and its companion XML file to return
+a `BandStructureData` object. The function automatically identifies high-symmetry 
+points by analyzing the crystal structure provided in the XML.
+
+Arguments:
+- `dir`: The directory containing the output files.
+- `prefix`: The Quantum ESPRESSO prefix (used to find `<prefix>.xml`).
+- `bands_file`: The name of the band data file (default: `<prefix>.bands.dat`).
 """
-function parse_quantum_espresso_bands(filename::String)
-    return with_stage_log(
-        "Parse Quantum ESPRESSO bands";
-        context=(filename=filename,),
-        summarize_result=result -> (num_kpoints=result.num_kpoints, num_bands=result.num_bands),
-    ) do
-        open(filename, "r") do io
-            eof(io) && error("Quantum ESPRESSO bands file $filename is empty.")
+function parse_quantum_espresso_bands(dir::String, prefix::String, bands_file::String = "$prefix.bands.dat")
+    xml_path = joinpath(dir, "$prefix.xml")
+    if !isfile(xml_path)
+        error("Quantum ESPRESSO XML file not found at: $xml_path. High-symmetry path information is required.")
+    end
 
-            num_bands, num_kpoints = _parse_qe_bands_header(readline(io), filename)
+    return with_stage_log(
+        "Parse Quantum ESPRESSO bands with XML metadata";
+        context=(dir=dir, prefix=prefix, bands_file=bands_file),
+    ) do
+        # 1. Parse Structure and Symmetry
+        system = parse_quantum_espresso_xml(xml_path)
+        path_info = symmetry_path(system)
+        
+        # 2. Parse Band Data
+        dat_path = joinpath(dir, bands_file)
+        result = open(dat_path, "r") do io
+            eof(io) && error("Quantum ESPRESSO bands file $dat_path is empty.")
+
+            num_bands, num_kpoints = _parse_qe_bands_header(readline(io), dat_path)
             kpoints = Vector{SVector{3, Float64}}(undef, num_kpoints)
             bands = Matrix{Float64}(undef, num_kpoints, num_bands)
 
             for ik in 1:num_kpoints
-                kpoints[ik] = _parse_qe_kpoint(_read_next_nonempty_line(io, filename), filename)
-                bands[ik, :] = _parse_qe_band_block(io, filename, num_bands)
+                kpoints[ik] = _parse_qe_kpoint(_read_next_nonempty_line(io, dat_path), dat_path)
+                bands[ik, :] = _parse_qe_band_block(io, dat_path, num_bands)
             end
-
-            while !eof(io)
-                isempty(strip(readline(io))) || error("Found unexpected trailing content in $filename after reading $num_kpoints k-points.")
-            end
-
-            return (
-                kpoints = kpoints,
-                bands = bands,
-                num_kpoints = num_kpoints,
-                num_bands = num_bands,
-            )
+            return (kpoints=kpoints, bands=bands, num_bands=num_bands)
         end
+
+        # 3. Match Symmetry Points
+        labels = Dict{Int, Symbol}()
+        if !isnothing(path_info)
+            for (label, coord) in path_info.points
+                for (ik, k) in enumerate(result.kpoints)
+                    if norm(k - coord) < 1e-4
+                        labels[ik] = Symbol(label)
+                    end
+                end
+            end
+        end
+
+        # 4. Construct KPath
+        recip_basis_cart = reciprocal_vectors(primitive_vectors(system))
+        basis = [SVector{3, Float64}(recip_basis_cart[:, i]) for i in 1:3]
+        
+        # Convert parsed k-points (fractional) to Cartesian
+        k_matrix = reduce(hcat, basis)
+        kpoints_cart = [SVector{3, Float64}(k_matrix * k) for k in result.kpoints]
+
+        kpath = KPath{3}(
+            [kpoints_cart],
+            [labels],
+            basis,
+            Ref(Brillouin.CARTESIAN)
+        )
+
+        return BandStructureData(kpath, result.bands, result.num_bands)
     end
 end
 

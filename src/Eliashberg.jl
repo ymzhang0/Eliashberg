@@ -175,7 +175,8 @@ export ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstant
 export ε, ω, V
 export parse_wannier90_hr, parse_wannier90_tb, cell_from_wannier90_tb, periodic_cell_from_wannier90_tb, build_model_from_wannier90
 export parse_wannier90_band_dat, parse_wannier90_kpoints, parse_wannier90_labelinfo
-export kpath_from_wannier90_bands, kpath_from_wannier90_kpoints, band_data_from_wannier90_bands, compare_wannier90_tb_to_bands
+export kpath_from_wannier90_bands, kpath_from_wannier90_kpoints, compare_wannier90_tb_to_bands
+export parse_quantum_espresso_bands, parse_quantum_espresso_xml, parse_quantum_espresso_cell
 export Wannier90BandComparison
 
 # Correlations

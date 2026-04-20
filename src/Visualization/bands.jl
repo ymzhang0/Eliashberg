@@ -102,22 +102,23 @@ _plot_band_structure(data::BandStructureData; kwargs...) =
     _plot_band_structure(data.kpath, data.bands; kwargs...)
 
 """
-    _plot_wannier90_band_structure(bands_filename::String; labelinfo_filename=nothing, kwargs...)
+    _plot_wannier90_band_structure(dir::String, prefix::String, bands_file::String = "$(prefix)_band.dat"; kwargs...)
 
 Parse Wannier90 `*_band.dat` output and render it with the standard band
-structure plotter. Internal function.
+structure plotter using QE XML metadata for labels.
 """
 function _plot_wannier90_band_structure(
-    bands_filename::String;
-    labelinfo_filename::Union{Nothing, AbstractString}=nothing,
+    dir::String,
+    prefix::String,
+    bands_file::String = "$(prefix)_band.dat";
     kwargs...
 )
     return with_stage_log(
         "Plot Wannier90 band structure";
-        context=(bands_filename=bands_filename, labelinfo_filename=labelinfo_filename),
+        context=(dir=dir, prefix=prefix, bands_file=bands_file),
         summarize_result=result -> (figure_type=string(typeof(result)),),
     ) do
-        data = band_data_from_wannier90_bands(bands_filename; labelinfoinfo_filename)
+        data = parse_wannier90_band_dat(dir, prefix, bands_file)
         return _plot_band_structure(data; kwargs...)
     end
 end

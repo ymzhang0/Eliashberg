@@ -255,29 +255,6 @@ function kpath_from_wannier90_bands(
     end
 end
 
-"""
-    band_data_from_wannier90_bands(bands_filename::String; labelinfo_filename=nothing)
-
-Parse Wannier90 `*_band.dat` output and wrap it as `BandStructureData` for
-direct plotting. When `labelinfo_filename` is omitted, a sibling
-`*.labelinfo.dat` file is used automatically when present.
-"""
-function band_data_from_wannier90_bands(
-    bands_filename::String;
-    labelinfo_filename::Union{Nothing, AbstractString}=nothing,
-)
-    return with_stage_log(
-        "Build band data from Wannier90 bands";
-        context=(bands_filename=bands_filename, labelinfo_filename=labelinfo_filename),
-        summarize_result=identity,
-    ) do
-        parsed = parse_wannier90_band_dat(bands_filename)
-        resolved_labelinfo = isnothing(labelinfo_filename) ? _infer_wannier90_labelinfo_filename(bands_filename) : String(labelinfo_filename)
-        labelinfo = resolved_labelinfo === nothing ? nothing : parse_wannier90_labelinfo(resolved_labelinfo)
-        kpath = kpath_from_wannier90_bands(parsed.distances; labelinfo)
-        return BandStructureData(kpath, parsed.bands, parsed.num_bands)
-    end
-end
 
 """
     compare_wannier90_tb_to_bands(
@@ -312,7 +289,11 @@ function compare_wannier90_tb_to_bands(
 
         labelinfo = resolved_labelinfo === nothing ? nothing : parse_wannier90_labelinfo(resolved_labelinfo)
         parsed_kpoints = parse_wannier90_kpoints(resolved_kpoints)
-        reference = band_data_from_wannier90_bands(bands_filename; labelinfo_filename=resolved_labelinfo)
+        
+        # New parser call
+        dir = dirname(bands_filename)
+        prefix_inferred = replace(basename(bands_filename), r"_band\.dat$" => "")
+        reference = parse_wannier90_band_dat(dir, prefix_inferred, basename(bands_filename))
         model_kpath = kpath_from_wannier90_kpoints(
             parsed_kpoints.kpoints;
             cell=model.cell,
