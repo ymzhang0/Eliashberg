@@ -1,9 +1,9 @@
 [system]
 n_workers = 31             # 集群上留 1 个核给主进程，剩下全做 worker
 bootstrap_workers = true   # 允许引擎自动初始化这些 workers
-output_dir = "examples/plasmon/results"
-job_name = "plasmon_2d"
-output_filename = "plasmon_scan"
+output_dir = "examples/silicon/results"
+job_name = "silicon"
+output_filename = "silicon"
 write_hdf5 = true
 write_jld2 = true
 backup_config = true
@@ -12,18 +12,15 @@ log_level = "info"
 quiet = false
 
 [geometry]
-type = "Predefined"
-name = "cF"
-a = 1.5
-element = "C"
+type = "from_qe_xml"
+xml = "./Si.xml"
 
 [kpoints]
-grid = [50, 50, 50]
+grid = [20, 20, 20]
 
 [model]
-type = "TightBinding"
-t = -1.0
-tp = 0.2                   # 次近邻跃迁
+type = "from_wannier90"
+tb_dat = "./silicon_tb.dat"
 EF = -0.5
 spinor = false
 

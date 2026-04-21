@@ -125,6 +125,16 @@ function Spglib.SpglibCell(system::AbstractSystem)
     return SpglibCell(lattice, [SVector{3}(pos_fractional[:, i]) for i in 1:length(symbols)], atom_types)
 end
 
+function Spglib.SpglibCell(cell::PeriodicCell)
+    D = AtomsBase.n_dimensions(cell)
+    D == 3 || throw(ArgumentError("Spglib symmetry analysis is only supported for 3D systems (got $(D)D)."))
+
+    # Lattice matrix (columns are primitive vectors)
+    lattice = primitive_vectors(cell)
+    # Dummy atom at origin
+    return SpglibCell(lattice, [SVector{3}(0.0, 0.0, 0.0)], [1])
+end
+
 # --- Unified Bravais Identification ---
 
 """

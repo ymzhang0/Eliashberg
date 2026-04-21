@@ -71,6 +71,8 @@ reciprocal_lattice(l::AbstractBravaisLattice) = reciprocal_lattice(primitive_cel
 # Backward compatibility alias
 const reciprocal_vectors = reciprocal_lattice
 
+reciprocal_lattice(c::PeriodicCell) = reciprocal_lattice(primitive_vectors(c))
+
 # ---------------------------------------------------------
 # K-Grid Sampling
 # ---------------------------------------------------------
@@ -113,6 +115,9 @@ generate_kgrid(m::AbstractMatrix, mesh::Vararg{Int,N}; kwargs...) where {N} = ge
 generate_kgrid(s::AbstractSystem, mesh::NTuple{N,Int}; irreducible=false, kwargs...) where {N} =
     irreducible ? generate_irreducible_kgrid(s, mesh; kwargs...) : generate_kgrid(primitive_vectors(s), mesh; kwargs...)
 generate_kgrid(s::AbstractSystem, mesh::Vararg{Int,N}; kwargs...) where {N} = generate_kgrid(s, mesh; kwargs...)
+
+generate_kgrid(c::PeriodicCell, mesh::NTuple{N,Int}; kwargs...) where {N} = generate_kgrid(primitive_vectors(c), mesh; kwargs...)
+generate_kgrid(c::PeriodicCell, mesh::Vararg{Int,N}; kwargs...) where {N} = generate_kgrid(c, mesh; kwargs...)
 
 # ---------------------------------------------------------
 # Symmetry-Aware Operations (3D Only)
@@ -261,20 +266,20 @@ end
 function generate_kpath(l::AbstractBravaisLattice{3}; n_pts_per_segment=50)
     primitive = Matrix{Float64}(primitive_cell(l))
     # Temporary SpglibCell for symmetry identification (full grid skip, but path needs sgnum)
-    dataset = dataset = Spglib.get_dataset(Spglib.SpglibCell(primitive, [[0.0, 0.0, 0.0]], [1]))
+    dataset = Spglib.get_dataset(Spglib.SpglibCell(primitive, [[0.0, 0.0, 0.0]], [1]))
     kp = Brillouin.irrfbz_path(dataset.spacegroup_number, [SVector{3}(primitive[:, i]) for i in 1:3])
     return Brillouin.interpolate(Brillouin.cartesianize(kp), n_pts_per_segment)
 end
 
-function generate_kpath(s::AbstractSystem; kwargs...)
+function generate_kpath(s::Union{AbstractSystem,PeriodicCell}; kwargs...)
     D = AtomsBase.n_dimensions(s)
 
     # 3D Path Generation (Spglib + Brillouin)
     if D == 3
         # Extract lattice vectors as a matrix
         vectors = primitive_vectors(s)
-        # Identify spacegroup and generate path
-        dataset = Spglib.get_dataset(Spglib.SpglibCell(Matrix{Float64}(vectors), [[0.0, 0.0, 0.0]], [1]))
+        # Identify spacegroup and generate path (SpglibCell handles both System and PeriodicCell now)
+        dataset = Spglib.get_dataset(Spglib.SpglibCell(s))
         kp = Brillouin.irrfbz_path(dataset.spacegroup_number, [SVector{3}(vectors[:, i]) for i in 1:3])
         n_pts_per_segment = get(kwargs, :n_pts_per_segment, 50)
         return Brillouin.interpolate(Brillouin.cartesianize(kp), n_pts_per_segment)

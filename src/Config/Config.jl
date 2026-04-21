@@ -9,7 +9,7 @@ using ..Eliashberg: periodic_system
 using ..Eliashberg: PhysicalModel, FreeElectron, TightBinding, MultiOrbitalTightBinding, EinsteinModel, DebyeModel, PolaritonModel, MonoatomicLatticeModel, ElectronicDispersion, SpinorDispersion
 using ..Eliashberg: Interaction, ConstantInteraction, LocalInteraction, YukawaInteraction, LimitedConstantInteraction, BareCoulombInteraction, ScreenedCoulombInteraction, CompositeInteraction
 using ..Eliashberg: AuxiliaryField, ChargeDensityWave, SpinDensityWave, BCSReducedPairing, FFLOPairing, PairDensityWave, DirectChannel, ExchangeChannel
-using ..Eliashberg: ExactTrLn, RPA, generate_kpath
+using ..Eliashberg: ExactTrLn, RPA, generate_kpath, parse_quantum_espresso_xml, build_atoms_from_xml
 
 using LinearAlgebra
 using StaticArrays

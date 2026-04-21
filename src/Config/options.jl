@@ -75,7 +75,7 @@ end
 
 abstract type AbstractGeometryOption end
 
-@option "Predefined" struct PredefinedStructureOption <: AbstractGeometryOption
+@option "predefined" struct PredefinedStructureOption <: AbstractGeometryOption
     name::String
     a::Float64 = 1.0
     c::Union{Float64, Nothing} = nothing
@@ -83,9 +83,13 @@ abstract type AbstractGeometryOption end
     element2::Union{String, Symbol, Nothing} = nothing
 end
 
-@option "Custom" struct CustomStructureOption <: AbstractGeometryOption
+@option "custom" struct CustomStructureOption <: AbstractGeometryOption
     lattice::AbstractLatticeOption
     atoms::Vector{Dict{String, Any}}
+end
+
+@option "from_qe_xml" struct QEFromXMLOption <: AbstractGeometryOption
+    xml::String
 end
 
 # QELatticeOption removed.
@@ -135,6 +139,11 @@ end
 @option "SSHModel" struct SSHModelOption <: AbstractModelOption
     t1::Float64
     t2::Float64
+    EF::Float64 = 0.0
+end
+
+@option "from_wannier90" struct Wannier90ModelOption <: AbstractModelOption
+    tb_dat::String
     EF::Float64 = 0.0
 end
 
@@ -310,7 +319,7 @@ end
 # ---------------------------------------------------------
 @option struct EliashbergConfig
     system::SystemOptions = SystemOptions()
-    geometry::AbstractGeometryOption
+    geometry::Union{AbstractGeometryOption, Nothing} = nothing
     kpoints::KpointsOptions = KpointsOptions()
     model::AbstractModelOption
     interaction::AbstractInteractionOption
@@ -350,8 +359,9 @@ function load_config(path::AbstractString)::EliashbergConfig
 end
 
 const GEOMETRY_OPTION_TYPES = Dict{String,DataType}(
-    "Predefined" => PredefinedStructureOption,
-    "Custom" => CustomStructureOption,
+    "predefined" => PredefinedStructureOption,
+    "custom" => CustomStructureOption,
+    "from_qe_xml" => QEFromXMLOption,
 )
 
 const LATTICE_OPTION_TYPES = Dict{String,DataType}(
@@ -367,6 +377,8 @@ const MODEL_OPTION_TYPES = Dict{String,DataType}(
     "FreeElectron" => FreeElectronOption,
     "TightBinding" => TightBindingOption,
     "MultiOrbitalTightBinding" => MultiOrbitalTightBindingOption,
+    "custom" => MultiOrbitalTightBindingOption,
+    "from_wannier90" => Wannier90ModelOption,
     "KagomeModel" => KagomeModelOption,
     "GrapheneModel" => GrapheneModelOption,
     "SSHModel" => SSHModelOption,

@@ -91,6 +91,11 @@ function build_geometry(opt::CustomStructureOption)
     return periodic_system(processed_atoms, lattice; fractional=true)
 end
 
+function build_geometry(opt::QEFromXMLOption)
+    xml_dict = parse_quantum_espresso_xml(opt.xml)
+    return build_atoms_from_xml(xml_dict)
+end
+
 # build_geometry(opt::QELatticeOption) removed.
 
 function build_kpoints(opt::KpointsOptions, geometry)
@@ -142,6 +147,12 @@ end
 build_model(opt::KagomeModelOption, cell) = KagomeModel(opt.t, opt.EF)
 build_model(opt::GrapheneModelOption, cell) = GrapheneModel(opt.t, opt.EF)
 build_model(opt::SSHModelOption, cell) = SSHModel(opt.t1, opt.t2, opt.EF)
+
+# For Wannier90, the geometry can be internal to the model.
+# This method is a fallback if someone calls build_model(wannier_opt, cell)
+function build_model(opt::Wannier90ModelOption, cell=nothing)
+    return build_model_from_wannier90(opt.tb_dat, opt.EF)
+end
 # ---------------------------------------------------------
 # Interaction Factory
 # ---------------------------------------------------------
@@ -287,29 +298,45 @@ from the provided TOML configurations. Returns a NamedTuple with `(system, geome
 function build_from_config(config::EliashbergConfig)
     validate_task_config(config.task)
 
-    # 1. Geometry & Kpoints
-    geometry = build_geometry(config.geometry)
-    kpoints = build_kpoints(config.kpoints, geometry)
-    D = _dim(geometry)
+    # 1. Resolve Model and Geometry/Cell
+    # When importing from Wannier90, we can operate with just a PeriodicCell
+    # if no full geometry is provided.
+    local_lattice = nothing
+    if config.model isa Wannier90ModelOption
+        # Build model first from path
+        raw_model = build_model_from_wannier90(config.model.tb_dat, config.model.EF)
+        # Use the cell from the model if no explicit geometry is requested
+        local_lattice = isnothing(config.geometry) ? raw_model.cell : build_geometry(config.geometry)
+    else
+        # Standard flow requires geometry
+        if isnothing(config.geometry)
+            throw(ArgumentError("`geometry` must be provided in the config for model type '$(typeof(config.model))'. Only 'from_wannier90' supports optional geometry."))
+        end
+        local_lattice = build_geometry(config.geometry)
+        raw_model = build_model(config.model, local_lattice)
+    end
 
-    # 2. Model
-    raw_model = build_model(config.model, geometry)
+    # 2. Kpoints generation using the available lattice provider (System or Cell)
+    kpoints = build_kpoints(config.kpoints, local_lattice)
+    D = _dim(local_lattice)
+
+    # 3. Model Post-processing (Spinor)
     model = (config.model isa TightBindingOption && config.model.spinor) ? SpinorDispersion(raw_model) : raw_model
 
-    # 3. Interaction
+    # 4. Interaction
     interaction = build_interaction(config.interaction, model)
 
-    # 4. Field
+    # 5. Field
     if config.field isa MomentumDependentPairingOption
         field = build_field(config.field, kpoints)
     else
         field = build_field(config.field, D) # Pass dimension to enforce SVector
     end
 
-    # 5. Extract Clean Kwargs
+    # 6. Extract Clean Kwargs
     system_kwargs = extract_kwargs(config.system)
-    task_kwargs = build_task(config.task, geometry)
+    task_kwargs = build_task(config.task, local_lattice)
     plot_kwargs = extract_kwargs(config.plot, exclude=(:enable, :save_path))
 
-    return (; system=system_kwargs, geometry, kpoints, model, interaction, field, task=task_kwargs, plot=(enable=config.plot.enable, path=config.plot.save_path, kwargs=plot_kwargs))
+    return (; system=system_kwargs, geometry=local_lattice, kpoints, model, interaction, field, task=task_kwargs, plot=(enable=config.plot.enable, path=config.plot.save_path, kwargs=plot_kwargs))
 end
