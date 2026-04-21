@@ -25,7 +25,29 @@ Base.show(io::IO, g::KGrid{D}) where {D} = print(io, "KGrid (", D, "D, ", length
 Base.show(io::IO, ::MIME"text/plain", g::KGrid{D}) where {D} = show(io, g)
 
 Base.show(io::IO, kp::Brillouin.KPathInterpolant{D}) where {D} = print(io, "KPath (", D, "D, ", length(path_points(kp)), " points)")
-Base.show(io::IO, ::MIME"text/plain", kp::Brillouin.KPathInterpolant{D}) where {D} = show(io, kp)
+
+function Base.show(io::IO, ::MIME"text/plain", path::Brillouin.KPathInterpolant{D}) where D
+    print(io, "KPath (", D, "D)")
+    for (b_idx, labels) in enumerate(path.labels)
+        sorted_indices = sort(collect(keys(labels)))
+        for idx in sorted_indices
+            label = labels[idx]
+            point = path.kpaths[b_idx][idx]
+            print(io, "\n  ", label, ": ", point)
+        end
+    end
+end
+
+function _format_path_label(path::Brillouin.KPathInterpolant)
+    branch_labels = String[]
+    for labels in path.labels
+        isempty(labels) && continue
+        sorted_indices = sort(collect(keys(labels)))
+        push!(branch_labels, join([string(labels[idx]) for idx in sorted_indices], "-"))
+    end
+    full_path = join(branch_labels, "|")
+    return replace(full_path, r"([^|]+)\|\1" => s"\1")
+end
 
 # ---------------------------------------------------------
 # Reciprocal Lattice (Vectors)
@@ -175,8 +197,10 @@ function symmetry_path(s::AbstractSystem)
     D = AtomsBase.n_dimensions(s)
     if D == 3
         vectors = primitive_vectors(s)
+        # Ensure we pass Int to Brillouin and use StaticArrays for vectors
         dataset = Spglib.get_dataset(Spglib.SpglibCell(Matrix{Float64}(vectors), [[0.0, 0.0, 0.0]], [1]))
-        kp = Brillouin.irrfbz_path(dataset.spacegroup_number, [SVector{3}(vectors[:, i]) for i in 1:3])
+        Rs = SVector{3}(SVector{3}(vectors[:, i]) for i in 1:3)
+        kp = Brillouin.irrfbz_path(Int(dataset.spacegroup_number), Rs)
         points = Dict(String(k) => v for (k, v) in kp.points)
         # Use only the first branch for the "default" path. 
         # Multi-branch paths are handled by Brillouin.interpolate directly.

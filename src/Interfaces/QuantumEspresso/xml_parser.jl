@@ -2,67 +2,66 @@
 
 using StaticArrays
 using AtomsBase
-using Unitful
+using XMLDict
 
 """
-    parse_quantum_espresso_xml(filename::String)
+    parse_quantum_espresso_xml(xml_path::String)
 
-Parse a Quantum ESPRESSO data-file-schema.xml (or prefix.xml) and return an 
-`AtomsBase.AbstractSystem`. This parser extracts the lattice vectors and 
-atomic positions in Bohr and converts them to Angstroms.
+Read a Quantum ESPRESSO XML file and return it as a dictionary via `XMLDict.jl`.
 """
-function parse_quantum_espresso_xml(filename::String)
-    content = read(filename, String)
-
-    # 1. Parse Cell Vectors
-    a1 = _parse_xml_vector(content, "a1")
-    a2 = _parse_xml_vector(content, "a2")
-    a3 = _parse_xml_vector(content, "a3")
-
-    if isnothing(a1) || isnothing(a2) || isnothing(a3)
-        error("Could not find lattice vectors (a1, a2, a3) in QE XML file: $filename")
-    end
-
-    # 2. Parse Atomic Positions
-    atoms_data = _parse_xml_atoms(content)
-    if isempty(atoms_data)
-        error("No atomic positions found in QE XML file: $filename")
-    end
-
-    # 3. Construct periodic cell (Bohr to Angstrom)
-    # 1 Bohr = 0.529177210903 Angstrom
-    bohr_to_ang = A2Bohr # Uses the constant from our package if available, or just the number
-    
-    # Actually, we have A2Bohr which is Bohr/Angstrom. 
-    # To get Angstrom from Bohr, we divide by A2Bohr or multiply by inverse.
-    # Let's use the package constant Ry2eV and other things if we need, 
-    # but for geometry, A2Bohr is Bohr / Å.
-    
-    lattice = [a1 a2 a3] ./ A2Bohr
-
-    # 4. Build AtomsBase system
-    atoms = [Atom(species, pos ./ A2Bohr * u"Å") for (species, pos) in atoms_data]
-    
-    # We use FastSystem or whatever is convenient
-    return periodic_system(atoms, [lattice[:, i] .* u"Å" for i in 1:3])
+function parse_quantum_espresso_xml(xml_path::String)
+    isfile(xml_path) || error("Quantum ESPRESSO XML file not found at: $xml_path")
+    xml_data = read(xml_path, String)
+    return xml_dict(xml_data)
 end
 
-function _parse_xml_vector(content::AbstractString, tag::AbstractString)
-    m = match(Regex("<$tag>(.*?)</$tag>"), content)
-    isnothing(m) && return nothing
-    # Clean up whitespace and parse
-    vals = parse.(Float64, split(strip(m.captures[1])))
-    length(vals) == 3 || error("Expected 3 values for tag <$tag>, found $(length(vals))")
-    return SVector{3, Float64}(vals)
-end
+"""
+    build_atoms_from_xml(xml_dict::AbstractDict)
 
-function _parse_xml_atoms(content::AbstractString)
-    atoms = Tuple{Symbol, SVector{3, Float64}}[]
-    # Matches <atom name="Nb" index="1">0.0 0.0 0.0</atom>
-    for m in eachmatch(r"<atom\s+name=\"(.*?)\"\s+index=\"\d+\">(.*?)</atom>", content)
-        species = Symbol(m.captures[1])
-        pos_vals = parse.(Float64, split(strip(m.captures[2])))
-        push!(atoms, (species, SVector{3, Float64}(pos_vals)))
+Construct an `AtomsBase` system from a parsed Quantum ESPRESSO XML dictionary.
+"""
+function build_atoms_from_xml(xml_dict::AbstractDict)
+    # 1. Identify Root and Structural Node
+    root_key = first(filter(k -> endswith(string(k), "espresso"), keys(xml_dict)))
+    root = xml_dict[root_key]
+    
+    struct_node = if haskey(root, "output") && haskey(root["output"], "atomic_structure")
+        root["output"]["atomic_structure"]
+    elseif haskey(root, "input") && haskey(root["input"], "atomic_structure")
+        root["input"]["atomic_structure"]
+    else
+        error("Could not find <atomic_structure> in Quantum ESPRESSO XML dictionary.")
     end
-    return atoms
+    
+    # helper for vector parsing
+    function _parse_vec(v)
+        v_str = v isa AbstractDict ? get(v, "", get(v, "_content", get(v, "__content__", v))) : v
+        if !(v_str isa AbstractString)
+            error("Expected string content for vector, got $(typeof(v_str)): $v_str")
+        end
+        parts = split(strip(v_str))
+        return SVector{3, Float64}(parse.(Float64, parts))
+    end
+    
+    # 2. Parse Lattice Vectors
+    cell_node = get(struct_node, "cell", get(struct_node, "lattice_vectors", nothing))
+    isnothing(cell_node) && error("Could not find cell or lattice_vectors in XML structure.")
+    
+    a1 = _parse_vec(cell_node["a1"])
+    a2 = _parse_vec(cell_node["a2"])
+    a3 = _parse_vec(cell_node["a3"])
+    
+    bohr_to_ang = ustrip(A2Bohr)
+    lattice_vectors = [a1, a2, a3] .* bohr_to_ang .* u"Å"
+    
+    # 3. Parse Atomic Positions
+    pos_node = struct_node["atomic_positions"]
+    atom_list = pos_node["atom"] isa AbstractVector ? pos_node["atom"] : [pos_node["atom"]]
+    atoms = map(atom_list) do a
+        name = a[:name]
+        coords = _parse_vec(a) .* bohr_to_ang .* u"Å"
+        return Atom(Symbol(name), coords)
+    end
+    
+    return periodic_system(atoms, lattice_vectors)
 end

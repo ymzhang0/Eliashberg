@@ -4,15 +4,30 @@ Base.@kwdef struct BandStructureData{D}
     kpath::KPath{D}
     bands::Matrix{Float64}
     num_bands::Int
+    fermi_level::Float64 = 0.0
 
-    function BandStructureData{D}(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int) where {D}
+    function BandStructureData{D}(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int, fermi_level::Float64=0.0) where {D}
         size(bands, 1) == length(kpath) || throw(DimensionMismatch("Band matrix row count must match the number of k-path samples."))
         size(bands, 2) == num_bands || throw(DimensionMismatch("Band matrix column count must match `num_bands`."))
-        return new{D}(kpath, bands, num_bands)
+        return new{D}(kpath, bands, num_bands, fermi_level)
     end
 end
-Base.show(io::IO, d::BandStructureData) = print(io, "BandStructureData(", d.num_bands, " bands, ", size(d.bands, 1), " k-points)")
-BandStructureData(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int) where {D} = BandStructureData{D}(kpath, bands, num_bands)
+Base.show(io::IO, d::BandStructureData) = print(io, "BandStructureData(", d.num_bands, " bands, ", size(d.bands, 1), " k-points, E_F = ", d.fermi_level, ", path: ", _format_path_label(d.kpath), ")")
+BandStructureData(kpath::KPath{D}, bands::Matrix{Float64}, num_bands::Int, fermi_level::Float64=0.0) where {D} = BandStructureData{D}(kpath, bands, num_bands, fermi_level)
+
+"""
+    set_fermi_level(data::BandStructureData, fermi_level::Real)
+
+Return a new `BandStructureData` instance with the `fermi_level` updated to the provided value.
+"""
+function set_fermi_level(data::BandStructureData{D}, fermi_level::Real) where D
+    return BandStructureData{D}(
+        data.kpath,
+        data.bands,
+        data.num_bands,
+        Float64(fermi_level)
+    )
+end
 
 Base.@kwdef struct DispersionSurfaceData
     kxs::Vector{Float64}

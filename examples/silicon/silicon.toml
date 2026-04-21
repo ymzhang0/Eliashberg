@@ -1,0 +1,47 @@
+[system]
+n_workers = 31             # 集群上留 1 个核给主进程，剩下全做 worker
+bootstrap_workers = true   # 允许引擎自动初始化这些 workers
+output_dir = "examples/plasmon/results"
+job_name = "plasmon_2d"
+output_filename = "plasmon_scan"
+write_hdf5 = true
+write_jld2 = true
+backup_config = true
+log_filename = "runner.log"
+log_level = "info"
+quiet = false
+
+[geometry]
+type = "Predefined"
+name = "cF"
+a = 1.5
+element = "C"
+
+[kpoints]
+grid = [50, 50, 50]
+
+[model]
+type = "TightBinding"
+t = -1.0
+tp = 0.2                   # 次近邻跃迁
+EF = -0.5
+spinor = false
+
+[interaction]
+type = "BareCoulomb"
+cutoff = 0.001
+
+[field]
+type = "DirectChannel"
+
+[task]
+type = "spectral_function"
+npoints_each_line = 1000
+omega_range = [0.0, 5.0]
+omega_points = 1000
+T = 0.01
+eta = 0.02
+
+[plot]
+enable = false
+save_path = "output/rpa_scan_result"

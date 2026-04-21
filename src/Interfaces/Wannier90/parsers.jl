@@ -1,11 +1,11 @@
-const WannierHopping = Tuple{Int, Int, SVector{3, Int}, ComplexF64}
-const WannierPositionElement = Tuple{Int, Int, SVector{3, Int}, SVector{3, ComplexF64}}
+const WannierHopping = Tuple{Int,Int,SVector{3,Int},ComplexF64}
+const WannierPositionElement = Tuple{Int,Int,SVector{3,Int},SVector{3,ComplexF64}}
 
 
 function _parse_svector3_float(line::AbstractString, filename::AbstractString, context::AbstractString)
     fields = split(line)
     length(fields) == 3 || error("Expected 3 floating-point values for $context in $filename.")
-    return SVector{3, Float64}(
+    return SVector{3,Float64}(
         parse(Float64, fields[1]),
         parse(Float64, fields[2]),
         parse(Float64, fields[3]),
@@ -14,7 +14,7 @@ end
 
 function _parse_svector3_int(fields::AbstractVector{<:AbstractString}, filename::AbstractString, context::AbstractString)
     length(fields) == 3 || error("Expected 3 integer values for $context in $filename.")
-    return SVector{3, Int}(
+    return SVector{3,Int}(
         parse(Int, fields[1]),
         parse(Int, fields[2]),
         parse(Int, fields[3]),
@@ -41,7 +41,7 @@ function _read_wannier90_hr_entries(io::IO, filename::AbstractString, num_wann::
     sizehint!(hoppings, length(degeneracies) * num_wann)
 
     for degen in degeneracies
-        for _ in 1:(num_wann * num_wann)
+        for _ in 1:(num_wann*num_wann)
             fields = split(_read_next_nonempty_line(io, filename))
             length(fields) == 7 || error("Expected 7 columns in the Hamiltonian block of $filename.")
 
@@ -130,7 +130,7 @@ function _read_wannier90_tb_positions(io::IO, filename::AbstractString, num_wann
 
                 m = parse(Int, fields[1])
                 n = parse(Int, fields[2])
-                rvec = SVector{3, ComplexF64}(
+                rvec = SVector{3,ComplexF64}(
                     ComplexF64(parse(Float64, fields[3]), parse(Float64, fields[4])) * inv_degen,
                     ComplexF64(parse(Float64, fields[5]), parse(Float64, fields[6])) * inv_degen,
                     ComplexF64(parse(Float64, fields[7]), parse(Float64, fields[8])) * inv_degen,
@@ -152,7 +152,7 @@ function _read_wannier90_tb_positions(io::IO, filename::AbstractString, num_wann
                 R = _parse_svector3_int(current_fields[1:3], filename, "R vector")
                 m = parse(Int, current_fields[4])
                 n = parse(Int, current_fields[5])
-                rvec = SVector{3, ComplexF64}(
+                rvec = SVector{3,ComplexF64}(
                     ComplexF64(parse(Float64, current_fields[6]), parse(Float64, current_fields[7])) * inv_degen,
                     ComplexF64(parse(Float64, current_fields[8]), parse(Float64, current_fields[9])) * inv_degen,
                     ComplexF64(parse(Float64, current_fields[10]), parse(Float64, current_fields[11])) * inv_degen,
@@ -184,12 +184,25 @@ function _normalize_wannier90_label(label::AbstractString)
     return stripped
 end
 
-function _wannier90_dimension_hint(node_coordinates::AbstractVector{<:SVector{3, Float64}}; tol::Float64=1e-10)
+function _wannier90_dimension_hint(node_coordinates::AbstractVector{<:SVector{3,Float64}}; tol::Float64=1e-10)
     isempty(node_coordinates) && return 1
     reference = first(node_coordinates)
     varying_axes = count(axis -> any(abs(coords[axis] - reference[axis]) > tol for coords in node_coordinates), 1:3)
     return max(varying_axes, 1)
 end
+
+function _wannier90_band_stem(seedname::AbstractString)
+    name = basename(String(seedname))
+    if endswith(name, "_band.dat")
+        return replace(name, r"_band\.dat$" => "")
+    elseif endswith(name, ".dat")
+        return replace(name, r"\.dat$" => "")
+    end
+    return name
+end
+
+_wannier90_band_data_filename(seedname::AbstractString) =
+    endswith(String(seedname), ".dat") ? basename(String(seedname)) : "$(_wannier90_band_stem(seedname))_band.dat"
 
 """
     parse_wannier90_hr(filename::String)
@@ -244,7 +257,7 @@ function parse_wannier90_tb(filename::String; periodicity=nothing)
                 _parse_svector3_float(readline(io), filename, "lattice vector a3"),
             )
             atomsbase_periodicity = isnothing(periodicity) ? (true, true, true) :
-                periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
+                                    periodicity isa Bool ? ntuple(_ -> periodicity, 3) : Tuple(periodicity)
             cell = PeriodicCell(
                 ;
                 cell_vectors=ntuple(i -> lattice_vectors[i] .* u"Å", 3),
@@ -259,19 +272,18 @@ function parse_wannier90_tb(filename::String; periodicity=nothing)
             position_matrices = _read_wannier90_tb_positions(io, filename, num_wann, degeneracies)
 
             return (
-                cell = cell,
-                periodicity = atomsbase_periodicity,
-                lattice_vectors = lattice_vectors,
-                num_wann = num_wann,
-                hoppings = hoppings,
-                position_matrices = position_matrices,
+                cell=cell,
+                periodicity=atomsbase_periodicity,
+                num_wann=num_wann,
+                hoppings=hoppings,
+                position_matrices=position_matrices,
             )
         end
     end
 end
 
 """
-    parse_wannier90_band_dat(dir::String, prefix::String, bands_file::String = "$(prefix)_band.dat")
+    parse_wannier90_band_dat(dir::String, prefix::String, bands_file::String = "\$(prefix)_band.dat")
 
 Parse a Wannier90 interpolated `*_band.dat` file and its companion metadata to return 
 a `BandStructureData` object. It requires a companion Quantum ESPRESSO XML file 
@@ -280,9 +292,18 @@ a `BandStructureData` object. It requires a companion Quantum ESPRESSO XML file
 Arguments:
 - `dir`: The directory containing the output files.
 - `prefix`: The prefix used for the calculation (used to find `<prefix>.xml`).
-- `bands_file`: The name of the Wannier90 band data file (default: `<prefix>_band.dat`).
+- `seedname`: The seedname used for the calculation (used to find `<seedname>_band.dat`).
+- `branch_gap_factor`: Split consecutive k-path branches when the adjacent k-point
+  spacing in `<seedname>_band.kpt` exceeds this multiple of the median spacing.
+- `branch_gap_threshold`: Optional absolute k-point spacing threshold for branch splitting.
 """
-function parse_wannier90_band_dat(dir::String, prefix::String, bands_file::String = "$(prefix)_band.dat")
+function parse_wannier90_band_dat(
+    dir::String,
+    prefix::String,
+    seedname::String;
+    branch_gap_factor::Real=5.0,
+    branch_gap_threshold::Union{Nothing,Real}=nothing,
+)
     xml_path = joinpath(dir, "$prefix.xml")
     if !isfile(xml_path)
         error("Quantum ESPRESSO XML file not found at: $xml_path. Structure information is required for Wannier90 bands.")
@@ -290,51 +311,79 @@ function parse_wannier90_band_dat(dir::String, prefix::String, bands_file::Strin
 
     return with_stage_log(
         "Parse Wannier90 bands with XML metadata";
-        context=(dir=dir, prefix=prefix, bands_file=bands_file),
+        context=(dir=dir, prefix=prefix, seedname=seedname),
     ) do
-        # 1. Load Structure and Reciprocal Basis
-        system = parse_quantum_espresso_xml(xml_path)
+        # 1. Load Structure and Metadata in one pass
+        xml_dict = parse_quantum_espresso_xml(xml_path)
+        system = build_atoms_from_xml(xml_dict)
         recip_basis_cart = reciprocal_vectors(primitive_vectors(system))
-        basis = [SVector{3, Float64}(recip_basis_cart[:, i]) for i in 1:3]
+        basis = [SVector{3,Float64}(recip_basis_cart[:, i]) for i in 1:3]
 
-        # 2. Parse raw band data (distances and energies)
-        dat_path = joinpath(dir, bands_file)
-        raw = _parse_wannier90_raw_bands(dat_path)
-        
-        # 3. Handle Labels and Coordinates via labelinfo.dat
-        # Standard Wannier90 generates prefix.labelinfo.dat when bands are plotted
-        labelinfo_path = joinpath(dir, "$prefix.labelinfo.dat")
-        kpath = if isfile(labelinfo_path)
-            info = parse_wannier90_labelinfo(labelinfo_path)
-            
-            # Map labels to indices in the distance axis
-            labels = Dict{Int, Symbol}()
-            for (label, dist) in zip(info.node_labels, info.node_distances)
-                # Find index in raw.distances closest to dist
-                idx = argmin(abs.(raw.distances .- dist))
-                labels[idx] = Symbol(label)
+        # 2. Extract Fermi Energy from XML metadata
+        root_key = first(filter(k -> endswith(string(k), "espresso"), keys(xml_dict)))
+        root = xml_dict[root_key]
+
+        fermi_level = 0.0
+        if haskey(root, "output") && haskey(root["output"], "band_structure")
+            bs_node = root["output"]["band_structure"]
+            if haskey(bs_node, "fermi_energy")
+                fermi_val = bs_node["fermi_energy"]
+                fermi_str = fermi_val isa AbstractDict ? get(fermi_val, "", get(fermi_val, "_content", "0.0")) : fermi_val
+                fermi_level = parse(Float64, strip(fermi_str)) * ustrip(Ha2eV)
             end
-            
-            # Reconstruct 3D k-points from coordinates in labelinfo if possible,
-            # but usually info.node_coordinates are only for the nodes.
-            # Here we might just use the distances as a 1D path but typed as 3D 
-            # if we can't interpolate coordinates.
-            # For now, we'll use synthetic 3D points based on distance to satisfy types.
-            points = [SVector{3, Float64}(d, 0.0, 0.0) for d in raw.distances]
-            KPath{3}([points], [labels], basis, Ref(Brillouin.CARTESIAN))
-        else
-            # Fallback if no labelinfo: synthetic 1D-in-3D path
-            points = [SVector{3, Float64}(d, 0.0, 0.0) for d in raw.distances]
-            KPath{3}([points], [Dict{Int, Symbol}()], basis, Ref(Brillouin.CARTESIAN))
         end
 
-        return BandStructureData(kpath, raw.bands, raw.num_bands)
+        # 3. Parse raw band data (distances and energies)
+        band_stem = _wannier90_band_stem(seedname)
+        dat_path = joinpath(dir, _wannier90_band_data_filename(seedname))
+        raw = _parse_wannier90_raw_bands(dat_path)
+
+        # 4. Handle Labels and Coordinates via labelinfo.dat
+        # Standard Wannier90 generates seedname.labelinfo.dat when bands are plotted
+        labelinfo_path = joinpath(dir, "$(band_stem)_band.labelinfo.dat")
+        labels = Dict{Int,Symbol}()
+        if isfile(labelinfo_path)
+            info = parse_wannier90_labelinfo(labelinfo_path)
+
+            for (idx, label, distance) in zip(info.node_indices, info.node_labels, info.node_distances)
+                1 <= idx <= length(raw.distances) || throw(BoundsError(raw.distances, idx))
+                isapprox(raw.distances[idx], distance; atol=1e-6, rtol=1e-6) ||
+                    error("Wannier90 label distance mismatch at index $idx: file gives $distance but the band path contains $(raw.distances[idx]).")
+                labels[idx] = Symbol(label)
+            end
+        end
+
+        points = [SVector{3,Float64}(d, 0.0, 0.0) for d in raw.distances]
+        kpoints_path = joinpath(dir, "$(band_stem)_band.kpt")
+        gap_points = if isfile(kpoints_path)
+            parsed_kpoints = parse_wannier90_kpoints(kpoints_path)
+            length(parsed_kpoints.kpoints) == length(points) ||
+                error("Wannier90 k-point file $kpoints_path contains $(length(parsed_kpoints.kpoints)) samples, but $dat_path contains $(length(points)) path samples.")
+            _qe_cartesianize_kpoints(parsed_kpoints.kpoints, basis)
+        else
+            points
+        end
+        branched = _branch_kpath_at_large_point_gaps(
+            points,
+            labels;
+            gap_points=gap_points,
+            gap_factor=branch_gap_factor,
+            gap_threshold=branch_gap_threshold,
+        )
+        kpath = KPath{3}(branched.branches, branched.labels, basis, Ref(Brillouin.CARTESIAN))
+
+        return BandStructureData(
+            kpath=kpath,
+            bands=raw.bands,
+            num_bands=raw.num_bands,
+            fermi_level=fermi_level
+        )
     end
 end
 
 # Internal helper to preserve original parsing logic
 function _parse_wannier90_raw_bands(filename::String)
-    blocks = Vector{Tuple{Vector{Float64}, Vector{Float64}}}()
+    blocks = Vector{Tuple{Vector{Float64},Vector{Float64}}}()
     current_distances = Float64[]
     current_energies = Float64[]
 
@@ -386,7 +435,7 @@ function parse_wannier90_kpoints(filename::String)
     ) do
         open(filename, "r") do io
             num_kpoints = parse(Int, strip(_read_next_nonempty_line(io, filename)))
-            kpoints = Vector{SVector{3, Float64}}()
+            kpoints = Vector{SVector{3,Float64}}()
             weights = Float64[]
             sizehint!(kpoints, num_kpoints)
             sizehint!(weights, num_kpoints)
@@ -400,7 +449,7 @@ function parse_wannier90_kpoints(filename::String)
 
                 push!(
                     kpoints,
-                    SVector{3, Float64}(
+                    SVector{3,Float64}(
                         _parse_wannier90_number(fields[1], filename, "k-point x"),
                         _parse_wannier90_number(fields[2], filename, "k-point y"),
                         _parse_wannier90_number(fields[3], filename, "k-point z"),
@@ -413,9 +462,9 @@ function parse_wannier90_kpoints(filename::String)
                 error("Wannier90 k-point file $filename declares $num_kpoints samples but contains $(length(kpoints)).")
 
             return (
-                kpoints = kpoints,
-                weights = weights,
-                num_kpoints = num_kpoints,
+                kpoints=kpoints,
+                weights=weights,
+                num_kpoints=num_kpoints,
             )
         end
     end
@@ -437,7 +486,7 @@ function parse_wannier90_labelinfo(filename::String)
         node_labels = String[]
         node_indices = Int[]
         node_distances = Float64[]
-        node_coordinates = SVector{3, Float64}[]
+        node_coordinates = SVector{3,Float64}[]
 
         open(filename, "r") do io
             while !eof(io)
@@ -452,7 +501,7 @@ function parse_wannier90_labelinfo(filename::String)
                 push!(node_distances, _parse_wannier90_number(fields[3], filename, "label distance"))
                 push!(
                     node_coordinates,
-                    SVector{3, Float64}(
+                    SVector{3,Float64}(
                         _parse_wannier90_number(fields[4], filename, "label kx"),
                         _parse_wannier90_number(fields[5], filename, "label ky"),
                         _parse_wannier90_number(fields[6], filename, "label kz"),
@@ -464,11 +513,11 @@ function parse_wannier90_labelinfo(filename::String)
         isempty(node_labels) && error("Wannier90 labelinfo file $filename is empty.")
 
         return (
-            node_labels = node_labels,
-            node_indices = node_indices,
-            node_distances = node_distances,
-            node_coordinates = node_coordinates,
-            dimension = _wannier90_dimension_hint(node_coordinates),
+            node_labels=node_labels,
+            node_indices=node_indices,
+            node_distances=node_distances,
+            node_coordinates=node_coordinates,
+            dimension=_wannier90_dimension_hint(node_coordinates),
         )
     end
 end

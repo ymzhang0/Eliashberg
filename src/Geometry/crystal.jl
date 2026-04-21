@@ -113,11 +113,11 @@ function Spglib.SpglibCell(system::AbstractSystem)
 
     # Fractional positions
     # AtomsBase system.position returns Cartesian vectors with units
-    pos_cartesian = hcat([ustrip.(p) for p in AtomsBase.position(system)]...) # 3xN matrix
+    pos_cartesian = hcat([ustrip.(p) for p in AtomsBase.position(system, :)]...) # 3xN matrix
     pos_fractional = inv(lattice) * pos_cartesian
 
     # Atomic types (Spglib needs integers)
-    symbols = AtomsBase.atomic_symbol(system)
+    symbols = AtomsBase.atomic_symbol(system, :)
     unique_symbols = unique(symbols)
     sym_to_id = Dict(sym => i for (i, sym) in enumerate(unique_symbols))
     atom_types = [sym_to_id[s] for s in symbols]

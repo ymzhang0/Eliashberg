@@ -4,6 +4,12 @@ function _qe_reciprocal_basis(cell_like)
     return [SVector{D, Float64}(reciprocal[:, idx]) for idx in 1:D]
 end
 
+function _qe_reciprocal_basis(cell_like::AbstractMatrix{<:Number})
+    reciprocal = reciprocal_vectors(Matrix{Float64}(cell_like))
+    D = size(reciprocal, 1)
+    return [SVector{D, Float64}(reciprocal[:, idx]) for idx in 1:D]
+end
+
 function _qe_cartesianize_kpoints(kpoints::AbstractVector{<:SVector{D, <:Real}}, basis::AbstractVector{<:SVector{D, Float64}}) where {D}
     basis_matrix = reduce(hcat, basis)
     return [SVector{D, Float64}(basis_matrix * k) for k in kpoints]
@@ -15,18 +21,23 @@ end
         cell=nothing,
         coordinates=:fractional,
         node_labels=nothing,
+        branch_gap_factor=5.0,
+        branch_gap_threshold=nothing,
     )
 
-Build a single-branch `KPath` from Quantum ESPRESSO band-path samples. When a
+Build a `KPath` from Quantum ESPRESSO band-path samples. When a
 `cell` is provided and `coordinates == :fractional`, the k-points are
 interpreted as fractional coordinates in the reciprocal basis and converted to
-Cartesian reciprocal-space vectors.
+Cartesian reciprocal-space vectors. Large adjacent k-point jumps are interpreted
+as branch breaks.
 """
 function kpath_from_quantum_espresso_bands(
     kpoints::AbstractVector{<:SVector{D, <:Real}};
     cell=nothing,
     coordinates::Symbol=:fractional,
     node_labels::Union{Nothing, AbstractVector{<:AbstractString}}=nothing,
+    branch_gap_factor::Real=5.0,
+    branch_gap_threshold::Union{Nothing,Real}=nothing,
 ) where {D}
     coordinates in (:fractional, :cartesian) || throw(ConfigurationError("coordinates", coordinates, "Must be either `:fractional` or `:cartesian`."))
 
@@ -48,5 +59,12 @@ function kpath_from_quantum_espresso_bands(
         end
     end
 
-    return KPath{D}([path_points], [labels], basis, Ref(Brillouin.CARTESIAN))
+    branched = _branch_kpath_at_large_point_gaps(
+        path_points,
+        labels;
+        gap_factor=branch_gap_factor,
+        gap_threshold=branch_gap_threshold,
+    )
+
+    return KPath{D}(branched.branches, branched.labels, basis, Ref(Brillouin.CARTESIAN))
 end

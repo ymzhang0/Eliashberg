@@ -123,7 +123,7 @@ function _write_kpath(group, name::AbstractString, kpath::KPath{D}) where {D}
     attributes(path_group)["dimension"] = D
 
     # Flatten branches into a single matrix for storage
-    all_points = vcat(kpath.branches...)
+    all_points = vcat(kpath.kpaths...)
     points_matrix = zeros(length(all_points), D)
     for (i, p) in enumerate(all_points)
         points_matrix[i, :] .= p
@@ -131,7 +131,7 @@ function _write_kpath(group, name::AbstractString, kpath::KPath{D}) where {D}
     path_group["points"] = points_matrix
 
     # Branch metadata
-    branch_lengths = length.(kpath.branches)
+    branch_lengths = length.(kpath.kpaths)
     branch_stop = cumsum(branch_lengths)
     branch_start = [1; branch_stop[1:end-1] .+ 1]
     path_group["branch_start"] = branch_start
@@ -141,7 +141,7 @@ function _write_kpath(group, name::AbstractString, kpath::KPath{D}) where {D}
     node_indices = Int[]
     node_labels = String[]
     current_offset = 0
-    for (b_idx, labels) in enumerate(kpath.nodes)
+    for (b_idx, labels) in enumerate(kpath.labels)
         for (idx, sym) in labels
             push!(node_indices, idx + current_offset)
             push!(node_labels, string(sym))

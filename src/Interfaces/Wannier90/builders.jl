@@ -168,6 +168,8 @@ end
         cell,
         labelinfo=nothing,
         coordinates=:fractional,
+        branch_gap_factor=5.0,
+        branch_gap_threshold=nothing,
     )
 
 Build a `KPath` from Wannier90 `*.kpt` path samples. When a cell is provided
@@ -179,6 +181,8 @@ function kpath_from_wannier90_kpoints(
     cell,
     labelinfo::Union{Nothing, NamedTuple}=nothing,
     coordinates::Symbol=:fractional,
+    branch_gap_factor::Real=5.0,
+    branch_gap_threshold::Union{Nothing,Real}=nothing,
 )
     return with_stage_log(
         "Build KPath from Wannier90 k-points";
@@ -191,6 +195,8 @@ function kpath_from_wannier90_kpoints(
             cell=cell,
             coordinates=coordinates,
             node_labels=node_labels,
+            branch_gap_factor=branch_gap_factor,
+            branch_gap_threshold=branch_gap_threshold,
         )
     end
 end
@@ -200,6 +206,8 @@ function kpath_from_wannier90_kpoints(
     cell,
     labelinfo_filename::Union{Nothing, AbstractString}=nothing,
     coordinates::Symbol=:fractional,
+    branch_gap_factor::Real=5.0,
+    branch_gap_threshold::Union{Nothing,Real}=nothing,
 )
     parsed = parse_wannier90_kpoints(kpoints_filename)
     labelinfo = labelinfo_filename === nothing ? nothing : parse_wannier90_labelinfo(String(labelinfo_filename))
@@ -208,6 +216,8 @@ function kpath_from_wannier90_kpoints(
         cell=cell,
         labelinfo=labelinfo,
         coordinates=coordinates,
+        branch_gap_factor=branch_gap_factor,
+        branch_gap_threshold=branch_gap_threshold,
     )
 end
 

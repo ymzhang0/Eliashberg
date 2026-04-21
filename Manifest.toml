@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "b45238fa5d2b8a0a88e726619be8db22b1105ecf"
+project_hash = "978f35c311881df92f7aeae886b8c328fb1dfa13"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -516,7 +516,7 @@ uuid = "5ae413db-bbd1-5e63-b57d-d24a61df00f5"
 version = "2.2.4+0"
 
 [[deps.Eliashberg]]
-deps = ["AtomsBase", "AtomsIO", "Brillouin", "Configurations", "Distributed", "HDF5", "JLD2", "LaTeXStrings", "LinearAlgebra", "Logging", "Makie", "Optim", "PhysicalConstants", "ProgressLogging", "QuadGK", "SparseArrays", "Spglib", "StaticArrays", "Statistics", "TerminalLoggers", "Test", "TimerOutputs", "Unitful"]
+deps = ["AtomsBase", "AtomsIO", "Brillouin", "Configurations", "Distributed", "HDF5", "JLD2", "LaTeXStrings", "LinearAlgebra", "Logging", "Makie", "Optim", "PhysicalConstants", "ProgressLogging", "QuadGK", "SparseArrays", "Spglib", "StaticArrays", "Statistics", "TOML", "TerminalLoggers", "Test", "TimerOutputs", "Unitful"]
 path = "."
 uuid = "adbadfb0-2f75-4cd8-9a77-6e8457d2b59b"
 version = "0.1.0"
@@ -558,6 +558,12 @@ version = "0.2.2"
 git-tree-sha1 = "b309b36a9e02fe7be71270dd8c0fd873625332b4"
 uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
 version = "0.1.6"
+
+[[deps.EzXML]]
+deps = ["Printf", "XML2_jll"]
+git-tree-sha1 = "7ea1aa5869e2626ccae84480e4f37185bc6f41d3"
+uuid = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
+version = "1.2.3"
 
 [[deps.FFMPEG_jll]]
 deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libva_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
@@ -1913,6 +1919,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
 git-tree-sha1 = "80d3930c6347cfce7ccf96bd3bafdf079d9c0390"
 uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
 version = "2.13.9+0"
+
+[[deps.XMLDict]]
+deps = ["EzXML", "IterTools", "OrderedCollections"]
+git-tree-sha1 = "d9a3faf078210e477b291c79117676fca54da9dd"
+uuid = "228000da-037f-5747-90a9-8195ccbf91a5"
+version = "0.4.1"
 
 [[deps.XZ_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

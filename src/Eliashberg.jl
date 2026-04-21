@@ -28,6 +28,7 @@ import Makie: plot
 const TO = TimerOutput()
 
 # 1. Fundamental Constants and Linear Algebra (Base Tier)
+include("Exceptions.jl")
 include("Numerics/Constants.jl")
 include("Numerics/la.jl")
 
@@ -51,6 +52,8 @@ include("Geometry/predefined_structures.jl")
 
 # Models
 include("Models/dispersions.jl")
+include("Models/tb.jl")
+include("Models/spinor.jl")
 include("Models/predefined_models.jl")
 include("Models/calculator.jl")
 include("Models/interactions.jl")
@@ -140,6 +143,10 @@ const VisualizationTypes = Union{
 
 function Makie.plot(data::VisualizationTypes; kwargs...)
     return _call_visualization(:plot, data; kwargs...)
+end
+
+function Makie.plot(data1::VisualizationTypes, data2::VisualizationTypes; kwargs...)
+    return _call_visualization(:plot, data1, data2; kwargs...)
 end
 
 function Makie.plot(data::AbstractVector{<:VisualizationTypes}; kwargs...)

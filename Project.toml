@@ -28,6 +28,7 @@ TerminalLoggers = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+XMLDict = "228000da-037f-5747-90a9-8195ccbf91a5"
 
 [compat]
 Configurations = "0.17.6"
@@ -42,3 +43,4 @@ ProgressLogging = "0.1.6"
 TOML = "1.0.3"
 TerminalLoggers = "0.1.7"
 TimerOutputs = "0.5.29"
+XMLDict = "0.4.1"

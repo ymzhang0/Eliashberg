@@ -5,77 +5,80 @@ using AtomsBase
 using Unitful
 
 @testset "Quantum ESPRESSO bands parser" begin
-    parsed = parse_quantum_espresso_bands(joinpath(@__DIR__, "..", "examples", "graphene", "graphene.bands.dat"))
+    dir = joinpath(@__DIR__, "..", "examples", "niobium")
+    parsed = parse_quantum_espresso_bands(dir, "Nb")
 
-    @test parsed.num_bands == 60
-    @test parsed.num_kpoints == 274
-    @test length(parsed.kpoints) == parsed.num_kpoints
-    @test size(parsed.bands) == (parsed.num_kpoints, parsed.num_bands)
+    @test parsed.num_bands == 14
+    @test length(parsed.kpath) == 181
+    @test size(parsed.bands) == (181, 14)
 
-    @test parsed.kpoints[1] == SVector(0.0, 0.0, 0.0)
-    @test parsed.kpoints[2] == SVector(0.005, 0.002887, 0.0)
+    node_indices, node_labels = Eliashberg.path_node_metadata(parsed.kpath)
+    @test node_indices == [1, 21, 41, 61, 81, 101, 121, 141, 161, 181]
+    @test node_labels == ["Γ", "H", "P", "N", "Γ", "H", "N", "Γ", "P", "N"]
 
-    @test parsed.bands[1, 1] ≈ -21.912
-    @test parsed.bands[1, 60] ≈ 35.875
-    @test parsed.bands[2, 3] ≈ -5.382
-    @test parsed.bands[2, 60] ≈ 35.951
+    points = Eliashberg.path_points(parsed.kpath)
+    @test points[1] ≈ SVector(0.0, 0.0, 0.0)
+    @test points[21] ≈ SVector(1.903707107159504, 0.0, 0.0)
+    @test points[end] ≈ SVector(0.951853553579752, 0.0, 0.951853553579752)
+
+    @test isapprox(parsed.bands[1, 1], -36.317; atol=1e-3)
+    @test isapprox(parsed.bands[1, 14], 43.103; atol=1e-3)
+    @test isapprox(parsed.bands[21, 1], -35.894; atol=1e-3)
 end
 
-@testset "Quantum ESPRESSO cell parser" begin
-    input_file, input_io = mktemp()
-    write(input_io, """
-&SYSTEM
-    ibrav = 0,
-/
-CELL_PARAMETERS angstrom
-  2.460000  0.000000  0.000000
- -1.230000  2.130422  0.000000
-  0.000000  0.000000 15.000000
-""")
-    close(input_io)
+@testset "Quantum ESPRESSO high-symmetry matching with large k-point gap branches" begin
+    dir = joinpath(@__DIR__, "..", "examples", "silicon")
+    parsed = parse_quantum_espresso_bands(dir, "Si")
 
-    parsed_input_cell = parse_quantum_espresso_cell(input_file)
-    @test parsed_input_cell isa PeriodicCell{3}
-    @test Eliashberg.primitive_vectors(parsed_input_cell)[:, 1] ≈ [2.46, 0.0, 0.0]
-    @test Eliashberg.primitive_vectors(parsed_input_cell)[:, 3] ≈ [0.0, 0.0, 15.0]
-    @test periodicity(parsed_input_cell) == (true, true, true)
+    @test size(parsed.bands) == (82, 14)
+    @test length(parsed.kpath) == 82
+    @test length(Eliashberg.path_branches(parsed.kpath)) == 2
+    @test length.(Eliashberg.path_branches(parsed.kpath)) == [41, 41]
 
-    slab_input_cell = parse_quantum_espresso_cell(input_file; periodicity=(true, true, false))
-    @test periodicity(slab_input_cell) == (true, true, false)
+    node_indices, node_labels = Eliashberg.path_node_metadata(parsed.kpath)
+    @test node_indices == [1, 21, 41, 42, 62, 82]
+    @test node_labels == ["L", "Γ", "X", "X", "K", "Γ"]
 
-    output_file, output_io = mktemp()
-    write(output_io, """
-     bravais-lattice index     =            4
-     lattice parameter (alat)  =      4.64970000  a.u.
-     crystal axes: (cart. coord. in units of alat)
-               a(1) = (   1.000000000   0.000000000   0.000000000 )
-               a(2) = (  -0.500000000   0.866025404   0.000000000 )
-               a(3) = (   0.000000000   0.000000000   6.097565976 )
-""")
-    close(output_io)
-
-    parsed_output_cell = parse_quantum_espresso_cell(output_file)
-    @test Eliashberg.primitive_vectors(parsed_output_cell)[:, 1] ≈ [2.460515277535679, 0.0, 0.0]
-    @test Eliashberg.primitive_vectors(parsed_output_cell)[:, 2] ≈ [-1.2302576387678394, 2.1308687372760087, 0.0]
-    @test Eliashberg.primitive_vectors(parsed_output_cell)[:, 3] ≈ [0.0, 0.0, 15.003154239729753]
+    distances = Eliashberg.path_distances(parsed.kpath)
+    @test distances[41] ≈ distances[42]
+    @test isapprox(distances[62], 2.5678557104; atol=1e-6)
+    @test isapprox(distances[82], 3.7949454113; atol=1e-6)
 end
 
-@testset "Quantum ESPRESSO band data wrapper" begin
+@testset "Wannier90 band parser uses k-point gap branches" begin
+    dir = joinpath(@__DIR__, "..", "examples", "silicon")
+    parsed = parse_wannier90_band_dat(dir, "Si", "silicon")
+
+    @test size(parsed.bands) == (380, 8)
+    @test length(parsed.kpath) == 380
+    @test length.(Eliashberg.path_branches(parsed.kpath)) == [216, 164]
+
+    node_indices, node_labels = Eliashberg.path_node_metadata(parsed.kpath)
+    @test node_indices == [1, 101, 216, 217, 258, 380]
+    @test node_labels == ["L", "Γ", "X", "X", "K", "Γ"]
+
+    distances = Eliashberg.path_distances(parsed.kpath)
+    @test distances[216] ≈ distances[217]
+    @test isapprox(distances[258], 2.5678557104; atol=1e-6)
+    @test isapprox(distances[380], 3.7949454113; atol=1e-6)
+end
+
+@testset "Quantum ESPRESSO KPath builder" begin
     cell = @SMatrix [
         2.46 -1.23 0.0;
         0.0 2.130422 0.0;
         0.0 0.0 15.0
     ]
 
-    data = band_data_from_quantum_espresso_bands(
-        joinpath(@__DIR__, "..", "examples", "graphene", "graphene.bands.dat");
+    kpoints = [SVector(0.0, 0.0, 0.0), SVector(0.5, 0.0, 0.0)]
+    kpath = kpath_from_quantum_espresso_bands(
+        kpoints;
         cell=cell,
+        node_labels=["Γ", "M"],
     )
 
-    @test data isa BandStructureData{3}
-    @test size(data.bands) == (274, 60)
-    @test length(data.kpath) == 274
-    @test isempty(getfield(data.kpath, :labels)[1])
+    @test length(kpath) == 2
+    @test Eliashberg.path_node_metadata(kpath) == ([1, 2], ["Γ", "M"])
 
     periodic_cell = PeriodicCell(
         ;
@@ -86,10 +89,10 @@ end
         ),
         periodicity=(true, true, false),
     )
-    periodic_data = band_data_from_quantum_espresso_bands(
-        joinpath(@__DIR__, "..", "examples", "graphene", "graphene.bands.dat");
+    periodic_kpath = kpath_from_quantum_espresso_bands(
+        kpoints;
         cell=periodic_cell,
+        node_labels=["Γ", "M"],
     )
-    @test periodic_data isa BandStructureData{3}
-    @test length(periodic_data.kpath) == 274
+    @test length(periodic_kpath) == 2
 end

@@ -10,8 +10,8 @@ book:
       chapters: []
     - part: "Physics Foundations (Theory)"
       chapters:
-        - content/physics/CH0.ipynb
-        - content/physics/CH1.ipynb
+        - content/physics/intro.ipynb
+        - content/physics/electron_phonon.ipynb
     - part: "Examples"
       chapters:
         - content/examples/plasmon.qmd

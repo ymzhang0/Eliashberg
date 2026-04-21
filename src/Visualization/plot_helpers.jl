@@ -43,6 +43,9 @@ function _band_path_axes!(
         is_last = branch_idx == nbranches
         branch_ticks, branch_tick_labels = _branch_ticks(distances, node_indices, node_labels, range)
 
+        # Ensure axis is a NamedTuple to avoid spreading positional arguments
+        axis_kwargs = axis isa NamedTuple ? axis : (;)
+        
         ax = Axis(
             grid[1, branch_idx];
             xticks=(branch_ticks, branch_tick_labels),
@@ -53,7 +56,7 @@ function _band_path_axes!(
             yticksvisible=is_first,
             leftspinevisible=is_first,
             rightspinevisible=is_last,
-            axis...,
+            axis_kwargs...,
         )
         push!(branch_axes, ax)
 
